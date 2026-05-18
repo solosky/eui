@@ -12,3 +12,8 @@ add_executable(test_input test_input.c)
 target_include_directories(test_input PRIVATE ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(test_input PRIVATE eui)
 add_test(NAME input COMMAND test_input)
+
+add_executable(test_canvas test_canvas.c)
+target_include_directories(test_canvas PRIVATE ${CMAKE_BINARY_DIR}/include)
+target_link_libraries(test_canvas PRIVATE eui)
+add_test(NAME canvas COMMAND test_canvas)

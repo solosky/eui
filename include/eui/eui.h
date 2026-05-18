@@ -8,7 +8,7 @@
 #include "eui/eui_input_hal.h"
 #include "eui/eui_event.h"
 #include "eui/eui_input.h"
-/* TODO: #include "eui/eui_canvas.h" */
+#include "eui/eui_canvas.h"
 /* TODO: #include "eui/eui_font.h" */
 /* TODO: #include "eui/eui_view.h" */
 /* TODO: #include "eui/eui_view_dispatcher.h" */
