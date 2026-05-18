@@ -4,7 +4,7 @@
 #include "eui/eui_config.h"
 #include "eui/eui_types.h"
 #include "eui/eui_allocator.h"
-/* TODO: #include "eui/eui_display_hal.h" */
+#include "eui/eui_display_hal.h"
 /* TODO: #include "eui/eui_input_hal.h" */
 /* TODO: #include "eui/eui_event.h" */
 /* TODO: #include "eui/eui_canvas.h" */
