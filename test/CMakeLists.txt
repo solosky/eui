@@ -17,3 +17,8 @@ add_executable(test_canvas test_canvas.c)
 target_include_directories(test_canvas PRIVATE ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(test_canvas PRIVATE eui)
 add_test(NAME canvas COMMAND test_canvas)
+
+add_executable(test_font test_font.c)
+target_include_directories(test_font PRIVATE ${CMAKE_BINARY_DIR}/include)
+target_link_libraries(test_font PRIVATE eui)
+add_test(NAME font COMMAND test_font)
