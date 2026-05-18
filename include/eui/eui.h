@@ -11,7 +11,7 @@
 #include "eui/eui_canvas.h"
 #include "eui/eui_font.h"
 #include "eui/eui_view.h"
-/* TODO: #include "eui/eui_view_dispatcher.h" */
+#include "eui/eui_view_dispatcher.h"
 /* TODO: #include "eui/eui_scene.h" */
 /* TODO: #include "eui/eui_anim.h" */
 /* TODO: #include "eui/eui_widget.h" */
