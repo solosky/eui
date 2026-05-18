@@ -10,7 +10,7 @@
 #include "eui/eui_input.h"
 #include "eui/eui_canvas.h"
 #include "eui/eui_font.h"
-/* TODO: #include "eui/eui_view.h" */
+#include "eui/eui_view.h"
 /* TODO: #include "eui/eui_view_dispatcher.h" */
 /* TODO: #include "eui/eui_scene.h" */
 /* TODO: #include "eui/eui_anim.h" */

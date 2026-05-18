@@ -8,6 +8,7 @@ add_library(eui STATIC
     eui_font_bdf.c
     eui_font_vlw.c
     eui_font_builtin.c
+    eui_view.c
     eui.c
 )
 target_include_directories(eui PUBLIC
