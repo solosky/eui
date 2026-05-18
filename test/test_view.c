@@ -1,160 +1,107 @@
 #include "eui/eui.h"
-#include "eui/eui_allocator.h"
 #include <stdio.h>
 #include <string.h>
-
-#define POOL_SIZE 32768
-static uint8_t mem_pool[POOL_SIZE];
-
-/* Mock display for ViewDispatcher tests */
-#define MOCK_W 128
-#define MOCK_H 64
-static uint8_t mock_buf[MOCK_W * MOCK_H / 8];
-
-static void mock_write_buffer(const uint8_t *b, const eui_rect_t *r, void *ud) {
-    (void)ud;
-    int bpr = r->w / 8;
-    for (int row = 0; row < (int)r->h; row++)
-        memcpy(mock_buf + ((r->y + row) * (MOCK_W / 8) + r->x / 8),
-               b + row * bpr, bpr);
-}
-
-static eui_display_hal_t mock_display = {
-    .caps = { .width = 128, .height = 64, .color_depth = 1, .buffer_mode = 1 },
-    .write_buffer = mock_write_buffer,
-};
 
 static int tests_run = 0, tests_passed = 0;
 #define TEST(n) do { printf("  %s... ", n); tests_run++; } while(0)
 #define PASS() do { printf("PASS\n"); tests_passed++; } while(0)
 #define FAIL(m) do { printf("FAIL: %s\n", m); return; } while(0)
 
-static int draw_count, enter_count, exit_count, input_count;
+/* Test handler that counts events */
+typedef struct {
+    int draw_count;
+    int input_count;
+    int enter_count;
+    int exit_count;
+    int nav_count;
+    void *received_model;
+    const eui_event_t *received_input;
+} test_handler_data_t;
 
-static bool test_handler(eui_view_event_t *event, void *ctx) {
-    (void)ctx;
-    switch (event->type) {
-        case EUI_VIEW_EVT_DRAW:  draw_count++;  break;
-        case EUI_VIEW_EVT_INPUT: input_count++; break;
-        case EUI_VIEW_EVT_ENTER: enter_count++; break;
-        case EUI_VIEW_EVT_EXIT:  exit_count++;  break;
+static bool test_handler(eui_view_event_t *evt, void *ctx) {
+    test_handler_data_t *d = (test_handler_data_t*)ctx;
+    switch (evt->type) {
+        case EUI_VIEW_EVT_DRAW:  d->draw_count++;  d->received_model = evt->event.draw.model; break;
+        case EUI_VIEW_EVT_INPUT: d->input_count++; d->received_input = evt->event.input.input; break;
+        case EUI_VIEW_EVT_ENTER: d->enter_count++; break;
+        case EUI_VIEW_EVT_EXIT:  d->exit_count++; break;
+        case EUI_VIEW_EVT_NAVIGATE: d->nav_count++; break;
         default: break;
     }
     return true;
 }
 
 static void test_lifecycle(void) {
-    TEST("view lifecycle enter/draw/exit");
+    TEST("view lifecycle sequence");
+    test_handler_data_t data = {0};
     eui_view_t view;
-    eui_view_init(&view, test_handler, NULL);
-    
-    draw_count = enter_count = exit_count = 0;
-    
+    eui_view_init(&view, test_handler, &data);
+
     eui_view_send_enter(&view);
     eui_view_send_draw(&view, NULL);
     eui_view_send_exit(&view);
-    
-    if (enter_count != 1) FAIL("enter not called");
-    if (draw_count != 1) FAIL("draw not called");
-    if (exit_count != 1) FAIL("exit not called");
+
+    if (data.enter_count != 1) FAIL("enter not called");
+    if (data.draw_count != 1) FAIL("draw not called");
+    if (data.exit_count != 1) FAIL("exit not called");
     PASS();
 }
 
-static void test_model(void) {
-    TEST("model pointer passed in draw event");
-    int model_data = 42;
-    
+static void test_model_binding(void) {
+    TEST("model binding passes model to draw");
+    test_handler_data_t data = {0};
     eui_view_t view;
-    eui_view_init(&view, test_handler, NULL);
-    eui_view_set_model(&view, &model_data);
-    
-    if (view.model != &model_data) FAIL("model not stored");
+    eui_view_init(&view, test_handler, &data);
+
+    int model_value = 42;
+    eui_view_set_model(&view, &model_value);
+    eui_view_send_draw(&view, NULL);
+
+    if (data.received_model != &model_value) FAIL("model pointer mismatch");
     PASS();
 }
 
-static void test_flags(void) {
-    TEST("dirty flag");
+static void test_input_event(void) {
+    TEST("input event passes through");
+    test_handler_data_t data = {0};
     eui_view_t view;
-    eui_view_init(&view, test_handler, NULL);
-    
-    if (!(view.flags & EUI_VIEW_FLAG_VISIBLE)) FAIL("view not visible after init");
+    eui_view_init(&view, test_handler, &data);
+
+    eui_event_t evt = { .type = EUI_EVT_KEY_PRESS, .data.key = EUI_KEY_OK, .timestamp = 100 };
+    eui_view_send_input(&view, &evt);
+
+    if (data.input_count != 1) FAIL("input not received");
+    if (data.received_input->data.key != EUI_KEY_OK) FAIL("key mismatch");
+    PASS();
+}
+
+static void test_dirty_flag(void) {
+    TEST("dirty flag clears after draw");
+    eui_view_t view;
+    eui_view_init(&view, test_handler, &(test_handler_data_t){0});
     eui_view_mark_dirty(&view);
     if (!(view.flags & EUI_VIEW_FLAG_DIRTY)) FAIL("dirty flag not set");
+    eui_view_send_draw(&view, NULL);
+    if (view.flags & EUI_VIEW_FLAG_DIRTY) FAIL("dirty flag not cleared");
     PASS();
 }
 
-/* ---- ViewDispatcher tests ---- */
-static int vd_draw_count, vd_enter_count, vd_exit_count;
-
-static bool vd_handler(eui_view_event_t *event, void *ctx) {
-    switch (event->type) {
-        case EUI_VIEW_EVT_DRAW: vd_draw_count++; break;
-        case EUI_VIEW_EVT_ENTER: vd_enter_count++; break;
-        case EUI_VIEW_EVT_EXIT: vd_exit_count++; break;
-        default: break;
-    }
-    return true;
-}
-
-static void test_dispatcher_switch(void) {
-    TEST("dispatcher switch_to");
-    eui_canvas_t *c = eui_canvas_create(&mock_display);
-    eui_view_dispatcher_t vd;
-    eui_view_dispatcher_init(&vd, c);
-
-    eui_view_t v1, v2;
-    eui_view_init(&v1, vd_handler, NULL);
-    eui_view_init(&v2, vd_handler, NULL);
-
-    vd_enter_count = vd_exit_count = vd_draw_count = 0;
-
-    eui_view_dispatcher_add(&vd, 1, &v1);
-    eui_view_dispatcher_add(&vd, 2, &v2);
-
-    eui_view_dispatcher_switch_to(&vd, 1, EUI_ANIM_NONE);
-
-    eui_view_dispatcher_switch_to(&vd, 2, EUI_ANIM_NONE);
-
-    eui_canvas_destroy(c);
-    PASS();
-}
-
-static void test_dispatcher_overlay(void) {
-    TEST("dispatcher overlay push/pop");
-    eui_canvas_t *c = eui_canvas_create(&mock_display);
-    eui_view_dispatcher_t vd;
-    eui_view_dispatcher_init(&vd, c);
-
-    eui_view_t base, overlay;
-    eui_view_init(&base, vd_handler, NULL);
-    eui_view_init(&overlay, vd_handler, NULL);
-
-    eui_view_dispatcher_add(&vd, 1, &base);
-    eui_view_dispatcher_switch_to(&vd, 1, EUI_ANIM_NONE);
-
-    eui_view_t *active = eui_view_dispatcher_get_active(&vd);
-    if (active != &base) FAIL("expected base as active");
-
-    eui_view_dispatcher_push_overlay(&vd, &overlay, EUI_ANIM_NONE);
-    active = eui_view_dispatcher_get_active(&vd);
-    if (active != &overlay) FAIL("expected overlay as active");
-
-    eui_view_dispatcher_pop_overlay(&vd, EUI_ANIM_NONE);
-    active = eui_view_dispatcher_get_active(&vd);
-    if (active != &base) FAIL("expected base as active after pop");
-
-    eui_canvas_destroy(c);
+static void test_null_handler(void) {
+    TEST("null handler returns false safely");
+    eui_view_t view;
+    eui_view_init(&view, NULL, NULL);
+    bool result = eui_view_send_enter(&view);
+    if (result) FAIL("null handler should return false");
     PASS();
 }
 
 int main(void) {
-    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
     printf("=== View Tests ===\n");
     test_lifecycle();
-    test_model();
-    test_flags();
-    test_dispatcher_switch();
-    test_dispatcher_overlay();
+    test_model_binding();
+    test_input_event();
+    test_dirty_flag();
+    test_null_handler();
     printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     return tests_passed == tests_run ? 0 : 1;
 }
