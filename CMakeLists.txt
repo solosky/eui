@@ -22,6 +22,8 @@ configure_file(
 )
 
 add_subdirectory(third_party/tlsf)
+set(MC_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
+set(MC_BUILD_TEST OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/motionc)
 add_subdirectory(src)
 
@@ -32,6 +34,6 @@ if(EUI_BUILD_TESTS)
 endif()
 
 if(EUI_BUILD_EXAMPLES)
-    find_package(raylib REQUIRED)
+    find_package(raylib QUIET)
     add_subdirectory(examples)
 endif()
