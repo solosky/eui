@@ -1,5 +1,5 @@
 #include "eui/eui.h"
-#include "eui/eui_hal_raylib.h"
+#include "eui/hal/eui_hal_raylib.h"
 #include <raylib.h>
 #include <stdio.h>
 #include <string.h>

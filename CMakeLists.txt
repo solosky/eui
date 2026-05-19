@@ -4,6 +4,8 @@ project(eui VERSION 1.1.0 LANGUAGES C)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
 option(EUI_BUILD_TESTS "Build unit tests" ON)
 option(EUI_BUILD_EXAMPLES "Build raylib examples" ON)
 
