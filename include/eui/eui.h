@@ -23,7 +23,7 @@
 #include "eui/eui_widget_slider.h"
 #include "eui/eui_widget_scroll.h"
 #include "eui/eui_widget_dialog.h"
-#include "eui/eui_hal_raylib.h"
+#include "eui/hal/eui_hal_raylib.h"
 
 #ifdef __cplusplus
 extern "C" {

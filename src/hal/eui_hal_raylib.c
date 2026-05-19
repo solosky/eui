@@ -1,4 +1,4 @@
-#include "eui/eui_hal_raylib.h"
+#include "eui/hal/eui_hal_raylib.h"
 #include "eui/eui_allocator.h"
 #include <raylib.h>
 #include <string.h>
