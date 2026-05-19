@@ -29,3 +29,10 @@ target_include_directories(eui PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/motionc/include
 )
 target_link_libraries(eui PUBLIC tlsf mc)
+
+find_package(raylib QUIET)
+if(raylib_FOUND)
+    add_library(eui_hal_raylib STATIC eui_hal_raylib.c)
+    target_include_directories(eui_hal_raylib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+    target_link_libraries(eui_hal_raylib PUBLIC eui raylib)
+endif()
