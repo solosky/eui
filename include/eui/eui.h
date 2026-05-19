@@ -49,6 +49,9 @@ bool eui_is_running(void);
 void eui_set_fps(uint16_t fps);
 uint16_t eui_get_fps(void);
 
+void eui_set_tick_callback(uint32_t (*tick_fn)(void));
+uint32_t eui_get_tick_ms(void);
+
 #ifdef __cplusplus
 }
 #endif
