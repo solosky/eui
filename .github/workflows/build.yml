@@ -1,0 +1,25 @@
+name: Build & Test
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: Test (color=${{ matrix.color_depth }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        color_depth: [1, 8, 16]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: cmake -B build -DEUI_BUILD_TESTS=ON -DEUI_BUILD_EXAMPLES=OFF -DEUI_COLOR_DEPTH=${{ matrix.color_depth }}
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Run tests
+        run: cd build && ctest --output-on-failure

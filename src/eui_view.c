@@ -21,7 +21,6 @@ bool eui_view_send_draw(eui_view_t *view, eui_canvas_t *canvas) {
     eui_view_event_t event = { .type = EUI_VIEW_EVT_DRAW };
     event.event.draw.canvas = canvas;
     event.event.draw.model = view->model;
-    view->flags &= ~EUI_VIEW_FLAG_DIRTY;
     return view->handler(&event, view->context);
 }
 
