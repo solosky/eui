@@ -25,14 +25,28 @@ static void canvas_set_pixel(eui_canvas_t *c, int16_t x, int16_t y, eui_color_t 
     } else {
         c->buffer[byte_idx] &= ~(1u << bit_pos);
     }
+#elif EUI_COLOR_DEPTH == 8
+    c->buffer[y * screen_w + x] = color;
+#elif EUI_COLOR_DEPTH == 16
+    uint16_t *buf16 = (uint16_t*)c->buffer;
+    buf16[y * screen_w + x] = color;
 #else
     (void)c; (void)x; (void)y; (void)color;
 #endif
 }
 
-static uint16_t canvas_buf_size(eui_canvas_t *c)
+static size_t canvas_buf_size(eui_canvas_t *c)
 {
-    return c->buf_width * c->buf_height / 8;
+    size_t pixels = (size_t)c->buf_width * c->buf_height;
+#if EUI_COLOR_DEPTH == 1
+    return pixels / 8;
+#elif EUI_COLOR_DEPTH == 8
+    return pixels;
+#elif EUI_COLOR_DEPTH == 16
+    return pixels * 2;
+#else
+    return pixels / 8;
+#endif
 }
 
 /* ---- Lifecycle ---- */
@@ -170,7 +184,19 @@ void eui_canvas_clear(eui_canvas_t *canvas)
 {
     if (!canvas || !canvas->buffer) return;
     size_t size = canvas_buf_size(canvas);
+#if EUI_COLOR_DEPTH == 1
     memset(canvas->buffer, canvas->bg_color ? 0xFF : 0x00, size);
+#else
+    /* For 8bpp/16bpp, fill with bg_color */
+    if (canvas->bg_color == 0) {
+        memset(canvas->buffer, 0, size);
+    } else {
+        /* Fill with bg_color byte by byte for simplicity */
+        for (size_t i = 0; i < size; i++) {
+            canvas->buffer[i] = (uint8_t)canvas->bg_color;
+        }
+    }
+#endif
 }
 
 void eui_canvas_draw_dot(eui_canvas_t *canvas, int16_t x, int16_t y)

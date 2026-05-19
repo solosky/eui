@@ -1,6 +1,7 @@
 #include "eui/eui_canvas.h"
 #include "eui/eui_types.h"
 #include "eui/eui_allocator.h"
+#include "eui/eui_config.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -14,32 +15,63 @@ static int tests_run = 0, tests_passed = 0;
 
 #define MOCK_W 128
 #define MOCK_H 64
-static uint8_t mock_buf[MOCK_W * MOCK_H / 8];
+#if EUI_COLOR_DEPTH == 1
+#define MOCK_BUF_SIZE (MOCK_W * MOCK_H / 8)
+#elif EUI_COLOR_DEPTH == 8
+#define MOCK_BUF_SIZE (MOCK_W * MOCK_H)
+#else
+#define MOCK_BUF_SIZE (MOCK_W * MOCK_H * 2)
+#endif
+
+static uint8_t mock_buf[MOCK_BUF_SIZE];
 
 static void mock_write_buffer(const uint8_t *b, const eui_rect_t *r, void *ud)
 {
     (void)ud;
+#if EUI_COLOR_DEPTH == 1
     int bytes_per_row = r->w / 8;
     for (int row = 0; row < (int)r->h; row++) {
         memcpy(mock_buf + ((r->y + row) * (MOCK_W / 8) + r->x / 8),
                b + row * bytes_per_row, bytes_per_row);
     }
+#elif EUI_COLOR_DEPTH == 8
+    int bytes_per_row = r->w;
+    for (int row = 0; row < (int)r->h; row++) {
+        memcpy(mock_buf + ((r->y + row) * MOCK_W + r->x),
+               b + row * bytes_per_row, bytes_per_row);
+    }
+#else
+    int bytes_per_row = r->w * 2;
+    for (int row = 0; row < (int)r->h; row++) {
+        memcpy(mock_buf + ((r->y + row) * MOCK_W * 2 + r->x * 2),
+               b + row * bytes_per_row, bytes_per_row);
+    }
+#endif
 }
 
 static eui_display_hal_t mock_display = {
-    .caps = { .width = MOCK_W, .height = MOCK_H, .color_depth = 1, .buffer_mode = 1, .has_gram = false },
+    .caps = { .width = MOCK_W, .height = MOCK_H, .color_depth = EUI_COLOR_DEPTH, .buffer_mode = EUI_BUFFER_FULL, .has_gram = false },
     .init = NULL,
     .write_buffer = mock_write_buffer,
 };
 
 static int count_pixels(void)
 {
+#if EUI_COLOR_DEPTH == 1
     int count = 0;
     for (int i = 0; i < (int)sizeof(mock_buf); i++) {
         uint8_t b = mock_buf[i];
         while (b) { count += (b & 1); b >>= 1; }
     }
     return count;
+#else
+    /* For 8bpp/16bpp, count non-zero bytes as pixels */
+    int count = 0;
+    for (int i = 0; i < (int)sizeof(mock_buf); i++) {
+        if (mock_buf[i] != 0) count++;
+    }
+    return count;
+#endif
 }
 
 static void test_clear(void)
