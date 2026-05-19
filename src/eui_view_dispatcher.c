@@ -88,6 +88,7 @@ void eui_view_dispatcher_pop_overlay(eui_view_dispatcher_t *vd, eui_anim_type_t 
 void eui_view_dispatcher_tick(eui_view_dispatcher_t *vd) {
     eui_view_t *active = eui_view_dispatcher_get_active(vd);
     if (active) {
+        eui_canvas_clear(vd->canvas);
         eui_view_send_draw(active, vd->canvas);
     }
     eui_canvas_commit(vd->canvas);

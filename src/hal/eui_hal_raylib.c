@@ -2,6 +2,7 @@
 #include "eui/eui_allocator.h"
 #include <raylib.h>
 #include <string.h>
+#include <stdlib.h>
 
 /* ---- Display HAL ---- */
 
@@ -12,6 +13,7 @@ typedef struct {
     uint16_t          height;
     uint8_t           color_depth;
     int               scale;
+    uint8_t          *rgba_buffer;
 } raylib_display_t;
 
 static raylib_display_t *g_active_display = NULL;
@@ -23,6 +25,7 @@ static int disp_init(void *ud) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(sw, sh, "EUI - raylib");
     d->fb = LoadRenderTexture(d->width, d->height);
+    d->rgba_buffer = (uint8_t*)malloc((size_t)d->width * d->height * 4);
     g_active_display = d;
     SetTargetFPS(60);
     return 0;
@@ -31,6 +34,8 @@ static int disp_init(void *ud) {
 static int disp_deinit(void *ud) {
     raylib_display_t *d = (raylib_display_t*)ud;
     g_active_display = NULL;
+    free(d->rgba_buffer);
+    d->rgba_buffer = NULL;
     UnloadRenderTexture(d->fb);
     CloseWindow();
     return 0;
@@ -42,8 +47,34 @@ static void disp_draw_pixel(int16_t x, int16_t y, eui_color_t color, void *ud) {
 
 static void disp_write_buffer(const uint8_t *buffer, const eui_rect_t *rect, void *ud) {
     raylib_display_t *d = (raylib_display_t*)ud;
-    UpdateTexture(d->fb.texture, buffer);
     (void)rect;
+
+    if (!d->rgba_buffer) return;
+
+    int px_count = (int)d->width * (int)d->height;
+    if (d->color_depth == 1) {
+        int bytes_per_row = (int)d->width / 8;
+        for (int i = 0; i < px_count; i++) {
+            int x = i % d->width;
+            int y = i / d->width;
+            int byte_idx = y * bytes_per_row + (x / 8);
+            int bit_pos = x % 8;
+            uint8_t pixel = (buffer[byte_idx] >> bit_pos) & 1;
+            uint8_t *dst = d->rgba_buffer + (size_t)i * 4;
+            if (pixel) {
+                dst[0] = 255; dst[1] = 255; dst[2] = 255; dst[3] = 255;
+            } else {
+                dst[0] = 0;   dst[1] = 0;   dst[2] = 0;   dst[3] = 255;
+            }
+        }
+    } else {
+        for (int i = 0; i < px_count; i++) {
+            uint8_t *dst = d->rgba_buffer + (size_t)i * 4;
+            dst[0] = 0; dst[1] = 0; dst[2] = 0; dst[3] = 255;
+        }
+    }
+
+    UpdateTexture(d->fb.texture, d->rgba_buffer);
 }
 
 static void disp_set_contrast(uint8_t lvl, void *ud) { (void)lvl; (void)ud; }

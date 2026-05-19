@@ -6,7 +6,7 @@
 
 #define W 128
 #define H 64
-#define POOL_SIZE 8192
+#define POOL_SIZE 16384
 static uint8_t mem_pool[POOL_SIZE];
 static uint32_t get_tick(void) { return (uint32_t)(GetTime() * 1000.0); }
 
