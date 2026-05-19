@@ -8,6 +8,7 @@
 #include "eui/driver/eui_drv_st7735.h"
 #include "eui/driver/eui_drv_ili9341.h"
 #include "eui/driver/eui_drv_buttons.h"
+#include "eui/driver/eui_drv_encoder.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -203,6 +204,73 @@ static void test_buttons_press_back(void) {
     PASS();
 }
 
+static uint8_t test_enc_pins;
+static bool mock_enc_read_pin(uint8_t pin_id, void *ud) {
+    (void)ud;
+    return (test_enc_pins & (1u << pin_id)) != 0;
+}
+static void mock_enc_delay_us(uint32_t us, void *ud) { (void)us; (void)ud; }
+
+static void test_encoder_cw(void) {
+    TEST("encoder detects CW rotation");
+    eui_drv_encoder_config_t cfg = {
+        .gpio = { .read_pin = mock_enc_read_pin, .delay_us = mock_enc_delay_us, .user_data = NULL },
+        .pin_a = 0, .pin_b = 1, .pin_sw = 2, .poll_interval_us = 1000,
+    };
+    eui_input_hal_t *hal = eui_drv_encoder_create(&cfg);
+    hal->init(hal->user_data);
+
+    test_enc_pins = 0x00; hal->poll(NULL, hal->user_data);
+    test_enc_pins = 0x02;
+    eui_event_t evt;
+    int ret = hal->poll(&evt, hal->user_data);
+    if (ret != 1 || evt.type != EUI_EVT_ENCODER_CW) FAIL("expected CW");
+
+    eui_drv_encoder_destroy(hal);
+    PASS();
+}
+
+static void test_encoder_ccw(void) {
+    TEST("encoder detects CCW rotation");
+    eui_drv_encoder_config_t cfg = {
+        .gpio = { .read_pin = mock_enc_read_pin, .delay_us = mock_enc_delay_us, .user_data = NULL },
+        .pin_a = 0, .pin_b = 1, .pin_sw = 2, .poll_interval_us = 1000,
+    };
+    eui_input_hal_t *hal = eui_drv_encoder_create(&cfg);
+    hal->init(hal->user_data);
+
+    test_enc_pins = 0x00; hal->poll(NULL, hal->user_data);
+    test_enc_pins = 0x01;
+    eui_event_t evt;
+    int ret = hal->poll(&evt, hal->user_data);
+    if (ret != 1 || evt.type != EUI_EVT_ENCODER_CCW) FAIL("expected CCW");
+
+    eui_drv_encoder_destroy(hal);
+    PASS();
+}
+
+static void test_encoder_click(void) {
+    TEST("encoder detects click");
+    eui_drv_encoder_config_t cfg = {
+        .gpio = { .read_pin = mock_enc_read_pin, .delay_us = mock_enc_delay_us, .user_data = NULL },
+        .pin_a = 0, .pin_b = 1, .pin_sw = 2, .poll_interval_us = 1000,
+    };
+    eui_input_hal_t *hal = eui_drv_encoder_create(&cfg);
+    hal->init(hal->user_data);
+
+    test_enc_pins = 0x04;
+    eui_event_t evt;
+    int ret = hal->poll(&evt, hal->user_data);
+    if (ret != 1 || evt.type != EUI_EVT_ENCODER_CLICK) FAIL("expected CLICK");
+
+    test_enc_pins = 0x00;
+    ret = hal->poll(&evt, hal->user_data);
+    if (ret != 0) FAIL("expected no event on release");
+
+    eui_drv_encoder_destroy(hal);
+    PASS();
+}
+
 #define DRV_POOL_SIZE 32768
 static uint8_t drv_pool[DRV_POOL_SIZE];
 
@@ -232,6 +300,11 @@ int main(void) {
     printf("--- Buttons ---\n");
     test_buttons_press_release();
     test_buttons_press_back();
+
+    printf("--- Encoder ---\n");
+    test_encoder_cw();
+    test_encoder_ccw();
+    test_encoder_click();
 
     printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     eui_deinit();
