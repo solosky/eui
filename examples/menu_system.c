@@ -1,46 +1,29 @@
 #include "eui/eui.h"
+#include "eui/eui_hal_raylib.h"
+#include <raylib.h>
 #include <stdio.h>
 #include <string.h>
 
 #define W 128
 #define H 64
-#define POOL_SIZE 32768
+#define POOL_SIZE 8192
 static uint8_t mem_pool[POOL_SIZE];
+static uint32_t get_tick(void) { return (uint32_t)(GetTime() * 1000.0); }
 
-static uint8_t mock_buf[W * H / 8];
-
-static void mock_write_buffer(const uint8_t *b, const eui_rect_t *r, void *ud) {
-    (void)ud;
-    int bpr = r->w / 8;
-    for (int row = 0; row < (int)r->h; row++)
-        memcpy(mock_buf + ((r->y + row) * (W / 8) + r->x / 8),
-               b + row * bpr, bpr);
-}
-
-static eui_display_hal_t mock_display = {
-    .caps = { .width = W, .height = H, .color_depth = 1, .buffer_mode = EUI_BUFFER_FULL },
-    .init = NULL, .deinit = NULL, .write_buffer = mock_write_buffer,
-    .user_data = NULL
-};
-
-static int mock_poll(eui_event_t *e, void *d) { (void)e; (void)d; return 0; }
-static eui_input_hal_t mock_input = {
-    .poll = mock_poll, .user_data = NULL
-};
-
-static int last_leaf_hit = 0;
-
-static void on_brightness(void *ctx) { last_leaf_hit = 1; (void)ctx; }
-static void on_volume(void *ctx)     { last_leaf_hit = 2; (void)ctx; }
-static void on_about(void *ctx)      { last_leaf_hit = 3; (void)ctx; }
-static void on_quit(void *ctx)       { last_leaf_hit = 4; (void)ctx; }
+static void on_brightness(void *ctx) { printf("[MENU] Brightness\n"); (void)ctx; }
+static void on_volume(void *ctx)     { printf("[MENU] Volume\n"); (void)ctx; }
+static void on_about(void *ctx)      { printf("[MENU] About\n"); (void)ctx; }
+static void on_quit(void *ctx)       { printf("[MENU] Quit\n"); (void)ctx; }
 
 int main(void) {
-    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
-
-    eui_canvas_t *canvas = eui_canvas_create(&mock_display);
-    eui_view_dispatcher_t vd;
-    eui_view_dispatcher_init(&vd, canvas);
+    eui_display_hal_t *display = eui_hal_raylib_create_display(W, H, 1);
+    eui_input_hal_t *input = eui_hal_raylib_create_input();
+    eui_config_t cfg = { .mem_pool_buffer=mem_pool, .mem_pool_size=POOL_SIZE,
+                          .display=display, .input=input };
+    eui_init(&cfg);
+    eui_set_tick_callback(get_tick);
+    display->init(display->user_data);
+    eui_view_dispatcher_t *vd = eui_get_view_dispatcher();
 
     eui_widget_t *menu = eui_menu_create(0, 0, 128, 64);
     menu->focus_policy = EUI_FOCUS_STRONG;
@@ -55,47 +38,17 @@ int main(void) {
         eui_menu_add_item(sub, "Volume", on_volume);
     }
 
-    eui_view_dispatcher_add(&vd, 1, &menu->view);
-    eui_view_dispatcher_switch_to(&vd, 1, EUI_ANIM_NONE);
-    for (int i = 0; i < 3; i++)
-        eui_view_dispatcher_tick(&vd);
+    eui_view_dispatcher_add(vd, 1, &menu->view);
+    eui_view_dispatcher_switch_to(vd, 1, EUI_ANIM_NONE);
 
-    eui_event_t evt;
-
-    evt.type = EUI_EVT_KEY_PRESS;
-    evt.data.key = EUI_KEY_OK;
-    eui_view_dispatcher_send_input(&vd, &evt);
-    eui_view_dispatcher_tick(&vd);
-
-    evt.type = EUI_EVT_KEY_PRESS;
-    evt.data.key = EUI_KEY_DOWN;
-    eui_view_dispatcher_send_input(&vd, &evt);
-
-    evt.type = EUI_EVT_KEY_PRESS;
-    evt.data.key = EUI_KEY_OK;
-    eui_view_dispatcher_send_input(&vd, &evt);
-    eui_view_dispatcher_tick(&vd);
-
-    evt.type = EUI_EVT_KEY_PRESS;
-    evt.data.key = EUI_KEY_BACK;
-    eui_view_dispatcher_send_input(&vd, &evt);
-    eui_view_dispatcher_tick(&vd);
-
-    for (int i = 0; i < 3; i++) {
-        evt.type = EUI_EVT_KEY_PRESS;
-        evt.data.key = EUI_KEY_DOWN;
-        eui_view_dispatcher_send_input(&vd, &evt);
+    while (!eui_hal_raylib_window_should_close()) {
+        eui_tick();
+        eui_hal_raylib_refresh();
     }
 
-    evt.type = EUI_EVT_KEY_PRESS;
-    evt.data.key = EUI_KEY_OK;
-    eui_view_dispatcher_send_input(&vd, &evt);
-
-    for (int i = 0; i < 3; i++)
-        eui_view_dispatcher_tick(&vd);
-
-    if (last_leaf_hit == 0) { printf("[FAIL] No menu action triggered\n"); return 1; }
-    printf("[PASS] menu_system (leaf=%d)\n", last_leaf_hit);
-    eui_canvas_destroy(canvas);
+    display->deinit(display->user_data);
+    eui_deinit();
+    eui_hal_raylib_destroy_input(input);
+    eui_hal_raylib_destroy_display(display);
     return 0;
 }

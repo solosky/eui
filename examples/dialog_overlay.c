@@ -1,66 +1,48 @@
 #include "eui/eui.h"
+#include "eui/eui_hal_raylib.h"
+#include <raylib.h>
 #include <stdio.h>
 #include <string.h>
 
 #define W 128
 #define H 64
-#define POOL_SIZE 32768
+#define POOL_SIZE 8192
 static uint8_t mem_pool[POOL_SIZE];
+static uint32_t get_tick(void) { return (uint32_t)(GetTime() * 1000.0); }
 
-static uint8_t mock_buf[W * H / 8];
-
-static void mock_write_buffer(const uint8_t *b, const eui_rect_t *r, void *ud) {
-    (void)ud;
-    int bpr = r->w / 8;
-    for (int row = 0; row < (int)r->h; row++)
-        memcpy(mock_buf + ((r->y + row) * (W / 8) + r->x / 8),
-               b + row * bpr, bpr);
-}
-
-static eui_display_hal_t mock_display = {
-    .caps = { .width = W, .height = H, .color_depth = 1, .buffer_mode = EUI_BUFFER_FULL },
-    .init = NULL, .deinit = NULL, .write_buffer = mock_write_buffer,
-    .user_data = NULL
-};
-
-static int mock_poll(eui_event_t *e, void *d) { (void)e; (void)d; return 0; }
-static eui_input_hal_t mock_input = {
-    .poll = mock_poll, .user_data = NULL
-};
-
-static eui_dialog_result_t last_result = -1;
-
-static void on_dialog_result(eui_dialog_result_t result, void *ctx) {
-    last_result = result;
+static void on_dialog_done(eui_dialog_result_t result, void *ctx) {
+    printf("[DIALOG] Result: %s\n", result == EUI_DIALOG_YES ? "YES" : "NO");
     (void)ctx;
 }
 
 int main(void) {
-    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
+    eui_display_hal_t *display = eui_hal_raylib_create_display(W, H, 1);
+    eui_input_hal_t *input = eui_hal_raylib_create_input();
+    eui_config_t cfg = { .mem_pool_buffer=mem_pool, .mem_pool_size=POOL_SIZE,
+                          .display=display, .input=input };
+    eui_init(&cfg);
+    eui_set_tick_callback(get_tick);
+    display->init(display->user_data);
+    eui_view_dispatcher_t *vd = eui_get_view_dispatcher();
 
-    eui_canvas_t *canvas = eui_canvas_create(&mock_display);
-    eui_view_dispatcher_t vd;
-    eui_view_dispatcher_init(&vd, canvas);
+    eui_view_t placeholder;
+    eui_view_init(&placeholder, NULL, NULL);
+    eui_view_dispatcher_add(vd, 0, &placeholder);
+    eui_view_dispatcher_switch_to(vd, 0, EUI_ANIM_NONE);
 
     eui_widget_t *dialog = eui_dialog_create("Confirm", "Are you sure?");
     eui_dialog_add_button(dialog, "Yes", EUI_DIALOG_YES);
     eui_dialog_add_button(dialog, "No",  EUI_DIALOG_NO);
-    eui_dialog_show(dialog, &vd, on_dialog_result);
+    eui_dialog_show(dialog, vd, on_dialog_done);
 
-    for (int i = 0; i < 3; i++)
-        eui_view_dispatcher_tick(&vd);
+    while (!eui_hal_raylib_window_should_close()) {
+        eui_tick();
+        eui_hal_raylib_refresh();
+    }
 
-    eui_event_t evt;
-    evt.type = EUI_EVT_KEY_PRESS;
-    evt.data.key = EUI_KEY_OK;
-    eui_view_dispatcher_send_input(&vd, &evt);
-    eui_view_dispatcher_tick(&vd);
-
-    for (int i = 0; i < 3; i++)
-        eui_view_dispatcher_tick(&vd);
-
-    if ((int)last_result < 0) { printf("[FAIL] No dialog result\n"); return 1; }
-    printf("[PASS] dialog_overlay (result=%d)\n", (int)last_result);
-    eui_canvas_destroy(canvas);
+    display->deinit(display->user_data);
+    eui_deinit();
+    eui_hal_raylib_destroy_input(input);
+    eui_hal_raylib_destroy_display(display);
     return 0;
 }
