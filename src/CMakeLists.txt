@@ -13,6 +13,7 @@ add_library(eui STATIC
     eui_widget.c
     eui_widget_button.c
     eui_widget_label.c
+    eui_widget_menu.c
     eui_widget_list.c
     eui_scene.c
     eui_anim.c

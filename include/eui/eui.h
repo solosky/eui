@@ -18,7 +18,7 @@
 #include "eui/eui_widget_label.h"
 #include "eui/eui_widget_button.h"
 #include "eui/eui_widget_list.h"
-/* TODO: #include "eui/eui_widget_menu.h" */
+#include "eui/eui_widget_menu.h"
 /* TODO: #include "eui/eui_widget_progress.h" */
 /* TODO: #include "eui/eui_widget_slider.h" */
 /* TODO: #include "eui/eui_widget_scroll.h" */
