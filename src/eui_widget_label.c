@@ -1,10 +1,14 @@
 #include "eui/eui_widget_label.h"
 #include "eui/eui_allocator.h"
+#include "eui/eui_font_builtin.h"
 #include <string.h>
 
 static void label_draw(eui_widget_t *self, eui_canvas_t *canvas) {
     eui_label_t *l = (eui_label_t*)self;
     if (!l->text) return;
+    if (!canvas->font) {
+        eui_canvas_set_font(canvas, &eui_font_builtin);
+    }
     eui_canvas_draw_str_aligned(canvas, self->area.x + self->area.w / 2,
                                  self->area.y + self->area.h / 2,
                                  l->h_align, l->v_align, l->text);

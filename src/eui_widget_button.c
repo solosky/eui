@@ -1,9 +1,14 @@
 #include "eui/eui_widget_button.h"
 #include "eui/eui_allocator.h"
+#include "eui/eui_font_builtin.h"
 #include <string.h>
 
 static void button_draw(eui_widget_t *self, eui_canvas_t *canvas) {
     eui_button_t *b = (eui_button_t*)self;
+
+    if (!canvas->font) {
+        eui_canvas_set_font(canvas, &eui_font_builtin);
+    }
 
     eui_color_t fg = self->style & EUI_STYLE_PRESSED
         ? EUI_COLOR_BLACK : EUI_COLOR_WHITE;

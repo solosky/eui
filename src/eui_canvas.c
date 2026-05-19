@@ -1,5 +1,6 @@
 #include "eui/eui_canvas.h"
 #include "eui/eui_allocator.h"
+#include "eui/eui_font.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -439,7 +440,7 @@ void eui_canvas_fill_round_rect(eui_canvas_t *canvas, int16_t x, int16_t y,
     }
 }
 
-/* ---- Text (stubs) ---- */
+/* ---- Text ---- */
 
 void eui_canvas_set_font(eui_canvas_t *canvas, const eui_font_t *font)
 {
@@ -447,29 +448,99 @@ void eui_canvas_set_font(eui_canvas_t *canvas, const eui_font_t *font)
     canvas->font = font;
 }
 
+static void draw_bdf_glyph(eui_canvas_t *canvas, const eui_font_t *font,
+                           char c, int16_t x, int16_t y, uint8_t *adv_out)
+{
+    const uint8_t *p = font->data;
+    uint8_t first = p[0];
+    uint8_t last  = p[1];
+    if ((uint8_t)c < first || (uint8_t)c > last) {
+        if (adv_out) *adv_out = 0;
+        return;
+    }
+
+    uint8_t idx = (uint8_t)c - first;
+    uint8_t glyph_count = (uint8_t)(last - first + 1);
+
+    const uint8_t *data_start = p + 3 + glyph_count * 2;
+    uint16_t offset = p[3 + idx * 2] | ((uint16_t)p[3 + idx * 2 + 1] << 8);
+    const uint8_t *g = data_start + offset;
+
+    uint8_t gw = g[0];
+    uint8_t gh = g[1];
+    int8_t  x_off = (int8_t)g[2];
+    int8_t  y_off = (int8_t)g[3];
+    uint8_t x_adv = g[4];
+    uint8_t bytes_per_row = (gw + 7) / 8;
+    const uint8_t *bitmap = g + 5;
+
+    for (uint8_t row = 0; row < gh; row++) {
+        for (uint8_t col = 0; col < gw; col++) {
+            uint8_t byte = bitmap[row * bytes_per_row + col / 8];
+            uint8_t bit = (byte >> (7 - (col % 8))) & 1;
+            if (bit) {
+                canvas_set_pixel(canvas, x + col + x_off, y + row + y_off,
+                                 canvas->fg_color);
+            }
+        }
+    }
+
+    if (adv_out) *adv_out = x_adv;
+}
+
+static void draw_glyph(eui_canvas_t *canvas, const eui_font_t *font,
+                       char c, int16_t x, int16_t y, uint8_t *adv_out)
+{
+    if (!font || !font->data) { if (adv_out) *adv_out = 0; return; }
+    if (font->format == EUI_FONT_FORMAT_BDF) {
+        draw_bdf_glyph(canvas, font, c, x, y, adv_out);
+    } else {
+        if (adv_out) *adv_out = 0;
+    }
+}
+
 uint16_t eui_canvas_draw_str(eui_canvas_t *canvas, int16_t x, int16_t y, const char *str)
 {
-    (void)canvas; (void)x; (void)y; (void)str;
-    return 0;
+    if (!canvas || !canvas->font || !str) return 0;
+
+    int16_t cur_x = x;
+    for (const char *s = str; *s; s++) {
+        uint8_t adv = 0;
+        draw_glyph(canvas, canvas->font, *s, cur_x, y, &adv);
+        cur_x += adv;
+    }
+    return (uint16_t)(cur_x - x);
 }
 
 uint16_t eui_canvas_draw_str_aligned(eui_canvas_t *canvas, int16_t x, int16_t y,
                                       eui_align_t h_align, eui_align_t v_align, const char *str)
 {
-    (void)canvas; (void)x; (void)y; (void)h_align; (void)v_align; (void)str;
-    return 0;
+    if (!canvas || !canvas->font || !str) return 0;
+
+    const eui_font_t *font = canvas->font;
+    uint16_t str_w = eui_font_get_str_width(font, str);
+    uint8_t  fh    = eui_font_get_height(font);
+
+    int16_t dx = x, dy = y;
+
+    if (h_align & EUI_ALIGN_CENTER)  dx = x - (int16_t)(str_w / 2);
+    if (h_align & EUI_ALIGN_RIGHT)   dx = x - (int16_t)str_w;
+    if (v_align & EUI_ALIGN_MIDDLE)  dy = y - (int16_t)(fh / 2);
+    if (v_align & EUI_ALIGN_BOTTOM)  dy = y - (int16_t)fh;
+
+    return eui_canvas_draw_str(canvas, dx, dy, str);
 }
 
 uint16_t eui_canvas_str_width(const eui_canvas_t *canvas, const char *str)
 {
-    (void)canvas; (void)str;
-    return 0;
+    if (!canvas || !canvas->font || !str) return 0;
+    return eui_font_get_str_width(canvas->font, str);
 }
 
 uint16_t eui_canvas_font_height(const eui_canvas_t *canvas)
 {
-    (void)canvas;
-    return 0;
+    if (!canvas) return 0;
+    return eui_font_get_height(canvas->font);
 }
 
 /* ---- Images ---- */

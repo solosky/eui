@@ -1,5 +1,6 @@
 #include "eui/eui_widget_dialog.h"
 #include "eui/eui_allocator.h"
+#include "eui/eui_font_builtin.h"
 #include <string.h>
 
 static void dialog_draw(eui_widget_t *self, eui_canvas_t *canvas) {
@@ -7,6 +8,10 @@ static void dialog_draw(eui_widget_t *self, eui_canvas_t *canvas) {
     int16_t dlg_w = 80, dlg_h = 40;
     int16_t dlg_x = self->area.x + (self->area.w - dlg_w) / 2;
     int16_t dlg_y = self->area.y + (self->area.h - dlg_h) / 2;
+
+    if (!canvas->font) {
+        eui_canvas_set_font(canvas, &eui_font_builtin);
+    }
 
     /* Semi-transparent overlay: checkerboard pattern */
     for (int16_t yy = 0; yy < (int16_t)self->area.h; yy += 4) {

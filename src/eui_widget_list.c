@@ -1,5 +1,6 @@
 #include "eui/eui_widget_list.h"
 #include "eui/eui_allocator.h"
+#include "eui/eui_font_builtin.h"
 #include <string.h>
 
 #define ITEM_H 12
@@ -8,6 +9,10 @@ static void list_draw(eui_widget_t *self, eui_canvas_t *canvas) {
     eui_list_t *l = (eui_list_t*)self;
     uint8_t visible = self->area.h / ITEM_H;
     if (visible == 0) visible = 1;
+
+    if (!canvas->font) {
+        eui_canvas_set_font(canvas, &eui_font_builtin);
+    }
 
     eui_canvas_save(canvas);
     eui_canvas_set_clip(canvas, &self->area);

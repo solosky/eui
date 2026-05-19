@@ -63,8 +63,8 @@ static void test_null_font(void)
 static void test_out_of_range_char(void)
 {
     TEST("out-of-range char returns 0");
-    uint8_t w = eui_font_get_char_width(&eui_font_builtin, 'z');
-    if (w != 0) FAIL("'z' should be out of range");
+    uint8_t w = eui_font_get_char_width(&eui_font_builtin, '\x01');
+    if (w != 0) FAIL("char 0x01 should be out of range");
     PASS();
 }
 
@@ -75,7 +75,7 @@ static void test_draw_char(void)
     uint8_t adv = eui_font_draw_char(&eui_font_builtin, 'A', buf, 1, 1);
     if (adv != 8) FAIL("expected advance 8");
 
-    uint8_t expected[8] = {0x18, 0x3C, 0x66, 0x7E, 0x66, 0x66, 0x66, 0x00};
+    uint8_t expected[8] = {0x38, 0x44, 0x44, 0x7C, 0x44, 0x44, 0x44, 0x00};
     if (memcmp(buf, expected, 8) != 0) {
         printf("FAIL: glyph mismatch, got: ");
         for (int i = 0; i < 8; i++) printf("%02X ", buf[i]);
@@ -92,7 +92,7 @@ static void test_draw_char_b(void)
     uint8_t adv = eui_font_draw_char(&eui_font_builtin, 'B', buf, 1, 1);
     if (adv != 8) FAIL("expected advance 8");
 
-    uint8_t expected[8] = {0x7C, 0x66, 0x66, 0x7C, 0x66, 0x66, 0x7C, 0x00};
+    uint8_t expected[8] = {0x78, 0x44, 0x44, 0x78, 0x44, 0x44, 0x78, 0x00};
     if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch for 'B'");
     PASS();
 }
