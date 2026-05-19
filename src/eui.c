@@ -66,6 +66,10 @@ void eui_tick(void) {
 
 bool eui_is_running(void) { return g_eui.initialized; }
 
+eui_view_dispatcher_t* eui_get_view_dispatcher(void) {
+    return &g_eui.vd;
+}
+
 void eui_set_fps(uint16_t fps) { g_eui.config.fps_target = fps; }
 
 uint16_t eui_get_fps(void) { return g_eui.config.fps_target; }

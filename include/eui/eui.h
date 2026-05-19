@@ -23,6 +23,7 @@
 #include "eui/eui_widget_slider.h"
 #include "eui/eui_widget_scroll.h"
 #include "eui/eui_widget_dialog.h"
+#include "eui/eui_hal_raylib.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,6 +52,8 @@ uint16_t eui_get_fps(void);
 
 void eui_set_tick_callback(uint32_t (*tick_fn)(void));
 uint32_t eui_get_tick_ms(void);
+
+eui_view_dispatcher_t* eui_get_view_dispatcher(void);
 
 #ifdef __cplusplus
 }
