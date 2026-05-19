@@ -37,6 +37,8 @@ target_include_directories(eui PUBLIC
 )
 target_link_libraries(eui PUBLIC tlsf mc)
 
+if(EUI_BUILD_EXAMPLES)
 add_library(eui_hal_raylib STATIC hal/eui_hal_raylib.c)
 target_include_directories(eui_hal_raylib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 target_link_libraries(eui_hal_raylib PUBLIC eui raylib)
+endif()

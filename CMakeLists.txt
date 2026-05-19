@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.22)
 project(eui VERSION 1.1.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 99)
@@ -26,10 +26,6 @@ set(MC_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
 set(MC_BUILD_TEST OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/motionc)
 
-set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(USE_EXTERNAL_GLFW OFF CACHE BOOL "" FORCE)
-add_subdirectory(third_party/raylib) 
-
 add_subdirectory(src)
 
 if(EUI_BUILD_TESTS)
@@ -38,5 +34,8 @@ if(EUI_BUILD_TESTS)
 endif()
 
 if(EUI_BUILD_EXAMPLES)
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(USE_EXTERNAL_GLFW OFF CACHE BOOL "" FORCE)
+    add_subdirectory(third_party/raylib)
     add_subdirectory(examples)
 endif()
