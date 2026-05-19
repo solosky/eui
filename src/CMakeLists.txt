@@ -12,6 +12,7 @@ add_library(eui STATIC
     eui_view_dispatcher.c
     eui_widget.c
     eui_scene.c
+    eui_anim.c
     eui.c
 )
 target_include_directories(eui PUBLIC
