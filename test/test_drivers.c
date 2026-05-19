@@ -6,6 +6,7 @@
 #include "eui/driver/eui_drv_ssd1306.h"
 #include "eui/driver/eui_drv_sh1106.h"
 #include "eui/driver/eui_drv_st7735.h"
+#include "eui/driver/eui_drv_ili9341.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -120,6 +121,24 @@ static void test_st7735_create_and_caps(void) {
     PASS();
 }
 
+static void test_ili9341_create_and_caps(void) {
+    TEST("ILI9341 create sets correct caps");
+    eui_drv_ili9341_config_t cfg = {
+        .spi = { .write_cmd = mock_spi_write_cmd, .write_data = mock_spi_write_data,
+                 .read_data = mock_spi_read_data, .set_dc = mock_spi_set_dc,
+                 .set_cs = mock_spi_set_cs, .set_rst = mock_spi_set_rst,
+                 .delay_ms = mock_spi_delay_ms, .user_data = NULL },
+        .width = 240, .height = 320,
+    };
+    eui_display_hal_t *hal = eui_drv_ili9341_create(&cfg);
+    if (!hal) FAIL("create returned NULL");
+    if (hal->caps.width != 240) FAIL("width mismatch");
+    if (hal->caps.height != 320) FAIL("height mismatch");
+    if (hal->caps.color_depth != 16) FAIL("color depth mismatch");
+    eui_drv_ili9341_destroy(hal);
+    PASS();
+}
+
 #define DRV_POOL_SIZE 32768
 static uint8_t drv_pool[DRV_POOL_SIZE];
 
@@ -142,6 +161,9 @@ int main(void) {
 
     printf("--- ST7735 ---\n");
     test_st7735_create_and_caps();
+
+    printf("--- ILI9341 ---\n");
+    test_ili9341_create_and_caps();
 
     printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     eui_deinit();
