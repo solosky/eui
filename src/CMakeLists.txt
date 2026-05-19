@@ -23,6 +23,7 @@ add_library(eui STATIC
     eui_anim.c
     driver/eui_drv_ssd1306.c
     driver/eui_drv_sh1106.c
+    driver/eui_drv_st7735.c
     eui.c
 )
 target_include_directories(eui PUBLIC

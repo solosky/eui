@@ -5,6 +5,7 @@
 #include "eui/eui.h"
 #include "eui/driver/eui_drv_ssd1306.h"
 #include "eui/driver/eui_drv_sh1106.h"
+#include "eui/driver/eui_drv_st7735.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -32,6 +33,25 @@ static void mock_i2c_delay_ms(uint32_t ms, void *ud) {
     (void)ms; (void)ud;
     test_ssd1306_delay_count++;
 }
+
+static int test_spi_cmd_count;
+static int test_spi_data_count;
+
+static void mock_spi_write_cmd(uint8_t cmd, void *ud) {
+    (void)cmd; (void)ud;
+    test_spi_cmd_count++;
+}
+static void mock_spi_write_data(const uint8_t *buf, uint32_t len, void *ud) {
+    (void)buf; (void)ud;
+    test_spi_data_count += (int)len;
+}
+static void mock_spi_read_data(uint8_t *buf, uint32_t len, void *ud) {
+    (void)buf; (void)len; (void)ud;
+}
+static void mock_spi_set_dc(bool dm, void *ud) { (void)dm; (void)ud; }
+static void mock_spi_set_cs(bool a, void *ud) { (void)a; (void)ud; }
+static void mock_spi_set_rst(bool a, void *ud) { (void)a; (void)ud; }
+static void mock_spi_delay_ms(uint32_t ms, void *ud) { (void)ms; (void)ud; }
 
 static void test_ssd1306_create_and_caps(void) {
     TEST("SSD1306 create sets correct caps");
@@ -82,6 +102,24 @@ static void test_sh1106_create_and_caps(void) {
     PASS();
 }
 
+static void test_st7735_create_and_caps(void) {
+    TEST("ST7735 create sets correct caps");
+    eui_drv_st7735_config_t cfg = {
+        .spi = { .write_cmd = mock_spi_write_cmd, .write_data = mock_spi_write_data,
+                 .read_data = mock_spi_read_data, .set_dc = mock_spi_set_dc,
+                 .set_cs = mock_spi_set_cs, .set_rst = mock_spi_set_rst,
+                 .delay_ms = mock_spi_delay_ms, .user_data = NULL },
+        .width = 128, .height = 160, .variant = 0,
+    };
+    eui_display_hal_t *hal = eui_drv_st7735_create(&cfg);
+    if (!hal) FAIL("create returned NULL");
+    if (hal->caps.width != 128) FAIL("width mismatch");
+    if (hal->caps.height != 160) FAIL("height mismatch");
+    if (hal->caps.color_depth != 16) FAIL("color depth mismatch");
+    eui_drv_st7735_destroy(hal);
+    PASS();
+}
+
 #define DRV_POOL_SIZE 32768
 static uint8_t drv_pool[DRV_POOL_SIZE];
 
@@ -101,6 +139,9 @@ int main(void) {
 
     printf("--- SH1106 ---\n");
     test_sh1106_create_and_caps();
+
+    printf("--- ST7735 ---\n");
+    test_st7735_create_and_caps();
 
     printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     eui_deinit();
