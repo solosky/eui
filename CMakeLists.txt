@@ -1,10 +1,8 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.25)
 project(eui VERSION 1.1.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 option(EUI_BUILD_TESTS "Build unit tests" ON)
 option(EUI_BUILD_EXAMPLES "Build raylib examples" ON)
@@ -27,15 +25,18 @@ add_subdirectory(third_party/tlsf)
 set(MC_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
 set(MC_BUILD_TEST OFF CACHE BOOL "" FORCE)
 add_subdirectory(third_party/motionc)
+
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(USE_EXTERNAL_GLFW OFF CACHE BOOL "" FORCE)
+add_subdirectory(third_party/raylib) 
+
 add_subdirectory(src)
 
 if(EUI_BUILD_TESTS)
     enable_testing()
-    find_package(raylib QUIET)
     add_subdirectory(test)
 endif()
 
 if(EUI_BUILD_EXAMPLES)
-    find_package(raylib QUIET)
     add_subdirectory(examples)
 endif()
