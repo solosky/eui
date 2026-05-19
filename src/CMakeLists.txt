@@ -21,6 +21,7 @@ add_library(eui STATIC
     eui_widget_dialog.c
     eui_scene.c
     eui_anim.c
+    driver/eui_drv_ssd1306.c
     eui.c
 )
 target_include_directories(eui PUBLIC
