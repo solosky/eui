@@ -13,7 +13,7 @@
 #include "eui/eui_view.h"
 #include "eui/eui_view_dispatcher.h"
 #include "eui/eui_scene.h"
-/* TODO: #include "eui/eui_anim.h" */
+#include "eui/eui_anim.h"
 #include "eui/eui_widget.h"
 /* TODO: #include "eui/eui_widget_label.h" */
 /* TODO: #include "eui/eui_widget_button.h" */

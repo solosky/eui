@@ -27,3 +27,8 @@ add_executable(test_view test_view.c)
 target_include_directories(test_view PRIVATE ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(test_view PRIVATE eui)
 add_test(NAME view COMMAND test_view)
+
+add_executable(test_widget test_widget.c)
+target_include_directories(test_widget PRIVATE ${CMAKE_BINARY_DIR}/include)
+target_link_libraries(test_widget PRIVATE eui)
+add_test(NAME widget COMMAND test_widget)

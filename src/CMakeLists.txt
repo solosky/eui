@@ -17,5 +17,6 @@ add_library(eui STATIC
 target_include_directories(eui PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_BINARY_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/motionc/include
 )
 target_link_libraries(eui PUBLIC tlsf mc)
