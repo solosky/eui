@@ -15,7 +15,7 @@
 #include "eui/eui_scene.h"
 #include "eui/eui_anim.h"
 #include "eui/eui_widget.h"
-/* TODO: #include "eui/eui_widget_label.h" */
+#include "eui/eui_widget_label.h"
 /* TODO: #include "eui/eui_widget_button.h" */
 /* TODO: #include "eui/eui_widget_list.h" */
 /* TODO: #include "eui/eui_widget_menu.h" */
