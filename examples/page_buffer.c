@@ -11,10 +11,10 @@ static uint8_t mem_pool[POOL_SIZE];
 static uint32_t get_tick(void) { return (uint32_t)(GetTime() * 1000.0); }
 
 int main(void) {
+    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
     eui_display_hal_t *display = eui_hal_raylib_create_display(W, H, 1);
     eui_input_hal_t *input = eui_hal_raylib_create_input();
-    eui_config_t cfg = { .mem_pool_buffer=mem_pool, .mem_pool_size=POOL_SIZE,
-                          .display=display, .input=input };
+    eui_config_t cfg = { .display=display, .input=input };
     eui_init(&cfg);
     eui_set_tick_callback(get_tick);
     display->init(display->user_data);
