@@ -1,6 +1,7 @@
 #include "eui/eui_font.h"
 #include "eui/eui_font_builtin.h"
 #include "eui/eui_allocator.h"
+#include "test_vlw_font.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -111,18 +112,103 @@ static void test_flags(void)
     PASS();
 }
 
-static void test_vlw_format_returns_zero(void)
+static const eui_font_t test_vlw_font = {
+    .format = EUI_FONT_FORMAT_VLW,
+    .line_height = TEST_VLW_ASCENT + TEST_VLW_DESCENT,
+    .baseline = TEST_VLW_ASCENT,
+    .flags = EUI_FONT_FIXED_WIDTH,
+    .data = test_vlw_font_data,
+};
+
+static void test_vlw_char_width(void)
 {
-    TEST("VLW format returns 0");
-    eui_font_t vlw_font = {
+    TEST("VLW char width returns 8 for 'A'");
+    uint8_t w = eui_font_get_char_width(&test_vlw_font, 'A');
+    if (w != 8) FAIL("expected width 8 for 'A'");
+    PASS();
+}
+
+static void test_vlw_str_width(void)
+{
+    TEST("VLW string width sums char widths");
+    uint16_t w = eui_font_get_str_width(&test_vlw_font, "AB");
+    if (w != 16) FAIL("expected width 16 for 'AB'");
+    PASS();
+}
+
+static void test_vlw_height(void)
+{
+    TEST("VLW font height");
+    uint8_t h = eui_font_get_height(&test_vlw_font);
+    if (h != 12) FAIL("expected height 12");
+    PASS();
+}
+
+static void test_vlw_baseline(void)
+{
+    TEST("VLW font baseline");
+    uint8_t b = eui_font_get_baseline(&test_vlw_font);
+    if (b != 10) FAIL("expected baseline 10");
+    PASS();
+}
+
+static void test_vlw_out_of_range(void)
+{
+    TEST("VLW out-of-range char returns 0");
+    uint8_t w = eui_font_get_char_width(&test_vlw_font, 'z');
+    if (w != 0) FAIL("'z' should be out of range");
+    PASS();
+}
+
+static void test_vlw_empty_str(void)
+{
+    TEST("VLW empty string width is 0");
+    uint16_t w = eui_font_get_str_width(&test_vlw_font, "");
+    if (w != 0) FAIL("expected 0 for empty string");
+    PASS();
+}
+
+static void test_vlw_draw_char_a(void)
+{
+    TEST("VLW draw_char 'A' produces correct glyph");
+    uint8_t buf[8] = {0};
+    uint8_t adv = eui_font_draw_char(&test_vlw_font, 'A', buf, 1, 1);
+    if (adv != 8) FAIL("expected advance 8");
+
+    uint8_t expected[8] = {0x18, 0x3C, 0x66, 0x7E, 0x66, 0x66, 0x66, 0x00};
+    if (memcmp(buf, expected, 8) != 0) {
+        printf("FAIL: glyph mismatch, got: ");
+        for (int i = 0; i < 8; i++) printf("%02X ", buf[i]);
+        printf("\n");
+        return;
+    }
+    PASS();
+}
+
+static void test_vlw_draw_char_b(void)
+{
+    TEST("VLW draw_char 'B' produces correct glyph");
+    uint8_t buf[8] = {0};
+    uint8_t adv = eui_font_draw_char(&test_vlw_font, 'B', buf, 1, 1);
+    if (adv != 8) FAIL("expected advance 8");
+
+    uint8_t expected[8] = {0x7C, 0x66, 0x66, 0x7C, 0x66, 0x66, 0x7C, 0x00};
+    if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch for 'B'");
+    PASS();
+}
+
+static void test_vlw_null_data(void)
+{
+    TEST("VLW null data returns 0");
+    eui_font_t f = {
         .format = EUI_FONT_FORMAT_VLW,
         .line_height = 10,
-        .baseline = 9,
+        .baseline = 8,
         .flags = 0,
         .data = NULL,
     };
-    uint8_t w = eui_font_get_char_width(&vlw_font, 'A');
-    if (w != 0) FAIL("VLW should return 0");
+    uint8_t w = eui_font_get_char_width(&f, 'A');
+    if (w != 0) FAIL("null data should return 0");
     PASS();
 }
 
@@ -141,7 +227,15 @@ int main(void)
     test_draw_char_b();
     test_empty_str();
     test_flags();
-    test_vlw_format_returns_zero();
+    test_vlw_char_width();
+    test_vlw_str_width();
+    test_vlw_height();
+    test_vlw_baseline();
+    test_vlw_out_of_range();
+    test_vlw_empty_str();
+    test_vlw_draw_char_a();
+    test_vlw_draw_char_b();
+    test_vlw_null_data();
     printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     return tests_passed == tests_run ? 0 : 1;
 }
