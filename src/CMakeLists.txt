@@ -11,7 +11,9 @@ add_library(eui STATIC
     eui_view.c
     eui_view_dispatcher.c
     eui_widget.c
+    eui_widget_button.c
     eui_widget_label.c
+    eui_widget_list.c
     eui_scene.c
     eui_anim.c
     eui.c
