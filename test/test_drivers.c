@@ -9,6 +9,7 @@
 #include "eui/driver/eui_drv_ili9341.h"
 #include "eui/driver/eui_drv_buttons.h"
 #include "eui/driver/eui_drv_encoder.h"
+#include "eui/driver/eui_drv_xpt2046.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -271,6 +272,44 @@ static void test_encoder_click(void) {
     PASS();
 }
 
+static bool test_touch_irq_state;
+static bool mock_xpt_irq(void *ud) { (void)ud; return test_touch_irq_state; }
+
+static void test_xpt2046_touch_down_up(void) {
+    TEST("XPT2046 detects touch down and up");
+    eui_drv_xpt2046_config_t cfg = {
+        .spi = { .write_cmd = mock_spi_write_cmd, .write_data = mock_spi_write_data,
+                 .read_data = mock_spi_read_data, .set_dc = mock_spi_set_dc,
+                 .set_cs = mock_spi_set_cs, .set_rst = mock_spi_set_rst,
+                 .delay_ms = mock_spi_delay_ms, .user_data = NULL },
+        .irq = { .read_irq = mock_xpt_irq, .user_data = NULL },
+        .screen_width = 320, .screen_height = 240,
+    };
+    eui_input_hal_t *hal = eui_drv_xpt2046_create(&cfg);
+    hal->init(hal->user_data);
+
+    /* no touch: IRQ high */
+    test_touch_irq_state = true;
+    eui_event_t evt;
+    int ret = hal->poll(&evt, hal->user_data);
+    if (ret != 0) FAIL("expected no event when not touched");
+
+    /* touch down: IRQ low */
+    test_touch_irq_state = false;
+    ret = hal->poll(&evt, hal->user_data);
+    if (ret != 1) FAIL("expected event on touch down");
+    if (evt.type != EUI_EVT_TOUCH_DOWN) FAIL("expected TOUCH_DOWN");
+
+    /* touch up: IRQ high */
+    test_touch_irq_state = true;
+    ret = hal->poll(&evt, hal->user_data);
+    if (ret != 1) FAIL("expected event on touch up");
+    if (evt.type != EUI_EVT_TOUCH_UP) FAIL("expected TOUCH_UP");
+
+    eui_drv_xpt2046_destroy(hal);
+    PASS();
+}
+
 #define DRV_POOL_SIZE 32768
 static uint8_t drv_pool[DRV_POOL_SIZE];
 
@@ -305,6 +344,9 @@ int main(void) {
     test_encoder_cw();
     test_encoder_ccw();
     test_encoder_click();
+
+    printf("--- XPT2046 ---\n");
+    test_xpt2046_touch_down_up();
 
     printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     eui_deinit();
