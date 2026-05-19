@@ -4,6 +4,7 @@
 #include "eui/eui_allocator.h"
 #include "eui/eui.h"
 #include "eui/driver/eui_drv_ssd1306.h"
+#include "eui/driver/eui_drv_sh1106.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -64,6 +65,23 @@ static void test_ssd1306_init_sends_commands(void) {
     PASS();
 }
 
+static void test_sh1106_create_and_caps(void) {
+    TEST("SH1106 create sets correct caps");
+    eui_drv_sh1106_config_t cfg = {
+        .i2c = { .write_cmd = mock_i2c_write_cmd, .write_data = mock_i2c_write_data,
+                 .delay_ms = mock_i2c_delay_ms, .user_data = NULL },
+        .width = 128, .height = 64, .i2c_addr = 0x3C,
+    };
+    eui_display_hal_t *hal = eui_drv_sh1106_create(&cfg);
+    if (!hal) FAIL("create returned NULL");
+    if (hal->caps.width != 128) FAIL("width mismatch");
+    if (hal->caps.height != 64) FAIL("height mismatch");
+    if (hal->caps.color_depth != 1) FAIL("color depth mismatch");
+    if (hal->caps.buffer_mode != EUI_BUFFER_PAGE) FAIL("buffer mode mismatch");
+    eui_drv_sh1106_destroy(hal);
+    PASS();
+}
+
 #define DRV_POOL_SIZE 32768
 static uint8_t drv_pool[DRV_POOL_SIZE];
 
@@ -80,6 +98,9 @@ int main(void) {
     printf("--- SSD1306 ---\n");
     test_ssd1306_create_and_caps();
     test_ssd1306_init_sends_commands();
+
+    printf("--- SH1106 ---\n");
+    test_sh1106_create_and_caps();
 
     printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     eui_deinit();
