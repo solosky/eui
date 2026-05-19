@@ -7,6 +7,7 @@
 #include "eui/driver/eui_drv_sh1106.h"
 #include "eui/driver/eui_drv_st7735.h"
 #include "eui/driver/eui_drv_ili9341.h"
+#include "eui/driver/eui_drv_buttons.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -139,6 +140,69 @@ static void test_ili9341_create_and_caps(void) {
     PASS();
 }
 
+static uint8_t test_btn_pin_state;
+static bool mock_btn_read_pin(uint8_t pin_id, void *ud) {
+    (void)ud;
+    return (test_btn_pin_state & (1u << pin_id)) != 0;
+}
+static void mock_btn_delay_us(uint32_t us, void *ud) { (void)us; (void)ud; }
+
+static void test_buttons_press_release(void) {
+    TEST("buttons poll detects press and release");
+    const eui_drv_button_map_t map[] = {
+        { .pin_id = 0, .key = EUI_KEY_OK },
+        { .pin_id = 1, .key = EUI_KEY_BACK },
+    };
+    eui_drv_buttons_config_t cfg = {
+        .gpio = { .read_pin = mock_btn_read_pin, .delay_us = mock_btn_delay_us, .user_data = NULL },
+        .map = map, .count = 2,
+    };
+    eui_input_hal_t *hal = eui_drv_buttons_create(&cfg);
+    if (!hal) FAIL("create returned NULL");
+
+    hal->init(hal->user_data);
+
+    test_btn_pin_state = 0x01;
+    eui_event_t evt;
+    int ret = hal->poll(&evt, hal->user_data);
+    if (ret != 1) FAIL("expected event on press");
+    if (evt.type != EUI_EVT_KEY_PRESS || evt.data.key != EUI_KEY_OK) FAIL("expected OK press");
+
+    ret = hal->poll(&evt, hal->user_data);
+    if (ret != 0) FAIL("expected no event on unchanged state");
+
+    test_btn_pin_state = 0x00;
+    ret = hal->poll(&evt, hal->user_data);
+    if (ret != 1) FAIL("expected event on release");
+    if (evt.type != EUI_EVT_KEY_RELEASE || evt.data.key != EUI_KEY_OK) FAIL("expected OK release");
+
+    eui_drv_buttons_destroy(hal);
+    PASS();
+}
+
+static void test_buttons_press_back(void) {
+    TEST("buttons poll detects BACK key");
+    const eui_drv_button_map_t map[] = {
+        { .pin_id = 0, .key = EUI_KEY_UP },
+        { .pin_id = 1, .key = EUI_KEY_BACK },
+    };
+    eui_drv_buttons_config_t cfg = {
+        .gpio = { .read_pin = mock_btn_read_pin, .delay_us = mock_btn_delay_us, .user_data = NULL },
+        .map = map, .count = 2,
+    };
+    eui_input_hal_t *hal = eui_drv_buttons_create(&cfg);
+    hal->init(hal->user_data);
+
+    test_btn_pin_state = 0x02;
+    eui_event_t evt;
+    int ret = hal->poll(&evt, hal->user_data);
+    if (ret != 1) FAIL("expected event");
+    if (evt.data.key != EUI_KEY_BACK) FAIL("expected BACK key");
+
+    eui_drv_buttons_destroy(hal);
+    PASS();
+}
+
 #define DRV_POOL_SIZE 32768
 static uint8_t drv_pool[DRV_POOL_SIZE];
 
@@ -164,6 +228,10 @@ int main(void) {
 
     printf("--- ILI9341 ---\n");
     test_ili9341_create_and_caps();
+
+    printf("--- Buttons ---\n");
+    test_buttons_press_release();
+    test_buttons_press_back();
 
     printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     eui_deinit();
