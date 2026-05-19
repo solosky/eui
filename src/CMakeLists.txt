@@ -15,6 +15,10 @@ add_library(eui STATIC
     eui_widget_label.c
     eui_widget_menu.c
     eui_widget_list.c
+    eui_widget_progress.c
+    eui_widget_slider.c
+    eui_widget_scroll.c
+    eui_widget_dialog.c
     eui_scene.c
     eui_anim.c
     eui.c

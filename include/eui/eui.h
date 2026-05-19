@@ -19,10 +19,10 @@
 #include "eui/eui_widget_button.h"
 #include "eui/eui_widget_list.h"
 #include "eui/eui_widget_menu.h"
-/* TODO: #include "eui/eui_widget_progress.h" */
-/* TODO: #include "eui/eui_widget_slider.h" */
-/* TODO: #include "eui/eui_widget_scroll.h" */
-/* TODO: #include "eui/eui_widget_dialog.h" */
+#include "eui/eui_widget_progress.h"
+#include "eui/eui_widget_slider.h"
+#include "eui/eui_widget_scroll.h"
+#include "eui/eui_widget_dialog.h"
 
 #ifdef __cplusplus
 extern "C" {
