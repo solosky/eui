@@ -51,26 +51,45 @@ static void disp_write_buffer(const uint8_t *buffer, const eui_rect_t *rect, voi
 
     if (!d->rgba_buffer) return;
 
-    int px_count = (int)d->width * (int)d->height;
     if (d->color_depth == 1) {
         int bytes_per_row = (int)d->width / 8;
-        for (int i = 0; i < px_count; i++) {
-            int x = i % d->width;
-            int y = i / d->width;
-            int byte_idx = y * bytes_per_row + (x / 8);
-            int bit_pos = x % 8;
-            uint8_t pixel = (buffer[byte_idx] >> bit_pos) & 1;
-            uint8_t *dst = d->rgba_buffer + (size_t)i * 4;
-            if (pixel) {
-                dst[0] = 255; dst[1] = 255; dst[2] = 255; dst[3] = 255;
-            } else {
-                dst[0] = 0;   dst[1] = 0;   dst[2] = 0;   dst[3] = 255;
+        for (int y = 0; y < (int)d->height; y++) {
+            int flipped_y = (int)d->height - 1 - y;
+            for (int x = 0; x < (int)d->width; x++) {
+                int byte_idx = y * bytes_per_row + (x / 8);
+                int bit_pos = x % 8;
+                uint8_t pixel = (buffer[byte_idx] >> bit_pos) & 1;
+                uint8_t *dst = d->rgba_buffer + (size_t)(flipped_y * d->width + x) * 4;
+                if (pixel) {
+                    dst[0] = 255; dst[1] = 255; dst[2] = 255; dst[3] = 255;
+                } else {
+                    dst[0] = 0;   dst[1] = 0;   dst[2] = 0;   dst[3] = 255;
+                }
+            }
+        }
+    } else if (d->color_depth == 16) {
+        const uint16_t *src16 = (const uint16_t*)buffer;
+        for (int y = 0; y < (int)d->height; y++) {
+            int flipped_y = (int)d->height - 1 - y;
+            for (int x = 0; x < (int)d->width; x++) {
+                uint16_t c = src16[y * d->width + x];
+                uint8_t r = (uint8_t)(((c >> 11) & 0x1F) << 3);
+                uint8_t g = (uint8_t)(((c >> 5)  & 0x3F) << 2);
+                uint8_t b = (uint8_t)((c & 0x1F) << 3);
+                uint8_t *dst = d->rgba_buffer + (size_t)(flipped_y * d->width + x) * 4;
+                dst[0] = r | (r >> 5);
+                dst[1] = g | (g >> 6);
+                dst[2] = b | (b >> 5);
+                dst[3] = 255;
             }
         }
     } else {
-        for (int i = 0; i < px_count; i++) {
-            uint8_t *dst = d->rgba_buffer + (size_t)i * 4;
-            dst[0] = 0; dst[1] = 0; dst[2] = 0; dst[3] = 255;
+        for (int y = 0; y < (int)d->height; y++) {
+            int flipped_y = (int)d->height - 1 - y;
+            for (int x = 0; x < (int)d->width; x++) {
+                uint8_t *dst = d->rgba_buffer + (size_t)(flipped_y * d->width + x) * 4;
+                dst[0] = 0; dst[1] = 0; dst[2] = 0; dst[3] = 255;
+            }
         }
     }
 

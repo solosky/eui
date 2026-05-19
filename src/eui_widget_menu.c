@@ -26,6 +26,8 @@ static void menu_draw(eui_widget_t *self, eui_canvas_t *canvas) {
         if (idx == active->selected_index) {
             eui_canvas_invert_rect(canvas, self->area.x, y, self->area.w, ITEM_H);
         }
+        eui_canvas_set_color(canvas, idx == active->selected_index
+                             ? EUI_COLOR_BLACK : EUI_COLOR_WHITE);
         eui_canvas_draw_str(canvas, self->area.x + 2, y + 2, item->label ? item->label : "");
 
         /* Draw submenu indicator */

@@ -1,14 +1,17 @@
 #include "eui/eui_widget_list.h"
 #include "eui/eui_allocator.h"
 #include "eui/eui_font_builtin.h"
+#include "mc.h"
 #include <string.h>
 
 #define ITEM_H 12
+#define EUI_LIST_ANIM_DURATION 10
 
 static void list_draw(eui_widget_t *self, eui_canvas_t *canvas) {
     eui_list_t *l = (eui_list_t*)self;
     uint8_t visible = self->area.h / ITEM_H;
     if (visible == 0) visible = 1;
+    bool animating = l->anim_rem > 0;
 
     if (!canvas->font) {
         eui_canvas_set_font(canvas, &eui_font_builtin);
@@ -17,15 +20,50 @@ static void list_draw(eui_widget_t *self, eui_canvas_t *canvas) {
     eui_canvas_save(canvas);
     eui_canvas_set_clip(canvas, &self->area);
 
+    /* Draw animation highlight */
+    if (animating) {
+        l->anim_rem--;
+        int16_t from_vis = (int16_t)l->anim_from - (int16_t)l->scroll_offset;
+        if (from_vis >= 0 && from_vis < (int16_t)visible) {
+            int16_t old_y = self->area.y + from_vis * l->item_height;
+            int16_t to_vis = (int16_t)l->selected_index - (int16_t)l->scroll_offset;
+            int16_t new_y = self->area.y + to_vis * l->item_height;
+            int32_t raw = EUI_LIST_ANIM_DURATION - l->anim_rem;
+            mc_real_t t = MC_FP_C((float)raw / EUI_LIST_ANIM_DURATION);
+            mc_real_t eased = mc_ease_back_out(t);
+            float f = MC_REAL_TO_FLOAT(eased);
+            int16_t cur_y = old_y + (int16_t)((new_y - old_y) * f);
+            eui_canvas_invert_rect(canvas, self->area.x, cur_y,
+                                   self->area.w, l->item_height);
+        }
+    } else {
+        /* Static highlight at selected index */
+        if (l->selected_index >= l->scroll_offset
+         && l->selected_index < l->scroll_offset + visible) {
+            int16_t y = self->area.y
+                + (l->selected_index - l->scroll_offset) * l->item_height;
+            eui_canvas_invert_rect(canvas, self->area.x, y,
+                                   self->area.w, l->item_height);
+        }
+    }
+
+    /* Draw item text */
     for (uint8_t i = 0; i < visible && (i + l->scroll_offset) < l->item_count; i++) {
         uint8_t idx = i + l->scroll_offset;
-        int16_t y = self->area.y + i * ITEM_H;
-        if (idx == l->selected_index) {
-            eui_canvas_invert_rect(canvas, self->area.x, y, self->area.w, ITEM_H);
-        }
-        eui_canvas_draw_str(canvas, self->area.x + 2, y + 2, l->items[idx].text ? l->items[idx].text : "");
+        int16_t y = self->area.y + i * l->item_height;
+        bool highlighted = (idx == l->selected_index)
+                        || (animating && idx == (uint8_t)l->anim_from);
+        eui_canvas_set_color(canvas, highlighted
+                             ? EUI_COLOR_BLACK : EUI_COLOR_WHITE);
+        eui_canvas_draw_str(canvas, self->area.x + 2, y + 2,
+                            l->items[idx].text ? l->items[idx].text : "");
     }
     eui_canvas_restore(canvas);
+}
+
+static void list_start_anim(eui_list_t *l, uint8_t old_sel) {
+    l->anim_from = (int8_t)old_sel;
+    l->anim_rem = EUI_LIST_ANIM_DURATION;
 }
 
 static bool list_input(eui_widget_t *self, const eui_event_t *evt) {
@@ -35,13 +73,23 @@ static bool list_input(eui_widget_t *self, const eui_event_t *evt) {
 
     if (evt->type == EUI_EVT_KEY_PRESS) {
         if (evt->data.key == EUI_KEY_DOWN) {
-            if (l->selected_index < l->item_count - 1) l->selected_index++;
-            if (l->selected_index >= l->scroll_offset + visible) l->scroll_offset++;
+            if (l->selected_index < l->item_count - 1) {
+                uint8_t old = l->selected_index;
+                l->selected_index++;
+                if (l->selected_index >= l->scroll_offset + visible)
+                    l->scroll_offset++;
+                list_start_anim(l, old);
+            }
             return true;
         }
         if (evt->data.key == EUI_KEY_UP) {
-            if (l->selected_index > 0) l->selected_index--;
-            if (l->selected_index < l->scroll_offset) l->scroll_offset = l->selected_index;
+            if (l->selected_index > 0) {
+                uint8_t old = l->selected_index;
+                l->selected_index--;
+                if (l->selected_index < l->scroll_offset)
+                    l->scroll_offset = l->selected_index;
+                list_start_anim(l, old);
+            }
             return true;
         }
         if (evt->data.key == EUI_KEY_OK) {
@@ -50,13 +98,23 @@ static bool list_input(eui_widget_t *self, const eui_event_t *evt) {
         }
     }
     if (evt->type == EUI_EVT_ENCODER_CW) {
-        if (l->selected_index < l->item_count - 1) l->selected_index++;
-        if (l->selected_index >= l->scroll_offset + visible) l->scroll_offset++;
+        if (l->selected_index < l->item_count - 1) {
+            uint8_t old = l->selected_index;
+            l->selected_index++;
+            if (l->selected_index >= l->scroll_offset + visible)
+                l->scroll_offset++;
+            list_start_anim(l, old);
+        }
         return true;
     }
     if (evt->type == EUI_EVT_ENCODER_CCW) {
-        if (l->selected_index > 0) l->selected_index--;
-        if (l->selected_index < l->scroll_offset) l->scroll_offset = l->selected_index;
+        if (l->selected_index > 0) {
+            uint8_t old = l->selected_index;
+            l->selected_index--;
+            if (l->selected_index < l->scroll_offset)
+                l->scroll_offset = l->selected_index;
+            list_start_anim(l, old);
+        }
         return true;
     }
     return false;

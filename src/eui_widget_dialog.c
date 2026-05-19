@@ -40,6 +40,8 @@ static void dialog_draw(eui_widget_t *self, eui_canvas_t *canvas) {
         if (i == d->focused_button) {
             eui_canvas_invert_rect(canvas, bx, by, 22, 10);
         }
+        eui_canvas_set_color(canvas, i == d->focused_button
+                             ? EUI_COLOR_BLACK : EUI_COLOR_WHITE);
         eui_canvas_draw_str(canvas, bx + 2, by + 2, d->buttons[i].label);
     }
 }

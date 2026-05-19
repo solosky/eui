@@ -21,6 +21,8 @@ typedef struct {
     uint16_t            item_height;
     eui_list_callback_t callback;
     void               *callback_ctx;
+    int8_t              anim_from;
+    uint8_t             anim_rem;
 } eui_list_t;
 
 eui_widget_t* eui_list_create(int16_t x, int16_t y, uint16_t w, uint16_t h);

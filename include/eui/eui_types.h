@@ -28,7 +28,11 @@ typedef uint16_t eui_color_t;
 
 typedef enum {
     EUI_COLOR_BLACK = 0,
+#if EUI_COLOR_DEPTH == 16
+    EUI_COLOR_WHITE = 0xFFFF,
+#else
     EUI_COLOR_WHITE = 1,
+#endif
 } eui_color_id_t;
 
 eui_color_t eui_color_from_rgb(uint8_t r, uint8_t g, uint8_t b);

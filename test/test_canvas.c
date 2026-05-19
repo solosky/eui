@@ -64,8 +64,16 @@ static int count_pixels(void)
         while (b) { count += (b & 1); b >>= 1; }
     }
     return count;
+#elif EUI_COLOR_DEPTH == 16
+    int count = 0;
+    uint16_t *p = (uint16_t*)mock_buf;
+    int num = (int)sizeof(mock_buf) / 2;
+    for (int i = 0; i < num; i++) {
+        if (p[i] != 0) count++;
+    }
+    return count;
 #else
-    /* For 8bpp/16bpp, count non-zero bytes as pixels */
+    /* For 8bpp, count non-zero bytes as pixels */
     int count = 0;
     for (int i = 0; i < (int)sizeof(mock_buf); i++) {
         if (mock_buf[i] != 0) count++;
