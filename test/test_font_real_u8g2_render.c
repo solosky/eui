@@ -193,24 +193,21 @@ static int discover_unicode_glyphs(const eui_font_t *font, uint16_t *codes, int 
 
     const uint8_t *jump_table = p + 23 + unicode_off;
     const uint8_t *lt = jump_table;
+    const uint8_t *glyph_ptr = jump_table;
     int count = 0;
 
-    /* Walk jump table blocks */
     for (;;) {
         uint16_t block_off = font_get_be16(lt);
         uint16_t last_unicode = font_get_be16(lt + 2);
+        glyph_ptr += block_off;
+        lt += 4;
 
         if (last_unicode == 0xFFFF) break;
 
-        const uint8_t *block = jump_table + block_off;
-        lt += 4;
-
-        /* Compute next block offset for boundary check */
         uint16_t next_off = font_get_be16(lt);
-        const uint8_t *block_end = jump_table + next_off;
+        const uint8_t *block_end = glyph_ptr + next_off;
 
-        /* Linear scan within block */
-        const uint8_t *entry = block;
+        const uint8_t *entry = glyph_ptr;
         while (entry + 3 <= block_end) {
             uint16_t code = font_get_be16(entry);
             uint8_t jump = entry[2];
