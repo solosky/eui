@@ -460,7 +460,7 @@ static void draw_u8g2_glyph(eui_canvas_t *canvas, const eui_font_t *font,
 {
     u8g2_glyph_t g;
     int16_t idx = eui_font_u8g2_lookup_glyph(font, (uint8_t)c, 0);
-    if (idx < 0 || !decode_glyph_at(font, (uint8_t)idx, &g)) {
+    if (idx < 0 || !decode_glyph_at(font, (uint16_t)idx, &g)) {
         if (adv_out) *adv_out = 0;
         return;
     }
@@ -478,10 +478,10 @@ static void draw_u8g2_glyph(eui_canvas_t *canvas, const eui_font_t *font,
     if (adv_out) *adv_out = g.x_advance;
 }
 
-/* Draw a u8g2 glyph by direct glyph index (for kerning) */
+/* Draw a u8g2 glyph by data offset (for kerning) */
 static void draw_u8g2_glyph_by_index(eui_canvas_t *canvas,
                                       const eui_font_t *font,
-                                      uint8_t idx, int16_t x, int16_t y,
+                                      uint16_t idx, int16_t x, int16_t y,
                                       uint8_t *adv_out)
 {
     u8g2_glyph_t g;
@@ -575,7 +575,7 @@ uint16_t eui_canvas_draw_str(eui_canvas_t *canvas, int16_t x, int16_t y, const c
                                                          (uint16_t)(uint8_t)prev);
             if (kn_idx >= 0) {
                 uint8_t adv = 0;
-                draw_u8g2_glyph_by_index(canvas, canvas->font, (uint8_t)kn_idx, cur_x, y, &adv);
+                draw_u8g2_glyph_by_index(canvas, canvas->font, (uint16_t)kn_idx, cur_x, y, &adv);
                 cur_x += adv;
                 prev = *s;
                 continue;
