@@ -97,9 +97,9 @@ static void test_u8g2_draw_a(void)
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x18, 0x3C, 0x66, 0x7E, 0x66, 0x66, 0x66, 0x00};
-    if (memcmp(buf + test_font.baseline, expected, 8) != 0) {
+    if (memcmp(buf, expected, 8) != 0) {
         printf("FAIL: got ");
-        for (int i = 0; i < 8; i++) printf("%02X ", buf[test_font.baseline + i]);
+        for (int i = 0; i < 8; i++) printf("%02X ", buf[i]);
         printf("\n");
         return;
     }
@@ -114,7 +114,7 @@ static void test_u8g2_draw_b(void)
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x7C, 0x66, 0x66, 0x7C, 0x66, 0x66, 0x7C, 0x00};
-    if (memcmp(buf + test_font.baseline, expected, 8) != 0) FAIL("glyph mismatch");
+    if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch");
     PASS();
 }
 
@@ -126,7 +126,7 @@ static void test_u8g2_draw_c(void)
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x3C, 0x66, 0x60, 0x60, 0x60, 0x66, 0x3C, 0x00};
-    if (memcmp(buf + test_font.baseline, expected, 8) != 0) FAIL("glyph mismatch");
+    if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch");
     PASS();
 }
 
@@ -138,7 +138,7 @@ static void test_u8g2_draw_d(void)
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x78, 0x6C, 0x66, 0x66, 0x66, 0x6C, 0x78, 0x00};
-    if (memcmp(buf + test_font.baseline, expected, 8) != 0) FAIL("glyph mismatch");
+    if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch");
     PASS();
 }
 
@@ -150,7 +150,7 @@ static void test_u8g2_draw_e(void)
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x7E, 0x60, 0x60, 0x7C, 0x60, 0x60, 0x7E, 0x00};
-    if (memcmp(buf + test_font.baseline, expected, 8) != 0) FAIL("glyph mismatch");
+    if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch");
     PASS();
 }
 
@@ -162,7 +162,7 @@ static void test_u8g2_draw_f(void)
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x7E, 0x60, 0x60, 0x7C, 0x60, 0x60, 0x60, 0x00};
-    if (memcmp(buf + test_font.baseline, expected, 8) != 0) FAIL("glyph mismatch");
+    if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch");
     PASS();
 }
 
@@ -174,7 +174,7 @@ static void test_u8g2_draw_g(void)
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x3C, 0x66, 0x60, 0x6E, 0x66, 0x66, 0x3C, 0x00};
-    if (memcmp(buf + test_font.baseline, expected, 8) != 0) FAIL("glyph mismatch");
+    if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch");
     PASS();
 }
 
@@ -186,7 +186,7 @@ static void test_u8g2_draw_h(void)
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x66, 0x66, 0x66, 0x7E, 0x66, 0x66, 0x66, 0x00};
-    if (memcmp(buf + test_font.baseline, expected, 8) != 0) FAIL("glyph mismatch");
+    if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch");
     PASS();
 }
 

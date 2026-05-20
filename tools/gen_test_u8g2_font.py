@@ -153,7 +153,7 @@ for ch in sorted(bdf_glyphs.keys()):
     bw.write_bits(MAX_CHAR_W, BITS_PER_CHAR_W)
     bw.write_bits(MAX_CHAR_H, BITS_PER_CHAR_H)
     bw.write_bits(encode_signed(0, BITS_PER_CHAR_X), BITS_PER_CHAR_X)     # x_offset=0
-    bw.write_bits(encode_signed(0, BITS_PER_CHAR_Y), BITS_PER_CHAR_Y)     # y_offset=0
+    bw.write_bits(encode_signed(-1, BITS_PER_CHAR_Y), BITS_PER_CHAR_Y)     # y_offset=-1: baseline(7) - height(8) = -1
     bw.write_bits(encode_signed(MAX_CHAR_W, BITS_PER_DELTA_X), BITS_PER_DELTA_X)  # advance=8
 
     # Encode glyph pixels

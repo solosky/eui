@@ -15,6 +15,7 @@
 #define HDR_MAX_CHAR_H      10
 #define HDR_START_POS_UPPER_A 17
 #define HDR_START_POS_LOWER_A 19
+#define HDR_START_POS_UNICODE 21
 #define U8G2_HEADER_SIZE    23
 
 typedef struct {
@@ -62,6 +63,45 @@ static uint16_t get_be16(const uint8_t *p)
     return ((uint16_t)p[0] << 8) | p[1];
 }
 
+/* Search the unicode encoding table for a glyph.
+ * Returns pointer to packed glyph data, or NULL if not found. */
+static const uint8_t* find_glyph_data_unicode(const eui_font_t *font, uint16_t encoding)
+{
+    const uint8_t *p = font->data;
+    uint16_t unicode_off = get_be16(p + HDR_START_POS_UNICODE);
+    if (unicode_off == 0) return NULL;
+
+    const uint8_t *jump_table = p + U8G2_HEADER_SIZE + unicode_off;
+    const uint8_t *lt = jump_table;
+
+    for (;;) {
+        uint16_t block_off = get_be16(lt);
+        uint16_t last_unicode = get_be16(lt + 2);
+
+        if (last_unicode == 0xFFFF) return NULL;
+
+        const uint8_t *block = jump_table + block_off;
+        lt += 4;
+
+        /* Compute block end boundary from next jump entry */
+        uint16_t next_off = get_be16(lt);
+        const uint8_t *block_end = jump_table + next_off;
+
+        if (last_unicode >= encoding) {
+            /* Linear search within this block */
+            const uint8_t *entry = block;
+            while (entry + 3 <= block_end) {
+                uint16_t code = get_be16(entry);
+                uint8_t jump = entry[2];
+                if (jump < 3 || jump > 60) return NULL;
+                if (code == encoding) return entry + 3;
+                entry += jump;
+            }
+            return NULL;
+        }
+    }
+}
+
 /* Walk the index table to find glyph data for the given encoding.
  * Returns pointer to packed glyph data, or NULL if not found. */
 static const uint8_t* find_glyph_data(const eui_font_t *font, uint16_t encoding)
@@ -79,6 +119,11 @@ static const uint8_t* find_glyph_data(const eui_font_t *font, uint16_t encoding)
     while (entry[1] != 0) {
         if (entry[0] == (uint8_t)encoding) return entry + 2;
         entry += entry[1];
+    }
+
+    /* Fall back to unicode encoding table for code points > 255 */
+    if (encoding > 255 || get_be16(p + HDR_START_POS_UNICODE) != 0) {
+        return find_glyph_data_unicode(font, encoding);
     }
     return NULL;
 }
@@ -231,18 +276,17 @@ uint16_t eui_font_u8g2_get_str_width(const eui_font_t *font, const char *str)
     return w;
 }
 
-uint8_t eui_font_u8g2_draw_char(const eui_font_t *font, char c,
-                                 uint8_t *buf, uint16_t buf_stride,
-                                 uint8_t color_depth)
+uint8_t eui_font_u8g2_draw_glyph(const eui_font_t *font, uint16_t encoding,
+                                  uint8_t *buf, uint16_t buf_stride,
+                                  uint8_t color_depth)
 {
     if (!font || !font->data || !buf) return 0;
 
     u8g2_glyph_t g = {0};
-    const uint8_t *gd = find_glyph_data(font, (uint8_t)c);
+    const uint8_t *gd = find_glyph_data(font, encoding);
     if (!gd) return 0;
     if (!decode_glyph_metrics(font, gd, &g)) return 0;
 
-    /* baseline = ascent, y_offset is glyph's shift from baseline */
     int8_t baseline = font->baseline;
 
     for (uint16_t py = 0; py < g.height; py++) {
@@ -250,9 +294,7 @@ uint8_t eui_font_u8g2_draw_char(const eui_font_t *font, char c,
             uint16_t pix_idx = (uint16_t)py * g.width + px;
             if (get_bitmap_pixel(font->data, g.bitmap_byte, g.bitmap_bit, pix_idx,
                                    g.width, g.height)) {
-                /* Apply baseline and y_offset for correct vertical positioning.
-                 * x_offset is NOT applied here — caller handles horizontal position. */
-                int16_t buf_row = (int16_t)baseline + (int16_t)g.y_offset + (int16_t)py;
+                int16_t buf_row = (int16_t)baseline - (int16_t)g.height - (int16_t)g.y_offset + (int16_t)py;
                 if (buf_row < 0) continue;
                 if (color_depth == 1) {
                     buf[(uint16_t)buf_row * buf_stride + px / 8] |= (1u << (7 - (px % 8)));
@@ -261,6 +303,13 @@ uint8_t eui_font_u8g2_draw_char(const eui_font_t *font, char c,
         }
     }
     return g.x_advance;
+}
+
+uint8_t eui_font_u8g2_draw_char(const eui_font_t *font, char c,
+                                 uint8_t *buf, uint16_t buf_stride,
+                                 uint8_t color_depth)
+{
+    return eui_font_u8g2_draw_glyph(font, (uint8_t)c, buf, buf_stride, color_depth);
 }
 
 /* Alternative draw using bitmap pixel approach */
