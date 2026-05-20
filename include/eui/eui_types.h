@@ -57,16 +57,26 @@ typedef struct {
 } eui_bitmap_t;
 
 /* ---- Font ---- */
-typedef struct {
-    uint8_t  format;        /* 0 = u8g2 bdf, 1 = VLW */
+
+struct eui_font;
+
+typedef int16_t (*eui_font_lookup_fn)(const struct eui_font *font,
+                                       uint16_t encoding, uint16_t prev);
+
+typedef struct eui_font {
+    uint8_t  format;
     uint8_t  line_height;
     uint8_t  baseline;
-    uint8_t  flags;         /* bit0: 0=variable, 1=fixed width */
+    uint8_t  flags;
     const uint8_t *data;
+#if EUI_FONT_ENABLE_U8G2
+    eui_font_lookup_fn lookup_glyph;
+#endif
 } eui_font_t;
 
-/* Font flags */
 #define EUI_FONT_FIXED_WIDTH  (1u << 0)
+#define EUI_FONT_HAS_KERNING  (1u << 1)
+#define EUI_FONT_HAS_UNICODE  (1u << 2)
 
 /* ---- Buffer mode ---- */
 typedef enum {
