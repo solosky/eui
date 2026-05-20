@@ -12,9 +12,9 @@
 #define HDR_BITS_PER_CHAR_Y 7
 #define HDR_BITS_PER_DELTA_X 8
 #define HDR_MAX_CHAR_W      9
-#define HDR_MAX_CHAR_H      11
-#define HDR_START_POS_UNICODE 19
-#define U8G2_HEADER_SIZE    21
+#define HDR_MAX_CHAR_H      10
+#define HDR_START_POS_UNICODE 17
+#define U8G2_HEADER_SIZE    19
 
 typedef struct {
     const uint8_t *data;
@@ -31,6 +31,13 @@ typedef struct {
     uint16_t bitmap_byte;
     uint8_t  bitmap_bit;
 } u8g2_glyph_t;
+
+static void br_clone(bit_reader_t *dst, const bit_reader_t *src)
+{
+    dst->data = src->data;
+    dst->byte_pos = src->byte_pos;
+    dst->bit_pos = src->bit_pos;
+}
 
 static void br_init(bit_reader_t *br, const uint8_t *data)
 {
@@ -51,13 +58,6 @@ static uint8_t br_read(bit_reader_t *br, uint8_t num_bits)
     return val;
 }
 
-static void br_skip(bit_reader_t *br, uint16_t num_bits)
-{
-    uint16_t total = (uint16_t)br->bit_pos + num_bits;
-    br->byte_pos += total / 8;
-    br->bit_pos = (uint8_t)(total % 8);
-}
-
 static int16_t default_lookup(const eui_font_t *font, uint16_t encoding, uint16_t prev)
 {
     (void)font; (void)prev;
@@ -71,6 +71,69 @@ int16_t eui_font_u8g2_lookup_glyph(const eui_font_t *font, uint16_t encoding, ui
     return default_lookup(font, encoding, prev);
 }
 
+static void rle_skip(bit_reader_t *br, uint16_t pixel_count,
+                      uint8_t bp0, uint8_t bp1)
+{
+    uint8_t max0 = ((1u << bp0) - 1) - 1;
+    uint8_t max1 = ((1u << bp1) - 1) - 1;
+    uint8_t rt = 0;
+    int16_t rem = (int16_t)pixel_count;
+
+    while (rem > 0) {
+        uint8_t bits = rt ? bp1 : bp0;
+        uint8_t max_run = rt ? max1 : max0;
+        uint16_t run = 0;
+        uint8_t v;
+        do {
+            v = br_read(br, bits);
+            run += v;
+        } while (v == max_run);
+
+        if (run > (uint16_t)rem) run = rem;
+        rem -= (int16_t)run;
+        rt = !rt;
+    }
+}
+
+static uint8_t rle_decode(bit_reader_t *br, uint8_t width, uint8_t height,
+                           uint8_t bp0, uint8_t bp1,
+                           uint8_t *buf, uint16_t buf_stride,
+                           uint8_t color_depth)
+{
+    uint8_t max0 = ((1u << bp0) - 1) - 1;
+    uint8_t max1 = ((1u << bp1) - 1) - 1;
+    uint8_t rt = 0;
+    uint16_t remaining = (uint16_t)width * height;
+    uint16_t px = 0;
+
+    while (remaining > 0) {
+        uint8_t bits = rt ? bp1 : bp0;
+        uint8_t max_run = rt ? max1 : max0;
+        uint16_t run = 0;
+        uint8_t v;
+        do {
+            v = br_read(br, bits);
+            run += v;
+        } while (v == max_run);
+
+        if (run > remaining) run = remaining;
+
+        if (rt && color_depth == 1) {
+            for (uint16_t k = 0; k < run; k++) {
+                uint16_t row = px / width;
+                uint16_t col = px % width;
+                buf[row * buf_stride + col / 8] |= (1u << (7 - (col % 8)));
+                px++;
+            }
+        } else {
+            px += run;
+        }
+        remaining -= run;
+        rt = !rt;
+    }
+    return 1;
+}
+
 /* Decode glyph at index. Returns 1 on success, placing data in *glyph. */
 static uint8_t decode_glyph_at(const eui_font_t *font, uint8_t idx, u8g2_glyph_t *glyph)
 {
@@ -80,8 +143,8 @@ static uint8_t decode_glyph_at(const eui_font_t *font, uint8_t idx, u8g2_glyph_t
     uint8_t  bpcw = p[HDR_BITS_PER_CHAR_W], bpch = p[HDR_BITS_PER_CHAR_H];
     uint8_t  bpcx = p[HDR_BITS_PER_CHAR_X], bpcy = p[HDR_BITS_PER_CHAR_Y];
     uint8_t  bpdx = p[HDR_BITS_PER_DELTA_X];
-    uint8_t  mcw = p[HDR_MAX_CHAR_W] | ((uint16_t)p[HDR_MAX_CHAR_W+1] << 8);
-    uint8_t  mch = p[HDR_MAX_CHAR_H] | ((uint16_t)p[HDR_MAX_CHAR_H+1] << 8);
+    uint8_t  mcw = p[HDR_MAX_CHAR_W];
+    uint8_t  mch = p[HDR_MAX_CHAR_H];
     uint8_t  all0 = (1u << bp0) - 1, all1 = (1u << bp1) - 1;
 
     if (idx >= glyph_cnt) return 0;
@@ -90,17 +153,18 @@ static uint8_t decode_glyph_at(const eui_font_t *font, uint8_t idx, u8g2_glyph_t
     br_init(&br, font->data);
 
     for (uint8_t i = 0; i <= idx; i++) {
-        /* Skip intermediate runs until glyph boundary */
         uint8_t marker;
         while (1) {
             marker = br_read(&br, bp0);
-            if (marker == all0) break;  /* glyph boundary */
-            /* normal run: skip ones count and bitmap bits */
+            if (marker == all0) {
+                uint8_t escape = br_read(&br, bp1);
+                if (escape == all1) return 0;
+                break;
+            }
             uint8_t ones = br_read(&br, bp1);
-            if (ones == all1) return 0;  /* end of data */
-            br_skip(&br, (uint16_t)marker + ones);
+            if (ones == all1) return 0;
+            rle_skip(&br, (uint16_t)marker + ones, bp0, bp1);
         }
-        /* Read glyph metrics */
         uint8_t cw = br_read(&br, bpcw);
         uint8_t ch = br_read(&br, bpch);
         uint8_t cx = br_read(&br, bpcx);
@@ -113,25 +177,12 @@ static uint8_t decode_glyph_at(const eui_font_t *font, uint8_t idx, u8g2_glyph_t
         glyph->y_offset  = (int8_t)cy;
         glyph->x_advance = dx ? dx : mcw;
 
-        /* Record bitmap position */
         glyph->bitmap_byte = br.byte_pos;
         glyph->bitmap_bit  = br.bit_pos;
 
-        /* Skip bitmap for all glyphs */
-        uint16_t bm_bits = (uint16_t)glyph->width * glyph->height;
-        br_skip(&br, bm_bits);
+        rle_skip(&br, (uint16_t)glyph->width * glyph->height, bp0, bp1);
     }
     return 1;
-}
-
-/* Read one bitmap pixel from a specific bit position */
-static uint8_t get_bitmap_pixel(const uint8_t *data, uint16_t byte_off,
-                                 uint8_t bit_off, uint16_t pixel_idx)
-{
-    uint16_t total_bit = (uint16_t)byte_off * 8 + bit_off + pixel_idx;
-    uint16_t byte_idx = total_bit / 8;
-    uint8_t  bit_idx  = total_bit % 8;
-    return (data[byte_idx] >> (7 - bit_idx)) & 1;
 }
 
 uint8_t eui_font_u8g2_get_char_width(const eui_font_t *font, char c)
@@ -161,15 +212,17 @@ uint8_t eui_font_u8g2_draw_char(const eui_font_t *font, char c,
     u8g2_glyph_t g;
     if (!decode_glyph_at(font, (uint8_t)idx, &g)) return 0;
 
-    for (uint8_t row = 0; row < g.height; row++) {
-        for (uint8_t col = 0; col < g.width; col++) {
-            uint16_t px = (uint16_t)row * g.width + col;
-            if (get_bitmap_pixel(font->data, g.bitmap_byte, g.bitmap_bit, px)) {
-                if (color_depth == 1) {
-                    buf[row * buf_stride + col / 8] |= (1u << (7 - (col % 8)));
-                }
-            }
-        }
+    if (color_depth == 1) {
+        const uint8_t *p = font->data;
+        uint8_t bp0 = p[HDR_BITS_PER_0];
+        uint8_t bp1 = p[HDR_BITS_PER_1];
+
+        bit_reader_t br;
+        br.data = font->data;
+        br.byte_pos = g.bitmap_byte;
+        br.bit_pos = g.bitmap_bit;
+
+        rle_decode(&br, g.width, g.height, bp0, bp1, buf, buf_stride, color_depth);
     }
     return g.x_advance;
 }

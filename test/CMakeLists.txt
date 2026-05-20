@@ -23,6 +23,11 @@ target_include_directories(test_font PRIVATE ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(test_font PRIVATE eui)
 add_test(NAME font COMMAND test_font)
 
+add_executable(test_font_u8g2 test_font_u8g2.c)
+target_include_directories(test_font_u8g2 PRIVATE ${CMAKE_BINARY_DIR}/include)
+target_link_libraries(test_font_u8g2 PRIVATE eui)
+add_test(NAME font_u8g2 COMMAND test_font_u8g2)
+
 add_executable(test_view test_view.c)
 target_include_directories(test_view PRIVATE ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(test_view PRIVATE eui)
