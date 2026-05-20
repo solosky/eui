@@ -9,6 +9,7 @@
 #include "eui/eui_types.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #define POOL_SIZE 65536
 static uint8_t mem_pool[POOL_SIZE];
@@ -43,31 +44,80 @@ static int count_pixels_1bpp(void)
     return count;
 }
 
-static void write_pbm(const char *filename)
+static void write_bmp(const char *filename)
 {
     FILE *f = fopen(filename, "wb");
     if (!f) { printf("FAIL: cannot open %s\n", filename); return; }
-    fprintf(f, "P4\n%d %d\n", IMG_W, IMG_H);
+
+    int row_size = ((IMG_W + 31) / 32) * 4;
+    int pixel_data_size = row_size * IMG_H;
+    int palette_size = 8;
+    int offset = 14 + 40 + palette_size;
+    int file_size = offset + pixel_data_size;
+
+    /* BMP file header */
+    uint16_t bfType = 0x4D42;
+    uint32_t bfSize = file_size;
+    uint32_t bfOffBits = offset;
+    fwrite(&bfType, 2, 1, f);
+    fwrite(&bfSize, 4, 1, f);
+    uint32_t zero32 = 0;
+    fwrite(&zero32, 4, 1, f);
+    fwrite(&bfOffBits, 4, 1, f);
+
+    /* DIB header (BITMAPINFOHEADER) */
+    uint32_t biSize = 40;
+    int32_t  biWidth = IMG_W;
+    int32_t  biHeight = IMG_H;
+    uint16_t biPlanes = 1;
+    uint16_t biBitCount = 1;
+    uint32_t biCompression = 0;
+    uint32_t biSizeImage = pixel_data_size;
+    int32_t  biXPelsPerMeter = 2835;
+    int32_t  biYPelsPerMeter = 2835;
+    uint32_t biClrUsed = 2;
+    uint32_t biClrImportant = 2;
+    fwrite(&biSize, 4, 1, f);
+    fwrite(&biWidth, 4, 1, f);
+    fwrite(&biHeight, 4, 1, f);
+    fwrite(&biPlanes, 2, 1, f);
+    fwrite(&biBitCount, 2, 1, f);
+    fwrite(&biCompression, 4, 1, f);
+    fwrite(&biSizeImage, 4, 1, f);
+    fwrite(&biXPelsPerMeter, 4, 1, f);
+    fwrite(&biYPelsPerMeter, 4, 1, f);
+    fwrite(&biClrUsed, 4, 1, f);
+    fwrite(&biClrImportant, 4, 1, f);
+
+    /* Palette: black (index 0) and white (index 1) */
+    uint8_t black[4] = {0, 0, 0, 0};
+    uint8_t white[4] = {255, 255, 255, 0};
+    fwrite(black, 4, 1, f);
+    fwrite(white, 4, 1, f);
+
+    /* Pixel data: bottom-up, 1=bright (white=fg), 0=black (bg) */
+    uint8_t *row = malloc(row_size);
+    if (!row) { fclose(f); return; }
+
+    for (int y = IMG_H - 1; y >= 0; y--) {
+        memset(row, 0, row_size);
+        for (int x = 0; x < IMG_W; x++) {
 #if EUI_COLOR_DEPTH == 1
-    fwrite(img_buf, 1, BUF_SIZE, f);
+            int idx = y * (IMG_W / 8) + x / 8;
+            int bit = (img_buf[idx] >> (7 - (x % 8))) & 1;
+#elif EUI_COLOR_DEPTH == 8
+            int bit = img_buf[y * IMG_W + x] > 128 ? 1 : 0;
 #else
-    for (int y = 0; y < IMG_H; y++) {
-        for (int x = 0; x < IMG_W; x += 8) {
-            uint8_t byte = 0;
-            for (int b = 0; b < 8 && x + b < IMG_W; b++) {
-                int idx = y * IMG_W + x + b;
-#if EUI_COLOR_DEPTH == 8
-                if (img_buf[idx] > 128) byte |= (1 << (7 - b));
-#else
-                uint16_t *p16 = (uint16_t *)img_buf;
-                if (p16[idx] > 0) byte |= (1 << (7 - b));
+            uint16_t *p16 = (uint16_t *)img_buf;
+            int bit = p16[y * IMG_W + x] > 0 ? 1 : 0;
 #endif
-            }
-            fwrite(&byte, 1, 1, f);
+            if (bit) row[x / 8] |= (1 << (7 - (x % 8)));
         }
+        fwrite(row, 1, row_size, f);
     }
-#endif
+    free(row);
     fclose(f);
+    printf("  Written: %s (%d bytes)\n", filename, file_size);
 }
 
 int main(void)
@@ -134,7 +184,7 @@ int main(void)
     printf("  Total chars: %d, render errors: %d\n", char_count, fail_count);
     printf("  Total pixels: %d\n", count_pixels_1bpp());
 
-    write_pbm("font_render.pbm");
+    write_bmp("font_render.bmp");
 
     if (count_pixels_1bpp() == 0) {
         printf("FAIL: no pixels rendered\n");
