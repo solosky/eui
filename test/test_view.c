@@ -100,7 +100,7 @@ static void test_dispatcher_switch(void) {
     TEST("dispatcher switch_to");
     eui_canvas_t *c = eui_canvas_create(&mock_display);
     eui_view_dispatcher_t vd;
-    eui_view_dispatcher_init(&vd, c);
+    eui_view_dispatcher_init(&vd, c, NULL);
 
     eui_view_t v1, v2;
     eui_view_init(&v1, vd_handler, NULL);
@@ -123,7 +123,7 @@ static void test_dispatcher_overlay(void) {
     TEST("dispatcher overlay push/pop");
     eui_canvas_t *c = eui_canvas_create(&mock_display);
     eui_view_dispatcher_t vd;
-    eui_view_dispatcher_init(&vd, c);
+    eui_view_dispatcher_init(&vd, c, NULL);
 
     eui_view_t base, overlay;
     eui_view_init(&base, vd_handler, NULL);

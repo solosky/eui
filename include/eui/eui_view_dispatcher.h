@@ -17,9 +17,16 @@ typedef struct eui_view_dispatcher_t {
     uint8_t overlay_count;
     bool running;
     eui_canvas_t *canvas;
+
+    /* Transition animation state */
+    bool transitioning;
+    eui_anim_type_t transition_type;
+    eui_view_t *transition_prev_view;
+    uint32_t transition_start_ms;
+    uint32_t (*get_tick_ms)(void);
 } eui_view_dispatcher_t;
 
-void eui_view_dispatcher_init(eui_view_dispatcher_t *vd, eui_canvas_t *canvas);
+void eui_view_dispatcher_init(eui_view_dispatcher_t *vd, eui_canvas_t *canvas, uint32_t (*get_tick_ms)(void));
 int  eui_view_dispatcher_add(eui_view_dispatcher_t *vd, uint32_t view_id, eui_view_t *view);
 void eui_view_dispatcher_switch_to(eui_view_dispatcher_t *vd, uint32_t view_id, eui_anim_type_t anim);
 int  eui_view_dispatcher_push_overlay(eui_view_dispatcher_t *vd, eui_view_t *overlay, eui_anim_type_t anim);

@@ -3,9 +3,10 @@
 #include "eui/eui_canvas.h"
 #include <string.h>
 
-void eui_view_dispatcher_init(eui_view_dispatcher_t *vd, eui_canvas_t *canvas) {
+void eui_view_dispatcher_init(eui_view_dispatcher_t *vd, eui_canvas_t *canvas, uint32_t (*get_tick_ms)(void)) {
     memset(vd, 0, sizeof(*vd));
     vd->canvas = canvas;
+    vd->get_tick_ms = get_tick_ms;
     vd->running = false;
 }
 
@@ -28,8 +29,6 @@ eui_view_t* eui_view_dispatcher_get_active(eui_view_dispatcher_t *vd) {
 }
 
 void eui_view_dispatcher_switch_to(eui_view_dispatcher_t *vd, uint32_t view_id, eui_anim_type_t anim) {
-    (void)anim;
-
     int found_idx = -1;
     for (int i = 0; i < (int)vd->view_count; i++) {
         if (vd->views[i].id == view_id) {
@@ -39,15 +38,36 @@ void eui_view_dispatcher_switch_to(eui_view_dispatcher_t *vd, uint32_t view_id, 
     }
     if (found_idx < 0) return;
 
-    if (vd->overlay_count == 0) {
-        if (vd->view_count > 0 && vd->current_view_idx < vd->view_count) {
-            eui_view_send_exit(vd->views[vd->current_view_idx].view);
+    /* Finalize any in-progress transition */
+    if (vd->transitioning) {
+        if (vd->transition_prev_view) {
+            eui_view_send_exit(vd->transition_prev_view);
         }
+        vd->transitioning = false;
+    }
+
+    if (vd->overlay_count > 0) {
+        vd->current_view_idx = (uint8_t)found_idx;
+        return;
+    }
+
+    eui_view_t *old_view = NULL;
+    if (vd->view_count > 0 && vd->current_view_idx < vd->view_count) {
+        old_view = vd->views[vd->current_view_idx].view;
+    }
+
+    if (anim != EUI_ANIM_NONE && old_view && old_view != vd->views[found_idx].view) {
+        vd->transitioning = true;
+        vd->transition_type = anim;
+        vd->transition_prev_view = old_view;
+        vd->transition_start_ms = vd->get_tick_ms ? vd->get_tick_ms() : 0;
+        vd->current_view_idx = (uint8_t)found_idx;
+        eui_view_send_enter(vd->views[vd->current_view_idx].view);
+    } else {
+        if (old_view) eui_view_send_exit(old_view);
         vd->current_view_idx = (uint8_t)found_idx;
         eui_view_send_enter(vd->views[vd->current_view_idx].view);
         eui_view_send_draw(vd->views[vd->current_view_idx].view, vd->canvas);
-    } else {
-        vd->current_view_idx = (uint8_t)found_idx;
     }
 }
 
@@ -85,12 +105,77 @@ void eui_view_dispatcher_pop_overlay(eui_view_dispatcher_t *vd, eui_anim_type_t 
     }
 }
 
-void eui_view_dispatcher_tick(eui_view_dispatcher_t *vd) {
-    eui_view_t *active = eui_view_dispatcher_get_active(vd);
-    if (active) {
-        eui_canvas_clear(vd->canvas);
-        eui_view_send_draw(active, vd->canvas);
+static void render_transition(eui_view_dispatcher_t *vd) {
+    if (!vd->transition_prev_view || !vd->transition_start_ms) return;
+
+    eui_view_t *new_view = eui_view_dispatcher_get_active(vd);
+    if (!new_view) return;
+
+    uint32_t now = vd->get_tick_ms ? vd->get_tick_ms() : 0;
+    uint32_t elapsed = now - vd->transition_start_ms;
+    uint32_t duration = (vd->transition_type == EUI_ANIM_FADE) ? 400 : 300;
+    float progress = (float)elapsed / (float)duration;
+    if (progress > 1.0f) progress = 1.0f;
+
+    int16_t W = (int16_t)eui_canvas_width(vd->canvas);
+    int16_t H = (int16_t)eui_canvas_height(vd->canvas);
+
+    if (vd->transition_type == EUI_ANIM_FADE) {
+        /* Wipe: draw old view fully, then new view with growing clip */
+        eui_view_send_draw(vd->transition_prev_view, vd->canvas);
+
+        eui_rect_t clip = { 0, 0, (uint16_t)W, (uint16_t)((float)H * progress) };
+        eui_canvas_save(vd->canvas);
+        eui_canvas_set_clip(vd->canvas, &clip);
+        eui_view_send_draw(new_view, vd->canvas);
+        eui_canvas_restore(vd->canvas);
+    } else {
+        /* Slide: offset both views */
+        eui_rect_t old_save = vd->transition_prev_view->area;
+        eui_rect_t new_save = new_view->area;
+
+        switch (vd->transition_type) {
+            case EUI_ANIM_SLIDE_LEFT:
+                vd->transition_prev_view->area.x = (int16_t)(-(float)W * progress);
+                new_view->area.x = (int16_t)((float)W * (1.0f - progress));
+                break;
+            case EUI_ANIM_SLIDE_RIGHT:
+                vd->transition_prev_view->area.x = (int16_t)((float)W * progress);
+                new_view->area.x = (int16_t)(-(float)W * (1.0f - progress));
+                break;
+            case EUI_ANIM_SLIDE_UP:
+                vd->transition_prev_view->area.y = (int16_t)(-(float)H * progress);
+                new_view->area.y = (int16_t)((float)H * (1.0f - progress));
+                break;
+            default:
+                break;
+        }
+
+        eui_view_send_draw(vd->transition_prev_view, vd->canvas);
+        eui_view_send_draw(new_view, vd->canvas);
+
+        vd->transition_prev_view->area = old_save;
+        new_view->area = new_save;
     }
+
+    if (progress >= 1.0f) {
+        eui_view_send_exit(vd->transition_prev_view);
+        vd->transitioning = false;
+    }
+}
+
+void eui_view_dispatcher_tick(eui_view_dispatcher_t *vd) {
+    eui_canvas_clear(vd->canvas);
+
+    if (vd->transitioning) {
+        render_transition(vd);
+    } else {
+        eui_view_t *active = eui_view_dispatcher_get_active(vd);
+        if (active) {
+            eui_view_send_draw(active, vd->canvas);
+        }
+    }
+
     eui_canvas_commit(vd->canvas);
 }
 

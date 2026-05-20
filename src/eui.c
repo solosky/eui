@@ -27,7 +27,7 @@ int eui_init(const eui_config_t *config) {
     if (!g_eui.canvas) return -1;
 
     eui_input_init(&g_eui.input_mgr, config->input);
-    eui_view_dispatcher_init(&g_eui.vd, g_eui.canvas);
+    eui_view_dispatcher_init(&g_eui.vd, g_eui.canvas, eui_get_tick_ms);
     eui_anim_init();
     g_eui.last_tick_ms = 0;
     g_eui.initialized = true;
