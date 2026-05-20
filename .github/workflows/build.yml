@@ -16,10 +16,54 @@ jobs:
           submodules: recursive
 
       - name: Configure
-        run: cmake -B build -DEUI_BUILD_TESTS=ON -DEUI_BUILD_EXAMPLES=OFF -DEUI_COLOR_DEPTH=${{ matrix.color_depth }}
+        run: cmake -B build -DEUI_BUILD_TESTS=ON -DEUI_BUILD_EXAMPLES=OFF -DEUI_COLOR_DEPTH=${{ matrix.color_depth }} -DEUI_FONT_ENABLE_U8G2=ON -DEUI_FONT_ENABLE_KERNING=ON -DEUI_FONT_ENABLE_MULTILINE=ON
 
       - name: Build
         run: cmake --build build -j
 
       - name: Run tests
         run: cd build && ctest --output-on-failure
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure for coverage
+        run: |
+          cmake -B build \
+            -DEUI_BUILD_TESTS=ON \
+            -DEUI_BUILD_EXAMPLES=OFF \
+            -DEUI_COLOR_DEPTH=1 \
+            -DEUI_FONT_ENABLE_U8G2=ON \
+            -DEUI_FONT_ENABLE_KERNING=ON \
+            -DEUI_FONT_ENABLE_MULTILINE=ON \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="--coverage" \
+            -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Run tests
+        run: cd build && ctest --output-on-failure
+
+      - name: Generate coverage report
+        run: |
+          cd build
+          lcov --capture --directory . --output-file coverage.info
+          lcov --remove coverage.info '/usr/*' '*/test/*' '*/third_party/*' --output-file coverage.info
+          lcov --list coverage.info
+
+      - name: Check coverage threshold
+        run: |
+          cd build
+          COV=$(lcov --summary coverage.info 2>&1 | grep lines | grep -oP '\d+\.\d+' | head -1)
+          echo "Line coverage: ${COV}%"
+          if (( $(echo "$COV < 90.0" | bc -l) )); then
+            echo "Coverage below 90% threshold!"
+            exit 1
+          fi
