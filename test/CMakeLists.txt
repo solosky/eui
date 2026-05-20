@@ -38,6 +38,11 @@ target_include_directories(test_font_multiline PRIVATE ${CMAKE_BINARY_DIR}/inclu
 target_link_libraries(test_font_multiline PRIVATE eui)
 add_test(NAME font_multiline COMMAND test_font_multiline)
 
+add_executable(test_font_canvas test_font_canvas.c)
+target_include_directories(test_font_canvas PRIVATE ${CMAKE_BINARY_DIR}/include)
+target_link_libraries(test_font_canvas PRIVATE eui)
+add_test(NAME font_canvas COMMAND test_font_canvas)
+
 add_executable(test_view test_view.c)
 target_include_directories(test_view PRIVATE ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(test_view PRIVATE eui)
