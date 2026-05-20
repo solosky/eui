@@ -7,6 +7,7 @@ add_library(eui STATIC
     eui_font.c
     eui_font_bdf.c
     eui_font_vlw.c
+    eui_font_u8g2.c
     eui_font_builtin.c
     eui_view.c
     eui_view_dispatcher.c
