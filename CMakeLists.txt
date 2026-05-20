@@ -15,6 +15,9 @@ set(EUI_MAX_ANIMATIONS 8 CACHE STRING "Maximum concurrent animations")
 set(EUI_MAX_WIDGETS 32 CACHE STRING "Maximum widget instances")
 set(EUI_EVENT_QUEUE_SIZE 8 CACHE STRING "Event queue capacity")
 set(EUI_MAX_OVERLAYS 4 CACHE STRING "Overlay stack depth")
+set(EUI_FONT_ENABLE_U8G2 ON CACHE BOOL "Enable u8g2 font format support")
+set(EUI_FONT_ENABLE_KERNING ON CACHE BOOL "Enable font kerning support")
+set(EUI_FONT_ENABLE_MULTILINE ON CACHE BOOL "Enable multiline text support")
 
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/include/eui/eui_config.h.in
