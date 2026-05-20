@@ -212,6 +212,94 @@ static void test_vlw_null_data(void)
     PASS();
 }
 
+static void test_bdf_null_buffer(void)
+{
+    TEST("BDF draw_char with NULL buffer returns 0");
+    uint8_t adv = eui_font_draw_char(&eui_font_builtin, 'A', NULL, 1, 1);
+    if (adv != 0) FAIL("expected 0 with NULL buffer");
+    PASS();
+}
+
+static void test_vlw_null_buffer(void)
+{
+    TEST("VLW draw_char with NULL buffer returns 0");
+    uint8_t adv = eui_font_draw_char(&test_vlw_font, 'A', NULL, 1, 1);
+    if (adv != 0) FAIL("expected 0 with NULL buffer");
+    PASS();
+}
+
+static void test_bdf_null_str(void)
+{
+    TEST("BDF str_width with NULL string returns 0");
+    uint16_t w = eui_font_get_str_width(&eui_font_builtin, NULL);
+    if (w != 0) FAIL("expected 0 with NULL string");
+    PASS();
+}
+
+static void test_vlw_null_str(void)
+{
+    TEST("VLW str_width with NULL string returns 0");
+    uint16_t w = eui_font_get_str_width(&test_vlw_font, NULL);
+    if (w != 0) FAIL("expected 0 with NULL string");
+    PASS();
+}
+
+static void test_bdf_all_chars(void)
+{
+    TEST("BDF all chars in range have valid widths");
+    for (int c = 32; c <= 126; c++) {
+        uint8_t w = eui_font_get_char_width(&eui_font_builtin, (char)c);
+        if (w == 0) {
+            printf("FAIL: char %d (0x%02X) has width 0\n", c, c);
+            return;
+        }
+    }
+    PASS();
+}
+
+static void test_vlw_all_chars(void)
+{
+    TEST("VLW all test chars A-H return width 8");
+    const char *chars = "ABCDEFGH";
+    for (; *chars; chars++) {
+        uint8_t w = eui_font_get_char_width(&test_vlw_font, *chars);
+        if (w != 8) {
+            printf("FAIL: char '%c' has width %d, expected 8\n", *chars, w);
+            return;
+        }
+    }
+    PASS();
+}
+
+static void test_bdf_draw_char_edge(void)
+{
+    TEST("BDF draw_char with small buffer doesn't overflow");
+    uint8_t buf[16] = {0};
+    uint8_t adv = eui_font_draw_char(&eui_font_builtin, 'A', buf, 1, 1);
+    if (adv != 8) FAIL("expected advance 8");
+    for (int i = 8; i < 16; i++) {
+        if (buf[i] != 0) {
+            printf("FAIL: buf[%d] = 0x%02X, expected 0\n", i, buf[i]);
+            return;
+        }
+    }
+    PASS();
+}
+
+static void test_multiple_draw_calls(void)
+{
+    TEST("multiple draw_char calls accumulate");
+    uint8_t buf[8] = {0};
+    eui_font_draw_char(&eui_font_builtin, 'A', buf, 1, 1);
+    eui_font_draw_char(&eui_font_builtin, 'B', buf, 1, 1);
+    int nonzero = 0;
+    for (int i = 0; i < 8; i++) {
+        if (buf[i] != 0) nonzero = 1;
+    }
+    if (!nonzero) FAIL("expected non-zero buffer after multiple draws");
+    PASS();
+}
+
 int main(void)
 {
     eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
@@ -236,6 +324,14 @@ int main(void)
     test_vlw_draw_char_a();
     test_vlw_draw_char_b();
     test_vlw_null_data();
+    test_bdf_null_buffer();
+    test_vlw_null_buffer();
+    test_bdf_null_str();
+    test_vlw_null_str();
+    test_bdf_all_chars();
+    test_vlw_all_chars();
+    test_bdf_draw_char_edge();
+    test_multiple_draw_calls();
     printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     return tests_passed == tests_run ? 0 : 1;
 }
