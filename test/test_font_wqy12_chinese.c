@@ -161,8 +161,17 @@ int main(void)
     memset(img_buf, 0, sizeof(img_buf));
 
     uint16_t codes[256];
-    int total = discover_unicode_glyphs(&wqy12_font, codes, 256);
-    printf("  CJK glyphs found: %d\n", total);
+    int total_raw = discover_unicode_glyphs(&wqy12_font, codes, 256);
+
+    /* Filter to CJK Unified Ideographs only (U+4E00-U+9FFF) */
+    uint16_t cjk[256];
+    int total = 0;
+    for (int i = 0; i < total_raw && i < 256; i++) {
+        if (codes[i] >= 0x4E00 && codes[i] <= 0x9FFF) {
+            cjk[total++] = codes[i];
+        }
+    }
+    printf("  CJK glyphs found: %d (excluded %d non-CJK)\n", total, total_raw - total);
 
     int chars_per_row = 10;
     int cell_w = 20;
@@ -173,7 +182,7 @@ int main(void)
     int render_limit = chars_per_row * max_rows;
 
     for (int i = 0; i < total && i < render_limit; i++) {
-        uint16_t code = codes[i];
+        uint16_t code = cjk[i];
         int row = i / chars_per_row;
         int col = i % chars_per_row;
         int cx = margin_x + col * cell_w;
