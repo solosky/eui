@@ -390,15 +390,15 @@ void eui_canvas_draw_round_rect(eui_canvas_t *canvas, int16_t x, int16_t y,
         ddF_x += 2;
         f += ddF_x + 1;
 
-        canvas_set_pixel(canvas, l + cx, t - cy, canvas->fg_color);
-        canvas_set_pixel(canvas, ri - cx, t - cy, canvas->fg_color);
-        canvas_set_pixel(canvas, l + cx, b + cy, canvas->fg_color);
-        canvas_set_pixel(canvas, ri - cx, b + cy, canvas->fg_color);
+        canvas_set_pixel(canvas, l - cx, t - cy, canvas->fg_color);
+        canvas_set_pixel(canvas, ri + cx, t - cy, canvas->fg_color);
+        canvas_set_pixel(canvas, l - cx, b + cy, canvas->fg_color);
+        canvas_set_pixel(canvas, ri + cx, b + cy, canvas->fg_color);
 
-        canvas_set_pixel(canvas, l + cy, t - cx, canvas->fg_color);
-        canvas_set_pixel(canvas, ri - cy, t - cx, canvas->fg_color);
-        canvas_set_pixel(canvas, l + cy, b + cx, canvas->fg_color);
-        canvas_set_pixel(canvas, ri - cy, b + cx, canvas->fg_color);
+        canvas_set_pixel(canvas, l - cy, t - cx, canvas->fg_color);
+        canvas_set_pixel(canvas, ri + cy, t - cx, canvas->fg_color);
+        canvas_set_pixel(canvas, l - cy, b + cx, canvas->fg_color);
+        canvas_set_pixel(canvas, ri + cy, b + cx, canvas->fg_color);
     }
 }
 
@@ -421,6 +421,11 @@ void eui_canvas_fill_round_rect(eui_canvas_t *canvas, int16_t x, int16_t y,
     int16_t b = y + (int16_t)h - (int16_t)r - 1;
 
     eui_canvas_fill_rect(canvas, l, y, (uint16_t)(ri - l + 1), h);
+
+    if (b > t) {
+        eui_canvas_fill_rect(canvas, x, t, r, (uint16_t)(b - t + 1));
+        eui_canvas_fill_rect(canvas, ri + 1, t, r, (uint16_t)(b - t + 1));
+    }
 
     int16_t f = 1 - (int16_t)r;
     int16_t ddF_x = 0;

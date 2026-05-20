@@ -67,3 +67,8 @@ add_executable(test_drivers test_drivers.c)
 target_include_directories(test_drivers PRIVATE ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(test_drivers PRIVATE eui)
 add_test(NAME drivers COMMAND test_drivers)
+
+add_executable(test_canvas_render test_canvas_render.c)
+target_include_directories(test_canvas_render PRIVATE ${CMAKE_BINARY_DIR}/include)
+target_link_libraries(test_canvas_render PRIVATE eui)
+add_test(NAME canvas_render COMMAND test_canvas_render)
