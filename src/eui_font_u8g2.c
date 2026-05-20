@@ -108,6 +108,13 @@ static const uint8_t* find_glyph_data(const eui_font_t *font, uint16_t encoding)
 {
     if (!font || !font->data) return NULL;
     const uint8_t *p = font->data;
+
+    /* For code points > 255, skip 8-bit index table entirely to avoid
+     * false matches on the low byte (e.g. U+5165 would match 'e' at 0x65). */
+    if (encoding > 255) {
+        return find_glyph_data_unicode(font, encoding);
+    }
+
     const uint8_t *entry = p + U8G2_HEADER_SIZE;
 
     if (encoding >= 'a') {
@@ -121,8 +128,8 @@ static const uint8_t* find_glyph_data(const eui_font_t *font, uint16_t encoding)
         entry += entry[1];
     }
 
-    /* Fall back to unicode encoding table for code points > 255 */
-    if (encoding > 255 || get_be16(p + HDR_START_POS_UNICODE) != 0) {
+    /* Fall back to unicode encoding table if available */
+    if (get_be16(p + HDR_START_POS_UNICODE) != 0) {
         return find_glyph_data_unicode(font, encoding);
     }
     return NULL;
