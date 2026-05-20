@@ -1,8 +1,11 @@
 #include "eui/eui_font.h"
+#include "eui/eui_config.h"
 #include "eui/eui_types.h"
 #include "eui/eui_allocator.h"
 #include "test_font_kerning.h"
 #include <stdio.h>
+
+#if EUI_FONT_ENABLE_U8G2 && EUI_FONT_ENABLE_KERNING
 
 #define POOL_SIZE 32768
 static uint8_t mem_pool[POOL_SIZE];
@@ -91,3 +94,11 @@ int main(void)
     printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     return tests_passed == tests_run ? 0 : 1;
 }
+#else
+int main(void)
+{
+    printf("=== Kerning Tests ===\n");
+    printf("  SKIP: EUI_FONT_ENABLE_U8G2 or EUI_FONT_ENABLE_KERNING disabled\n");
+    return 0;
+}
+#endif

@@ -1,8 +1,11 @@
 #include "eui/eui_font.h"
+#include "eui/eui_config.h"
 #include "eui/eui_allocator.h"
 #include "test_u8g2_font.h"
 #include <stdio.h>
 #include <string.h>
+
+#if EUI_FONT_ENABLE_U8G2
 
 #define POOL_SIZE 32768
 static uint8_t mem_pool[POOL_SIZE];
@@ -235,3 +238,11 @@ int main(void)
     printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     return tests_passed == tests_run ? 0 : 1;
 }
+#else
+int main(void)
+{
+    printf("=== U8G2 Font Tests ===\n");
+    printf("  SKIP: EUI_FONT_ENABLE_U8G2 disabled\n");
+    return 0;
+}
+#endif

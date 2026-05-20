@@ -184,6 +184,7 @@ static void test_draw_str_ellipsis_truncates(void)
     PASS();
 }
 
+#if EUI_FONT_ENABLE_MULTILINE
 static void test_draw_str_in_rect_center(void)
 {
     TEST("draw_str_in_rect centers text");
@@ -265,6 +266,8 @@ static void test_draw_str_in_rect_right(void)
     eui_canvas_destroy(c);
     PASS();
 }
+
+#endif /* EUI_FONT_ENABLE_MULTILINE */
 
 #if EUI_FONT_ENABLE_MULTILINE
 
@@ -568,9 +571,9 @@ int main(void)
     test_draw_str_clipped();
     test_draw_str_ellipsis_fits();
     test_draw_str_ellipsis_truncates();
+#if EUI_FONT_ENABLE_MULTILINE
     test_draw_str_in_rect_center();
     test_draw_str_in_rect_right();
-#if EUI_FONT_ENABLE_MULTILINE
     test_multiline_simple();
     test_multiline_word_wrap();
     test_multiline_long_word();
