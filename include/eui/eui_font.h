@@ -6,6 +6,7 @@
 
 #define EUI_FONT_FORMAT_BDF  0
 #define EUI_FONT_FORMAT_VLW  1
+#define EUI_FONT_FORMAT_U8G2 2
 
 uint8_t  eui_font_get_char_width(const eui_font_t *font, char c);
 uint16_t eui_font_get_str_width(const eui_font_t *font, const char *str);
