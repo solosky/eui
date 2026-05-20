@@ -92,14 +92,14 @@ static void test_u8g2_empty_str(void)
 static void test_u8g2_draw_a(void)
 {
     TEST("u8g2 draw_char 'A' glyph");
-    uint8_t buf[8] = {0};
+    uint8_t buf[16] = {0};
     uint8_t adv = eui_font_draw_char(&test_font, 'A', buf, 1, 1);
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x18, 0x3C, 0x66, 0x7E, 0x66, 0x66, 0x66, 0x00};
-    if (memcmp(buf, expected, 8) != 0) {
+    if (memcmp(buf + test_font.baseline, expected, 8) != 0) {
         printf("FAIL: got ");
-        for (int i = 0; i < 8; i++) printf("%02X ", buf[i]);
+        for (int i = 0; i < 8; i++) printf("%02X ", buf[test_font.baseline + i]);
         printf("\n");
         return;
     }
@@ -109,84 +109,84 @@ static void test_u8g2_draw_a(void)
 static void test_u8g2_draw_b(void)
 {
     TEST("u8g2 draw_char 'B' glyph");
-    uint8_t buf[8] = {0};
+    uint8_t buf[16] = {0};
     uint8_t adv = eui_font_draw_char(&test_font, 'B', buf, 1, 1);
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x7C, 0x66, 0x66, 0x7C, 0x66, 0x66, 0x7C, 0x00};
-    if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch");
+    if (memcmp(buf + test_font.baseline, expected, 8) != 0) FAIL("glyph mismatch");
     PASS();
 }
 
 static void test_u8g2_draw_c(void)
 {
     TEST("u8g2 draw_char 'C' glyph");
-    uint8_t buf[8] = {0};
+    uint8_t buf[16] = {0};
     uint8_t adv = eui_font_draw_char(&test_font, 'C', buf, 1, 1);
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x3C, 0x66, 0x60, 0x60, 0x60, 0x66, 0x3C, 0x00};
-    if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch");
+    if (memcmp(buf + test_font.baseline, expected, 8) != 0) FAIL("glyph mismatch");
     PASS();
 }
 
 static void test_u8g2_draw_d(void)
 {
     TEST("u8g2 draw_char 'D' glyph");
-    uint8_t buf[8] = {0};
+    uint8_t buf[16] = {0};
     uint8_t adv = eui_font_draw_char(&test_font, 'D', buf, 1, 1);
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x78, 0x6C, 0x66, 0x66, 0x66, 0x6C, 0x78, 0x00};
-    if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch");
+    if (memcmp(buf + test_font.baseline, expected, 8) != 0) FAIL("glyph mismatch");
     PASS();
 }
 
 static void test_u8g2_draw_e(void)
 {
     TEST("u8g2 draw_char 'E' glyph");
-    uint8_t buf[8] = {0};
+    uint8_t buf[16] = {0};
     uint8_t adv = eui_font_draw_char(&test_font, 'E', buf, 1, 1);
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x7E, 0x60, 0x60, 0x7C, 0x60, 0x60, 0x7E, 0x00};
-    if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch");
+    if (memcmp(buf + test_font.baseline, expected, 8) != 0) FAIL("glyph mismatch");
     PASS();
 }
 
 static void test_u8g2_draw_f(void)
 {
     TEST("u8g2 draw_char 'F' glyph");
-    uint8_t buf[8] = {0};
+    uint8_t buf[16] = {0};
     uint8_t adv = eui_font_draw_char(&test_font, 'F', buf, 1, 1);
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x7E, 0x60, 0x60, 0x7C, 0x60, 0x60, 0x60, 0x00};
-    if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch");
+    if (memcmp(buf + test_font.baseline, expected, 8) != 0) FAIL("glyph mismatch");
     PASS();
 }
 
 static void test_u8g2_draw_g(void)
 {
     TEST("u8g2 draw_char 'G' glyph");
-    uint8_t buf[8] = {0};
+    uint8_t buf[16] = {0};
     uint8_t adv = eui_font_draw_char(&test_font, 'G', buf, 1, 1);
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x3C, 0x66, 0x60, 0x6E, 0x66, 0x66, 0x3C, 0x00};
-    if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch");
+    if (memcmp(buf + test_font.baseline, expected, 8) != 0) FAIL("glyph mismatch");
     PASS();
 }
 
 static void test_u8g2_draw_h(void)
 {
     TEST("u8g2 draw_char 'H' glyph");
-    uint8_t buf[8] = {0};
+    uint8_t buf[16] = {0};
     uint8_t adv = eui_font_draw_char(&test_font, 'H', buf, 1, 1);
     if (adv != 8) FAIL("expected advance 8");
 
     uint8_t expected[8] = {0x66, 0x66, 0x66, 0x7E, 0x66, 0x66, 0x66, 0x00};
-    if (memcmp(buf, expected, 8) != 0) FAIL("glyph mismatch");
+    if (memcmp(buf + test_font.baseline, expected, 8) != 0) FAIL("glyph mismatch");
     PASS();
 }
 

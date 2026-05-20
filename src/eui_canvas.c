@@ -467,7 +467,8 @@ static void draw_u8g2_glyph(eui_canvas_t *canvas, const eui_font_t *font,
     for (uint8_t row = 0; row < g.height; row++) {
         for (uint8_t col = 0; col < g.width; col++) {
             uint16_t px = (uint16_t)row * g.width + col;
-            if (get_bitmap_pixel(font->data, g.bitmap_byte, g.bitmap_bit, px)) {
+            if (get_bitmap_pixel(font->data, g.bitmap_byte, g.bitmap_bit, px,
+                                   g.width, g.height)) {
                 canvas_set_pixel(canvas,
                                  x + col + g.x_offset,
                                  y + row + g.y_offset,
@@ -492,7 +493,8 @@ static void draw_u8g2_glyph_by_index(eui_canvas_t *canvas,
     for (uint8_t row = 0; row < g.height; row++) {
         for (uint8_t col = 0; col < g.width; col++) {
             uint16_t px = (uint16_t)row * g.width + col;
-            if (get_bitmap_pixel(font->data, g.bitmap_byte, g.bitmap_bit, px)) {
+            if (get_bitmap_pixel(font->data, g.bitmap_byte, g.bitmap_bit, px,
+                                   g.width, g.height)) {
                 canvas_set_pixel(canvas,
                                  x + col + g.x_offset,
                                  y + row + g.y_offset,

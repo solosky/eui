@@ -24,7 +24,7 @@ static const eui_font_t profont10_font = {
 };
 
 #define IMG_W 800
-#define IMG_H 200
+#define IMG_H 260
 
 #if EUI_COLOR_DEPTH == 1
 #define BUF_SIZE (IMG_W * IMG_H / 8)
@@ -140,6 +140,7 @@ int main(void)
     int chars_per_row = 20;
     int char_count = 0;
     int fail_count = 0;
+    int line_height = profont10_font.line_height;
 
     for (int c = 32; c <= 126; c++) {
         uint8_t cw = eui_font_get_char_width(&profont10_font, (char)c);
@@ -158,9 +159,9 @@ int main(void)
             continue;
         }
 
-        /* Estimate glyph height from buffer (not actual height) */
-        for (int row = 0; row < 10; row++) {
-            for (int col = 0; col < 10; col++) {
+        /* Scan glyph buffer rows (cover full glyph + baseline offset) */
+        for (int row = 0; row < line_height + 4; row++) {
+            for (int col = 0; col < 8; col++) {
                 uint8_t byte = glyph_buf[row];
                 if (byte & (1 << (7 - col))) {
                     int px = cur_y + row;
@@ -177,7 +178,7 @@ int main(void)
         char_count++;
         if (char_count % chars_per_row == 0) {
             cur_x = 10;
-            cur_y += 12;
+            cur_y += line_height + 4;
         }
     }
 

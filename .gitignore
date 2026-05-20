@@ -2,3 +2,4 @@ build/*
 build_*/*
 Testing/*
 CMakeFiles/*
+*/__pycache__/*
