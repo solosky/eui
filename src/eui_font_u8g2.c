@@ -93,7 +93,7 @@ static const uint8_t* find_glyph_data_unicode(const eui_font_t *font, uint16_t e
             while (entry + 3 <= block_end) {
                 uint16_t code = get_be16(entry);
                 uint8_t jump = entry[2];
-                if (jump < 3 || jump > 60) return NULL;
+                if (jump < 3) return NULL;
                 if (code == encoding) return entry + 3;
                 entry += jump;
             }

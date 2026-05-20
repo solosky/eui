@@ -116,7 +116,7 @@ static int discover_unicode_glyphs(const eui_font_t *font, uint16_t *codes, int 
         while (entry + 3 <= block_end) {
             uint16_t code = font_get_be16(entry);
             uint8_t jump = entry[2];
-            if (jump < 3 || jump > 60) break;
+            if (jump < 3) break;
             if (count < max_count) codes[count++] = code;
             entry += jump;
         }
