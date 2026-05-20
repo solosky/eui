@@ -1,5 +1,7 @@
-build/*
+build/**
 build_*/*
 Testing/*
 CMakeFiles/*
 */__pycache__/*
+.DS_Store
+._.DS_Store

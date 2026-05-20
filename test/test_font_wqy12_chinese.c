@@ -26,7 +26,7 @@ static const eui_font_t wqy12_font = {
 };
 
 #define IMG_W 800
-#define IMG_H 600
+#define IMG_H 900
 
 #if EUI_COLOR_DEPTH == 1
 #define BUF_SIZE (IMG_W * IMG_H / 8)
@@ -36,16 +36,60 @@ static const eui_font_t wqy12_font = {
 
 static uint8_t img_buf[BUF_SIZE];
 
-static void set_pixel(int x, int y)
-{
-    if (x < 0 || x >= IMG_W || y < 0 || y >= IMG_H) return;
-    int idx = y * (IMG_W / 8) + x / 8;
-    img_buf[idx] |= (1 << (7 - (x % 8)));
-}
-
 static uint16_t font_get_be16(const uint8_t *p)
 {
     return ((uint16_t)p[0] << 8) | p[1];
+}
+
+static int glyph_stride = 2;
+
+static void render_glyph(int img_x, int img_y, uint16_t encoding)
+{
+    uint8_t buf[256] = {0};
+    uint8_t adv = eui_font_u8g2_draw_glyph(&wqy12_font, encoding, buf, glyph_stride, 1);
+    if (adv == 0) return;
+
+    for (int r = 0; r < wqy12_font.line_height + 4; r++) {
+        for (int b = 0; b < glyph_stride; b++) {
+            uint8_t byte = buf[r * glyph_stride + b];
+            if (byte == 0) continue;
+            for (int bit = 0; bit < 8; bit++) {
+                if (byte & (1 << (7 - bit))) {
+                    int px = img_y + r;
+                    int py = img_x + b * 8 + bit;
+                    if (px >= 0 && px < IMG_H && py >= 0 && py < IMG_W) {
+                        int idx = px * (IMG_W / 8) + py / 8;
+                        img_buf[idx] |= (1 << (7 - (py % 8)));
+                    }
+                }
+            }
+        }
+    }
+}
+
+static int discover_8bit_glyphs(const eui_font_t *font, uint8_t *encodings, int max_count)
+{
+    const uint8_t *p = font->data;
+    int count = 0;
+    int upper_a_off = font_get_be16(p + 17);
+    int lower_a_off = font_get_be16(p + 19);
+    int sections[3][2] = {
+        {23, 23 + upper_a_off},
+        {23 + upper_a_off, 23 + lower_a_off},
+        {23 + lower_a_off, 65535}
+    };
+    for (int s = 0; s < 3 && count < max_count; s++) {
+        int off = sections[s][0];
+        int end = sections[s][1];
+        while (off + 1 < end && count < max_count) {
+            uint8_t enc = p[off];
+            uint8_t size = p[off + 1];
+            if (size == 0) break;
+            encodings[count++] = enc;
+            off += size;
+        }
+    }
+    return count;
 }
 
 static int discover_unicode_glyphs(const eui_font_t *font, uint16_t *codes, int max_count)
@@ -65,7 +109,6 @@ static int discover_unicode_glyphs(const eui_font_t *font, uint16_t *codes, int 
 
         const uint8_t *block = jump_table + block_off;
         lt += 4;
-
         uint16_t next_off = font_get_be16(lt);
         const uint8_t *block_end = jump_table + next_off;
 
@@ -156,64 +199,52 @@ static void write_bmp(const char *filename)
 int main(void)
 {
     eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
-    printf("=== Wqy12 Chinese Font Sample ===\n");
-
     memset(img_buf, 0, sizeof(img_buf));
 
+    int margin_x = 12;
+    int margin_y = 12;
+    int cell_w = 18;
+    int cell_h = 20;
+
+    /* Section 1: all 8-bit glyphs */
+    uint8_t encodings[256];
+    int n8 = discover_8bit_glyphs(&wqy12_font, encodings, 256);
+    printf("8-bit glyphs: %d\n", n8);
+
+    int chars_per_row = 16;
+    int cur_y = margin_y;
+    int cur_x;
+    int count = 0;
+
+    for (int i = 0; i < n8; i++) {
+        int col = count % chars_per_row;
+        int row = count / chars_per_row;
+        cur_x = margin_x + col * cell_w;
+        cur_y = margin_y + row * cell_h;
+        render_glyph(cur_x, cur_y, encodings[i]);
+        count++;
+    }
+
+    /* Section 2: all unicode glyphs */
     uint16_t codes[256];
-    int total_raw = discover_unicode_glyphs(&wqy12_font, codes, 256);
+    int nu = discover_unicode_glyphs(&wqy12_font, codes, 256);
+    printf("Unicode glyphs: %d\n", nu);
 
-    /* Filter to CJK Unified Ideographs only (U+4E00-U+9FFF) */
-    uint16_t cjk[256];
-    int total = 0;
-    for (int i = 0; i < total_raw && i < 256; i++) {
-        if (codes[i] >= 0x4E00 && codes[i] <= 0x9FFF) {
-            cjk[total++] = codes[i];
-        }
-    }
-    printf("  CJK glyphs found: %d (excluded %d non-CJK)\n", total, total_raw - total);
+    int n8_rows = (n8 + chars_per_row - 1) / chars_per_row;
+    cur_y = margin_y + n8_rows * cell_h + 8;
+    chars_per_row = 10;
+    count = 0;
 
-    int chars_per_row = 10;
-    int cell_w = 20;
-    int cell_h = 22;
-    int margin_x = 16;
-    int margin_y = 16;
-    int max_rows = (IMG_H - margin_y) / cell_h;
-    int render_limit = chars_per_row * max_rows;
-
-    for (int i = 0; i < total && i < render_limit; i++) {
-        uint16_t code = cjk[i];
-        int row = i / chars_per_row;
-        int col = i % chars_per_row;
-        int cx = margin_x + col * cell_w;
-        int cy = margin_y + row * cell_h;
-
-        uint8_t glyph_buf[256] = {0};
-        uint8_t adv = eui_font_u8g2_draw_glyph(&wqy12_font, code, glyph_buf, 2, 1);
-        if (adv == 0) continue;
-
-        int baseline = wqy12_font.baseline;
-        int glyph_h = wqy12_font.line_height + 4;
-
-        for (int r = 0; r < glyph_h; r++) {
-            for (int b = 0; b < 2; b++) {
-                uint8_t byte = glyph_buf[r * 2 + b];
-                if (byte == 0) continue;
-                for (int bit = 0; bit < 8; bit++) {
-                    if (byte & (1 << (7 - bit))) {
-                        int px = cy + r;
-                        int py = cx + b * 8 + bit;
-                        set_pixel(py, px);
-                    }
-                }
-            }
-        }
+    for (int i = 0; i < nu; i++) {
+        int col = count % chars_per_row;
+        int row = count / chars_per_row;
+        cur_x = margin_x + col * cell_w;
+        cur_y = margin_y + n8_rows * cell_h + 8 + row * cell_h;
+        render_glyph(cur_x, cur_y, codes[i]);
+        count++;
     }
 
-    printf("  Rendered %d CJK characters\n", total < render_limit ? total : render_limit);
-    if (total > render_limit)
-        printf("  Warning: %d characters truncated (image too small)\n", total - render_limit);
-
+    printf("Total: %d + %d = %d glyphs rendered\n", n8, nu, n8 + nu);
     write_bmp("font_wqy12_chinese.bmp");
     printf("PASS\n");
     return 0;
