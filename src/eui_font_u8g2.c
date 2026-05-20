@@ -65,9 +65,61 @@ static int16_t default_lookup(const eui_font_t *font, uint16_t encoding, uint16_
     return -1;
 }
 
+/* Encoding table entry */
+typedef struct {
+    uint16_t encoding;
+    uint8_t  glyph_index;
+} u8g2_enc_entry_t;
+
+/* Read encoding table from font data.
+ * Returns number of entries or 0 if no encoding table. */
+static uint16_t read_encoding_table(const eui_font_t *font,
+                                     u8g2_enc_entry_t *entries,
+                                     uint16_t max_entries)
+{
+    const uint8_t *p = font->data;
+    uint16_t start = p[HDR_START_POS_UNICODE] | ((uint16_t)p[HDR_START_POS_UNICODE + 1] << 8);
+    if (start == 0) return 0;
+
+    const uint8_t *enc = font->data + start;
+    /* Skip encoding_type (1 byte) and encoding_cnt (2 bytes LE) */
+    uint16_t cnt = enc[1] | ((uint16_t)enc[2] << 8);
+    if (cnt > max_entries) cnt = max_entries;
+
+    enc += 3; /* skip type + cnt */
+    for (uint16_t i = 0; i < cnt; i++) {
+        entries[i].encoding    = enc[0] | ((uint16_t)enc[1] << 8);
+        entries[i].glyph_index = enc[2];
+        enc += 3;
+    }
+    return cnt;
+}
+
+/* Encoding-table-based glyph lookup */
+static int16_t encoding_lookup(const eui_font_t *font, uint16_t encoding, uint16_t prev)
+{
+    u8g2_enc_entry_t entries[16];
+    uint16_t cnt = read_encoding_table(font, entries, 16);
+    (void)prev; /* kerning via encoding table: prev modifies the encoding lookup */
+
+    for (uint16_t i = 0; i < cnt; i++) {
+        if (entries[i].encoding == encoding) return (int16_t)entries[i].glyph_index;
+    }
+    return -1;
+}
+
 int16_t eui_font_u8g2_lookup_glyph(const eui_font_t *font, uint16_t encoding, uint16_t prev)
 {
     if (!font || !font->data) return -1;
+
+    /* Check if font has an encoding table */
+    const uint8_t *p = font->data;
+    uint16_t start = p[HDR_START_POS_UNICODE] | ((uint16_t)p[HDR_START_POS_UNICODE + 1] << 8);
+    if (start != 0) {
+        return encoding_lookup(font, encoding, prev);
+    }
+
+    /* Fallback: simple direct mapping */
     return default_lookup(font, encoding, prev);
 }
 
