@@ -55,7 +55,7 @@ class BitWriter:
 # Build font data
 data = bytearray()
 
-# 21-byte header (real u8g2 format)
+# 23-byte header (real u8g2 format)
 data.append(GLYPH_COUNT)               # 0: glyph_cnt
 data.append(0)                          # 1: bbx_mode
 data.append(BITS_PER_0)                # 2
@@ -73,8 +73,9 @@ data.append(8)                          # 13: ascent_A
 data.append(0)                          # 14: descent_g
 data.append(10)                         # 15: ascent_para
 data.append(0)                          # 16: descent_para
-data += struct.pack('<H', 21)           # 17-18: start_pos_upper_A
-data += struct.pack('<H', 0)            # 19-20: start_pos_lower_a
+data += struct.pack('>H', 0)           # 17-18: start_pos_upper_A (BE)
+data += struct.pack('>H', 0)           # 19-20: start_pos_lower_a (BE)
+data += struct.pack('>H', 0)           # 21-22: start_pos_unicode (BE)
 
 MAX_RUN = (1 << BITS_PER_0) - 1        # all-1s = continue
 
@@ -119,6 +120,21 @@ for ch in sorted(bdf_glyphs.keys()):
 
 data.append(0)
 data.append(0)
+
+# Compute section offsets from byte 23 for uppercase/lowercase sections
+pos = 23
+idx = 0
+while True:
+    enc = data[pos]
+    sz = data[pos + 1]
+    if sz == 0:
+        break
+    if idx == ord('A') - 32:
+        struct.pack_into('>H', data, 17, pos - 23)
+    if idx == ord('a') - 32:
+        struct.pack_into('>H', data, 19, pos - 23)
+    pos += sz
+    idx += 1
 
 hex_lines = []
 for i in range(0, len(data), 16):
