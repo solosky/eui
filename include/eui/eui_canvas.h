@@ -60,6 +60,26 @@ uint16_t eui_canvas_draw_str_aligned(eui_canvas_t *canvas, int16_t x, int16_t y,
 uint16_t eui_canvas_str_width(const eui_canvas_t *canvas, const char *str);
 uint16_t eui_canvas_font_height(const eui_canvas_t *canvas);
 
+/* Advanced text */
+#if EUI_FONT_ENABLE_MULTILINE
+uint16_t eui_canvas_draw_str_in_rect(eui_canvas_t *canvas,
+                                      const eui_rect_t *rect, const char *str,
+                                      eui_align_t h_align, eui_align_t v_align);
+uint16_t eui_canvas_draw_str_multiline(eui_canvas_t *canvas,
+                                        const eui_rect_t *rect, const char *str,
+                                        uint8_t line_height, eui_align_t h_align);
+uint16_t eui_canvas_str_multiline_height(const eui_canvas_t *canvas,
+                                          const char *str,
+                                          uint16_t max_width, uint8_t line_height);
+#endif
+
+uint16_t eui_canvas_draw_str_clipped(eui_canvas_t *canvas,
+                                      const eui_rect_t *clip_rect,
+                                      int16_t x, int16_t y, const char *str);
+uint16_t eui_canvas_draw_str_ellipsis(eui_canvas_t *canvas,
+                                       int16_t x, int16_t y,
+                                       const char *str, uint16_t max_width);
+
 /* Images */
 void eui_canvas_draw_xbm(eui_canvas_t *canvas, int16_t x, int16_t y,
                           uint16_t w, uint16_t h, const uint8_t *data);

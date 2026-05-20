@@ -758,3 +758,198 @@ bool eui_canvas_next_page(eui_canvas_t *canvas)
     }
     return true;
 }
+
+/* ---- Advanced Text Operations ---- */
+
+uint16_t eui_canvas_draw_str_clipped(eui_canvas_t *canvas,
+                                      const eui_rect_t *clip_rect,
+                                      int16_t x, int16_t y, const char *str)
+{
+    if (!canvas || !canvas->font || !str || !clip_rect) return 0;
+
+    eui_rect_t old_clip = canvas->clip;
+    canvas->clip = *clip_rect;
+
+    int16_t cur_x = x;
+    uint16_t drawn_w = eui_canvas_draw_str(canvas, cur_x, y, str);
+
+    canvas->clip = old_clip;
+    return drawn_w;
+}
+
+uint16_t eui_canvas_draw_str_ellipsis(eui_canvas_t *canvas,
+                                       int16_t x, int16_t y,
+                                       const char *str, uint16_t max_width)
+{
+    if (!canvas || !canvas->font || !str) return 0;
+
+    const eui_font_t *font = canvas->font;
+    uint16_t str_w = eui_font_get_str_width(font, str);
+
+    if (str_w <= max_width) {
+        return eui_canvas_draw_str(canvas, x, y, str);
+    }
+
+    uint16_t ellipsis_w = eui_font_get_str_width(font, "...");
+    if (ellipsis_w >= max_width) {
+        return eui_canvas_draw_str(canvas, x, y, "...");
+    }
+
+    uint16_t avail = max_width - ellipsis_w;
+    uint16_t cur_w = 0;
+    int16_t cur_x = x;
+    const char *s;
+    for (s = str; *s; s++) {
+        uint8_t cw = eui_font_get_char_width(font, *s);
+        if (cur_w + cw > avail) break;
+        uint8_t adv = 0;
+        draw_glyph(canvas, font, *s, cur_x, y, &adv);
+        cur_x += adv;
+        cur_w += cw;
+    }
+    cur_x += eui_canvas_draw_str(canvas, cur_x, y, "...");
+    return (uint16_t)(cur_x - x);
+}
+
+#if EUI_FONT_ENABLE_MULTILINE
+
+typedef struct {
+    const char *start;
+    uint16_t    len;
+} text_line_t;
+
+static uint16_t word_wrap(const eui_font_t *font, const char *str,
+                           uint16_t max_width,
+                           text_line_t *lines, uint16_t max_lines)
+{
+    uint16_t line_count = 0;
+    const char *line_start = str;
+    const char *last_space = NULL;
+    uint16_t line_w = 0;
+    uint16_t line_chars = 0;
+
+    if (!str || !*str) return 0;
+
+    for (const char *s = str; ; s++) {
+        if (*s == '\0' || *s == '\n') {
+            if (line_count < max_lines) {
+                lines[line_count].start = line_start;
+                lines[line_count].len = line_chars;
+                line_count++;
+            }
+            if (*s == '\0') break;
+            line_start = s + 1;
+            line_w = 0;
+            line_chars = 0;
+            last_space = NULL;
+            continue;
+        }
+        if (*s == '\r') continue;
+
+        uint8_t cw = eui_font_get_char_width(font, *s);
+        if (line_w + cw > max_width) {
+            if (last_space && last_space > line_start) {
+                uint16_t space_offset = (uint16_t)(last_space - line_start);
+                if (line_count < max_lines) {
+                    lines[line_count].start = line_start;
+                    lines[line_count].len = space_offset;
+                    line_count++;
+                }
+                line_start = last_space + 1;
+                line_chars = (uint16_t)(s - line_start) + 1;
+                line_w = cw;
+                for (const char *t = line_start; t < s; t++)
+                    line_w += eui_font_get_char_width(font, *t);
+                last_space = NULL;
+            } else {
+                if (line_chars > 0 && line_count < max_lines) {
+                    lines[line_count].start = line_start;
+                    lines[line_count].len = line_chars;
+                    line_count++;
+                }
+                line_start = s;
+                line_w = cw;
+                line_chars = 1;
+            }
+            continue;
+        }
+
+        if (*s == ' ') {
+            last_space = s;
+        }
+        line_w += cw;
+        line_chars++;
+    }
+    return line_count;
+}
+
+uint16_t eui_canvas_draw_str_multiline(eui_canvas_t *canvas,
+                                        const eui_rect_t *rect, const char *str,
+                                        uint8_t line_height, eui_align_t h_align)
+{
+    if (!canvas || !canvas->font || !str || !rect) return 0;
+
+    const eui_font_t *font = canvas->font;
+    uint8_t lh = line_height > 0 ? line_height : eui_font_get_height(font);
+    text_line_t lines[64];
+    uint16_t line_count = word_wrap(font, str, rect->w, lines, 64);
+
+    int16_t y = rect->y;
+    uint16_t total_h = 0;
+    uint16_t max_w = rect->w;
+
+    for (uint16_t i = 0; i < line_count; i++) {
+        uint16_t line_w = 0;
+        for (uint16_t j = 0; j < lines[i].len; j++)
+            line_w += eui_font_get_char_width(font, lines[i].start[j]);
+
+        int16_t dx = rect->x;
+        if (h_align & EUI_ALIGN_CENTER) dx = rect->x + (int16_t)((max_w - line_w) / 2);
+        if (h_align & EUI_ALIGN_RIGHT)  dx = rect->x + (int16_t)(max_w - line_w);
+
+        int16_t cx = dx;
+        for (uint16_t j = 0; j < lines[i].len; j++) {
+            uint8_t adv = 0;
+            draw_glyph(canvas, font, lines[i].start[j], cx, y, &adv);
+            cx += adv;
+        }
+
+        y += lh;
+        total_h += lh;
+    }
+    return total_h;
+}
+
+uint16_t eui_canvas_draw_str_in_rect(eui_canvas_t *canvas,
+                                      const eui_rect_t *rect, const char *str,
+                                      eui_align_t h_align, eui_align_t v_align)
+{
+    if (!canvas || !canvas->font || !str || !rect) return 0;
+
+    const eui_font_t *font = canvas->font;
+    uint16_t str_w = eui_font_get_str_width(font, str);
+    uint8_t  fh = eui_font_get_height(font);
+
+    int16_t dx = rect->x, dy = rect->y;
+
+    if (h_align & EUI_ALIGN_CENTER) dx = rect->x + (int16_t)((rect->w - str_w) / 2);
+    if (h_align & EUI_ALIGN_RIGHT)  dx = rect->x + (int16_t)(rect->w - str_w);
+    if (v_align & EUI_ALIGN_MIDDLE) dy = rect->y + (int16_t)((rect->h - fh) / 2);
+    if (v_align & EUI_ALIGN_BOTTOM) dy = rect->y + (int16_t)(rect->h - fh);
+
+    return eui_canvas_draw_str_clipped(canvas, rect, dx, dy, str);
+}
+
+uint16_t eui_canvas_str_multiline_height(const eui_canvas_t *canvas,
+                                          const char *str,
+                                          uint16_t max_width, uint8_t line_height)
+{
+    if (!canvas || !canvas->font || !str) return 0;
+    const eui_font_t *font = canvas->font;
+    uint8_t lh = line_height > 0 ? line_height : eui_font_get_height(font);
+    text_line_t lines[64];
+    uint16_t line_count = word_wrap(font, str, max_width, lines, 64);
+    return line_count * lh;
+}
+
+#endif /* EUI_FONT_ENABLE_MULTILINE */
