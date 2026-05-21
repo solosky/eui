@@ -140,9 +140,6 @@ static bool detail_view_handler(eui_view_event_t *evt, void *context) {
         eui_canvas_fill_rect(c, view->area.x, view->area.y,
                                 view->area.w, view->area.h);
         eui_canvas_set_color(c, EUI_COLOR_WHITE);
-        if (data->draw_pattern)
-            data->draw_pattern(c, view->area.x, view->area.y, view->area.w, view->area.h);
-        eui_canvas_draw_rect(c, view->area.x, view->area.y, view->area.w, view->area.h);
         eui_canvas_set_font(c, &eui_font_builtin);
         uint16_t tw = eui_canvas_str_width(c, data->name);
         eui_canvas_draw_str(c, view->area.x + (W - (int16_t)tw) / 2,
