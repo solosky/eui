@@ -82,3 +82,26 @@ add_executable(test_view_transition_render test_view_transition_render.c)
 target_include_directories(test_view_transition_render PRIVATE ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(test_view_transition_render PRIVATE eui_hal_raylib)
 add_test(NAME view_transition_render COMMAND test_view_transition_render)
+
+# ---- u8g2 reference comparison test ----
+set(U8G2_DIR "${CMAKE_SOURCE_DIR}/../u8g2" CACHE PATH "u8g2 source directory")
+
+if(EXISTS ${U8G2_DIR})
+    add_executable(test_font_vs_u8g2 test_font_vs_u8g2.c)
+
+    target_sources(test_font_vs_u8g2 PRIVATE
+        ${U8G2_DIR}/csrc/u8g2_setup.c
+        ${U8G2_DIR}/csrc/u8g2_font.c
+        ${U8G2_DIR}/csrc/u8g2_ll_hvline.c
+        ${U8G2_DIR}/csrc/u8g2_buffer.c
+        ${U8G2_DIR}/csrc/u8x8_setup.c
+    )
+
+    target_include_directories(test_font_vs_u8g2 PRIVATE
+        ${CMAKE_BINARY_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${U8G2_DIR}/csrc
+    )
+    target_link_libraries(test_font_vs_u8g2 PRIVATE eui)
+    add_test(NAME font_vs_u8g2 COMMAND test_font_vs_u8g2)
+endif()
