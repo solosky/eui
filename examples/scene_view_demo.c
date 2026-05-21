@@ -223,8 +223,8 @@ int main(void) {
         eui_hal_raylib_refresh();
 
         if (IsKeyPressed(KEY_F2)) {
-            eui_hal_raylib_save_screenshot("screenshot.ppm");
-            printf("Screenshot saved to screenshot.ppm\n");
+            TakeScreenshot("screenshot.png");
+            printf("GPU screenshot saved to screenshot.png\n");
         }
     }
 

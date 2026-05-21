@@ -146,10 +146,15 @@ void eui_hal_raylib_refresh(void) {
     BeginDrawing();
     ClearBackground(BLACK);
 
+    /* Inset source rect by 0.5 px to prevent texcoords from
+     * hitting exactly 1.0.  rlLoadTexture defaults to GL_REPEAT
+     * wrap, and texcoord 1.0 wraps to 0.0, sampling the opposite
+     * edge.  Insets keep texcoords in (0, 1) on all platforms.  */
+    float eps = 0.5f;
     Rectangle src = {
-        0, 0,
-        (float)d->fb.texture.width,
-        -(float)d->fb.texture.height
+        eps, eps,
+        (float)d->fb.texture.width  - 2.0f * eps,
+        -(float)(d->fb.texture.height - 2.0f * eps)
     };
     Rectangle dst = {
         0, 0,
