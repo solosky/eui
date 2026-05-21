@@ -19,7 +19,7 @@ static eui_widget_vtable_t square_vt = { .draw=square_draw, .input=square_input 
 
 int main(void) {
     eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
-    eui_display_hal_t *display = eui_hal_raylib_create_display(W, H, 1);
+    eui_display_hal_t *display = eui_hal_raylib_create_display(W, H, EUI_COLOR_DEPTH);
     eui_input_hal_t *input = eui_hal_raylib_create_input();
     eui_config_t cfg = { .display=display, .input=input };
     eui_init(&cfg);
