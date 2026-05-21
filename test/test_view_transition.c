@@ -5,6 +5,7 @@
 #include "eui/eui_allocator.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define POOL_SIZE 65536
 static uint8_t mem_pool[POOL_SIZE];
@@ -215,6 +216,187 @@ static void test_critical_progress_points(void) {
     PASS();
 }
 
+/* ---- test: raylib-style 1bpp buffer conversion ---- */
+static void test_raylib_1bpp_conversion(void) {
+    TEST("raylib 1bpp buffer conversion correctness");
+    /* Create a 128x64 1bpp canvas buffer manually */
+    uint8_t buf[128 * 64 / 8];
+    memset(buf, 0, sizeof(buf));
+
+    /* Set all bits to 1 (white) like both views filling with COVER_COLOR */
+    memset(buf, 0xFF, sizeof(buf));
+
+    /* Simulate raylib disp_write_buffer 1bpp conversion */
+    int W = 128, H = 64;
+    uint8_t *rgba = (uint8_t*)malloc((size_t)W * H * 4);
+    memset(rgba, 0xAA, (size_t)W * H * 4); /* poison */
+
+    int bytes_per_row = W / 8;
+    for (int y = 0; y < H; y++) {
+        int flipped_y = H - 1 - y;
+        for (int x = 0; x < W; x++) {
+            int byte_idx = y * bytes_per_row + (x / 8);
+            int bit_pos  = x % 8;
+            uint8_t pixel = (buf[byte_idx] >> bit_pos) & 1;
+            uint8_t *dst = rgba + (size_t)(flipped_y * W + x) * 4;
+            if (pixel) {
+                dst[0] = 255; dst[1] = 255; dst[2] = 255; dst[3] = 255;
+            } else {
+                dst[0] = 0;   dst[1] = 0;   dst[2] = 0;   dst[3] = 255;
+            }
+        }
+    }
+
+    /* Verify every pixel is white RGBA(255,255,255,255) */
+    for (int i = 0; i < W * H; i++) {
+        if (rgba[i*4+0] != 255 || rgba[i*4+1] != 255 ||
+            rgba[i*4+2] != 255 || rgba[i*4+3] != 255) {
+            printf("FAIL: pixel %d (x=%d,y=%d) = RGBA(%d,%d,%d,%d), expected (255,255,255,255)\n",
+                   i, i % W, i / W,
+                   rgba[i*4+0], rgba[i*4+1], rgba[i*4+2], rgba[i*4+3]);
+            free(rgba);
+            FAIL("conversion error");
+        }
+    }
+    free(rgba);
+    PASS();
+}
+
+/* ---- test: raylib-style 1bpp with checkerboard pattern ---- */
+static void test_raylib_1bpp_checkerboard(void) {
+    TEST("raylib 1bpp checkerboard conversion");
+    uint8_t buf[128 * 64 / 8];
+    int W = 128, H = 64;
+
+    /* Set checkerboard: even (x+y) = white, odd = black */
+    memset(buf, 0, sizeof(buf));
+    for (int y = 0; y < H; y++) {
+        for (int x = 0; x < W; x++) {
+            if (((x + y) & 1) == 0) {
+                int byte_idx = y * (W / 8) + (x / 8);
+                int bit_pos  = x % 8;
+                buf[byte_idx] |= (1u << bit_pos);
+            }
+        }
+    }
+
+    uint8_t *rgba = (uint8_t*)malloc((size_t)W * H * 4);
+    int bytes_per_row = W / 8;
+    for (int y = 0; y < H; y++) {
+        int flipped_y = H - 1 - y;
+        for (int x = 0; x < W; x++) {
+            int byte_idx = y * bytes_per_row + (x / 8);
+            int bit_pos  = x % 8;
+            uint8_t pixel = (buf[byte_idx] >> bit_pos) & 1;
+            uint8_t *dst = rgba + (size_t)(flipped_y * W + x) * 4;
+            if (pixel) {
+                dst[0] = 255; dst[1] = 255; dst[2] = 255; dst[3] = 255;
+            } else {
+                dst[0] = 0;   dst[1] = 0;   dst[2] = 0;   dst[3] = 255;
+            }
+        }
+    }
+
+    /* Verify checkerboard in RGBA space (with Y flip) */
+    int errors = 0;
+    for (int y = 0; y < H; y++) {
+        int flipped_y = H - 1 - y;
+        for (int x = 0; x < W; x++) {
+            int expected_white = ((x + y) & 1) == 0;
+            uint8_t *dst = rgba + (size_t)(flipped_y * W + x) * 4;
+            if (expected_white) {
+                if (dst[0] != 255) errors++;
+            } else {
+                if (dst[0] != 0) errors++;
+            }
+        }
+    }
+    free(rgba);
+    if (errors > 0) {
+        printf("FAIL: %d conversion errors in checkerboard\n", errors);
+        FAIL("checkerboard conversion");
+    }
+    PASS();
+}
+
+/* ---- test: raylib 1bpp conversion after transition rendering ---- */
+static void test_raylib_1bpp_transition_conversion(void) {
+    TEST("raylib 1bpp conversion after SLIDE_LEFT at 75%% progress");
+
+    eui_view_dispatcher_t vd;
+    eui_canvas_t *canvas = eui_canvas_create(&mock_display);
+    if (!canvas) FAIL("canvas alloc");
+
+    g_tick_ms = 1000;
+    eui_view_dispatcher_init(&vd, canvas, test_get_tick);
+
+    eui_view_t v1, v2;
+    eui_view_init(&v1, cover_view_handler, &v1);
+    v1.area = (eui_rect_t){ 0, 0, TW, TH };
+    eui_view_init(&v2, cover_view_handler, &v2);
+    v2.area = (eui_rect_t){ 0, 0, TW, TH };
+
+    eui_view_dispatcher_add(&vd, 1, &v1);
+    eui_view_dispatcher_add(&vd, 2, &v2);
+
+    /* 75% progress: off = 96, old=[0,32), new=[32,128) with my fix */
+    vd.transitioning        = true;
+    vd.transition_type      = EUI_ANIM_SLIDE_LEFT;
+    vd.transition_prev_view = &v1;
+    vd.current_view_idx     = 1;
+    g_tick_ms               = 1000 + 225;  /* 225/300 = 0.75 */
+    vd.transition_start_ms  = 1000;
+
+    eui_view_dispatcher_tick(&vd);
+
+    /* Now simulate raylib 1bpp conversion on mock_buf */
+    int W = TW, H = TH;
+    uint8_t *rgba = (uint8_t*)malloc((size_t)W * H * 4);
+    int bytes_per_row = W / 8;
+    for (int y = 0; y < H; y++) {
+        int flipped_y = H - 1 - y;
+        for (int x = 0; x < W; x++) {
+#if EUI_COLOR_DEPTH == 1
+            int byte_idx = y * bytes_per_row + (x / 8);
+            int bit_pos  = x % 8;
+            uint8_t pixel = (mock_buf[byte_idx] >> bit_pos) & 1;
+#elif EUI_COLOR_DEPTH == 16
+            uint16_t c = ((uint16_t*)mock_buf)[y * W + x];
+            uint8_t pixel = (c != 0) ? 1 : 0;
+#else
+            uint8_t pixel = mock_buf[y * W + x] ? 1 : 0;
+#endif
+            uint8_t *dst = rgba + (size_t)(flipped_y * W + x) * 4;
+            if (pixel) {
+                dst[0] = 255; dst[1] = 255; dst[2] = 255; dst[3] = 255;
+            } else {
+                dst[0] = 0;   dst[1] = 0;   dst[2] = 0;   dst[3] = 255;
+            }
+        }
+    }
+
+    /* Verify: every pixel should be COVER_COLOR (white/1), no CLEAR_COLOR (black/0) */
+    int errors = 0;
+    for (int i = 0; i < W * H; i++) {
+        if (rgba[i*4+0] != 255 || rgba[i*4+1] != 255 || rgba[i*4+2] != 255) {
+            errors++;
+            if (errors <= 5) {
+                printf("  bad pixel %d (x=%d,y=%d): RGBA(%d,%d,%d,%d)\n",
+                       i, i % W, i / W,
+                       rgba[i*4+0], rgba[i*4+1], rgba[i*4+2], rgba[i*4+3]);
+            }
+        }
+    }
+    free(rgba);
+    eui_canvas_destroy(canvas);
+
+    if (errors > 0) {
+        printf("FAIL: %d pixels not white after conversion\n", errors);
+        FAIL("transition conversion");
+    }
+    PASS();
+}
+
 int main(void) {
     eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
     printf("=== View Transition Uncovered-Pixel Tests ===\n");
@@ -224,6 +406,10 @@ int main(void) {
     test_slide_up_gap();
     test_fade_gap();
     test_critical_progress_points();
+
+    test_raylib_1bpp_conversion();
+    test_raylib_1bpp_checkerboard();
+    test_raylib_1bpp_transition_conversion();
 
     printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     return tests_passed == tests_run ? 0 : 1;
