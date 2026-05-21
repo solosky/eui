@@ -137,11 +137,7 @@ static const uint8_t* find_glyph_data(const eui_font_t *font, uint16_t encoding)
 int16_t eui_font_u8g2_lookup_glyph(const eui_font_t *font, uint16_t encoding, uint16_t prev)
 {
     if (!font || !font->data) return -1;
-
-    if (font->lookup_glyph) {
-        return font->lookup_glyph(font, encoding, prev);
-    }
-
+    (void)prev;
     const uint8_t *gd = find_glyph_data(font, encoding);
     if (!gd) return -1;
     return (int16_t)(gd - font->data);
