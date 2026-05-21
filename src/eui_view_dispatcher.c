@@ -105,19 +105,6 @@ void eui_view_dispatcher_pop_overlay(eui_view_dispatcher_t *vd, eui_anim_type_t 
     }
 }
 
-/* Compute intersection of rect r with the screen [0,W)×[0,H). */
-static eui_rect_t clip_to_screen(const eui_rect_t *r, int16_t W, int16_t H) {
-    eui_rect_t out;
-    int16_t l = r->x < 0 ? 0 : r->x;
-    int16_t t = r->y < 0 ? 0 : r->y;
-    int16_t ri = r->x + (int16_t)r->w; if (ri > W) ri = W;
-    int16_t b = r->y + (int16_t)r->h;  if (b > H) b  = H;
-    out.x = l; out.y = t;
-    out.w = (uint16_t)(ri - l);
-    out.h = (uint16_t)(b  - t);
-    return out;
-}
-
 static void render_transition(eui_view_dispatcher_t *vd) {
     if (!vd->transition_prev_view || !vd->transition_start_ms) return;
 
@@ -134,12 +121,18 @@ static void render_transition(eui_view_dispatcher_t *vd) {
     int16_t H = (int16_t)eui_canvas_height(vd->canvas);
 
     if (vd->transition_type == EUI_ANIM_FADE) {
-        /* Wipe: draw old view fully, then new view with growing clip */
-        eui_view_send_draw(vd->transition_prev_view, vd->canvas);
+        /* Wipe: both views draw clipped to their respective portions.
+         * Old view is visible only in the bottom portion below the wipe
+         * boundary; new view only in the growing top portion.  This
+         * prevents white content from the old view bleeding everywhere.  */
+        int16_t boundary = (int16_t)((float)H * progress);
+        eui_rect_t top_clip  = { 0, 0, (uint16_t)W, (uint16_t)boundary };
+        eui_rect_t bot_clip  = { 0, boundary, (uint16_t)W, (uint16_t)(H - boundary) };
 
-        eui_rect_t clip = { 0, 0, (uint16_t)W, (uint16_t)((float)H * progress) };
         eui_canvas_save(vd->canvas);
-        eui_canvas_set_clip(vd->canvas, &clip);
+        eui_canvas_set_clip(vd->canvas, &bot_clip);
+        eui_view_send_draw(vd->transition_prev_view, vd->canvas);
+        eui_canvas_set_clip(vd->canvas, &top_clip);
         eui_view_send_draw(new_view, vd->canvas);
         eui_canvas_restore(vd->canvas);
     } else {
