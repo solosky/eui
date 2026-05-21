@@ -72,3 +72,8 @@ add_executable(test_canvas_render test_canvas_render.c)
 target_include_directories(test_canvas_render PRIVATE ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(test_canvas_render PRIVATE eui)
 add_test(NAME canvas_render COMMAND test_canvas_render)
+
+add_executable(test_view_transition test_view_transition.c)
+target_include_directories(test_view_transition PRIVATE ${CMAKE_BINARY_DIR}/include)
+target_link_libraries(test_view_transition PRIVATE eui)
+add_test(NAME view_transition COMMAND test_view_transition)
