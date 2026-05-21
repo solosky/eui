@@ -84,21 +84,16 @@ static const uint8_t* find_glyph_data_unicode(const eui_font_t *font, uint16_t e
 
         if (last_unicode == 0xFFFF) return NULL;
 
-        uint16_t next_off = get_be16(lt);
-        const uint8_t *block_end = glyph_ptr + next_off;
-
         if (last_unicode >= encoding) {
+            /* search within this block until code=0 marker */
             const uint8_t *entry = glyph_ptr;
-            while (entry + 3 <= block_end) {
+            for (;;) {
                 uint16_t code = get_be16(entry);
-                uint8_t jump = entry[2];
-                if (jump < 3) return NULL;
+                if (code == 0) return NULL;       /* end of block */
                 if (code == encoding) return entry + 3;
-                entry += jump;
+                entry += entry[2];                /* advance to next glyph entry */
             }
-            return NULL;
         }
-        glyph_ptr = block_end;
     }
 }
 
@@ -200,7 +195,6 @@ uint8_t decode_glyph_at(const eui_font_t *font, uint16_t data_off, u8g2_glyph_t 
     uint8_t bpcx = p[HDR_BITS_PER_CHAR_X], bpcy = p[HDR_BITS_PER_CHAR_Y];
     uint8_t bpdx = p[HDR_BITS_PER_DELTA_X];
     uint8_t mcw = p[HDR_MAX_CHAR_W];
-    uint8_t mch = p[HDR_MAX_CHAR_H];
 
     bit_reader_t br;
     br.data = p;
@@ -213,11 +207,11 @@ uint8_t decode_glyph_at(const eui_font_t *font, uint16_t data_off, u8g2_glyph_t 
     int8_t cy = br_read_signed(&br, bpcy);
     int8_t dx = br_read_signed(&br, bpdx);
 
-    glyph->width     = cw ? cw : mcw;
-    glyph->height    = ch ? ch : mch;
+    glyph->width     = cw;
+    glyph->height    = ch;
     glyph->x_offset  = cx;
     glyph->y_offset  = cy;
-    glyph->x_advance = (uint8_t)(dx > 0 ? dx : (int8_t)mcw);
+    glyph->x_advance = (uint8_t)(dx != 0 ? dx : (int8_t)mcw);
     glyph->bitmap_byte = br.byte_pos;
     glyph->bitmap_bit  = br.bit_pos;
     return 1;
@@ -233,7 +227,6 @@ static uint8_t decode_glyph_metrics(const eui_font_t *font,
     uint8_t bpcx = p[HDR_BITS_PER_CHAR_X], bpcy = p[HDR_BITS_PER_CHAR_Y];
     uint8_t bpdx = p[HDR_BITS_PER_DELTA_X];
     uint8_t mcw = p[HDR_MAX_CHAR_W];
-    uint8_t mch = p[HDR_MAX_CHAR_H];
 
     bit_reader_t br;
     br.data = p;
@@ -246,11 +239,11 @@ static uint8_t decode_glyph_metrics(const eui_font_t *font,
     int8_t cy = br_read_signed(&br, bpcy);
     int8_t dx = br_read_signed(&br, bpdx);
 
-    glyph->width     = cw ? cw : mcw;
-    glyph->height    = ch ? ch : mch;
+    glyph->width     = cw;
+    glyph->height    = ch;
     glyph->x_offset  = cx;
     glyph->y_offset  = cy;
-    glyph->x_advance = (uint8_t)(dx > 0 ? dx : (int8_t)mcw);
+    glyph->x_advance = (uint8_t)(dx != 0 ? dx : (int8_t)mcw);
     glyph->bitmap_byte = br.byte_pos;
     glyph->bitmap_bit  = br.bit_pos;
     return 1;
@@ -289,6 +282,9 @@ uint8_t eui_font_u8g2_draw_glyph(const eui_font_t *font, uint16_t encoding,
     const uint8_t *gd = find_glyph_data(font, encoding);
     if (!gd) return 0;
     if (!decode_glyph_metrics(font, gd, &g)) return 0;
+
+    /* glyph with encoded width=0 means no pixels (e.g. space) */
+    if (g.width == 0) return g.x_advance;
 
     int8_t baseline = font->baseline;
 

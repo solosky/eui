@@ -493,7 +493,7 @@ static void draw_u8g2_glyph(eui_canvas_t *canvas, const eui_font_t *font,
                                    g.width, g.height)) {
                 canvas_set_pixel(canvas,
                                  x + col + g.x_offset,
-                                 y + row + g.y_offset,
+                                 (int16_t)(y - g.height - g.y_offset + row),
                                  canvas->fg_color);
             }
         }
@@ -519,7 +519,7 @@ static void draw_u8g2_glyph_by_index(eui_canvas_t *canvas,
                                    g.width, g.height)) {
                 canvas_set_pixel(canvas,
                                  x + col + g.x_offset,
-                                 y + row + g.y_offset,
+                                 (int16_t)(y - g.height - g.y_offset + row),
                                  canvas->fg_color);
             }
         }
