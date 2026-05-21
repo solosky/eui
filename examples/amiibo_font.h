@@ -478,8 +478,8 @@ static const uint8_t wqy13_data[] =
 
 static const eui_font_t wqy13_font = {
     .format = EUI_FONT_FORMAT_U8G2,
-    .line_height = 16,
-    .baseline = 14,
+    .line_height = 14,
+    .baseline = 13,
     .data = wqy13_data,
 #if EUI_FONT_ENABLE_U8G2
     .lookup_glyph = eui_font_u8g2_lookup_glyph,

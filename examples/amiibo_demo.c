@@ -222,8 +222,11 @@ static bool app_list_handler(eui_view_event_t *evt, void *context) {
         eui_canvas_fill_rect(c, view->area.x, view->area.y, view->area.w, view->area.h);
         eui_canvas_set_color(c, eui_color_from_rgb(200, 200, 220));
         eui_canvas_set_font(c, &wqy13_font);
-        eui_canvas_draw_str_aligned(c, view->area.x + (int16_t)(view->area.w / 2),
-                                     view->area.y + 10, EUI_ALIGN_CENTER, EUI_ALIGN_TOP, "应用列表");
+        const char *title = "应用列表";
+        uint16_t tw = eui_canvas_str_width(c, title);
+        uint8_t fh = eui_canvas_font_height(c);
+        eui_canvas_draw_str(c, view->area.x + (int16_t)(view->area.w / 2) - (int16_t)(tw / 2),
+                             view->area.y + fh, title);
         carousel_draw(&g_app_carousel, c, (eui_rect_t){ 0, 30, 240, 200 });
         return true;
     }
@@ -255,8 +258,11 @@ static bool amiibo_list_handler(eui_view_event_t *evt, void *context) {
         eui_canvas_fill_rect(c, view->area.x, view->area.y, view->area.w, view->area.h);
         eui_canvas_set_color(c, eui_color_from_rgb(200, 200, 220));
         eui_canvas_set_font(c, &wqy13_font);
-        eui_canvas_draw_str_aligned(c, view->area.x + (int16_t)(view->area.w / 2),
-                                     view->area.y + 10, EUI_ALIGN_CENTER, EUI_ALIGN_TOP, "Amiibo");
+        const char *title = "Amiibo";
+        uint16_t tw = eui_canvas_str_width(c, title);
+        uint8_t fh = eui_canvas_font_height(c);
+        eui_canvas_draw_str(c, view->area.x + (int16_t)(view->area.w / 2) - (int16_t)(tw / 2),
+                             view->area.y + fh, title);
         carousel_draw(&g_amiibo_carousel, c, (eui_rect_t){ 0, 30, 240, 200 });
         return true;
     }
@@ -295,8 +301,8 @@ static bool detail_handler(eui_view_event_t *evt, void *context) {
         /* Name */
         eui_canvas_set_color(c, eui_color_from_rgb(255, 220, 80));
         eui_canvas_set_font(c, &wqy13_font);
-        eui_canvas_draw_str_aligned(c, view->area.x + (int16_t)(view->area.w / 2), y,
-                                     EUI_ALIGN_CENTER, EUI_ALIGN_TOP, d->name);
+        uint16_t tw_name = eui_canvas_str_width(c, d->name);
+        eui_canvas_draw_str(c, view->area.x + (int16_t)(view->area.w / 2) - (int16_t)(tw_name / 2), y, d->name);
         y += 18;
 
         /* Icon */
