@@ -186,6 +186,14 @@ void eui_hal_raylib_save_screenshot(const char *filename) {
     fclose(f);
 }
 
+const uint8_t* eui_hal_raylib_get_rgba_buffer(uint16_t *out_width, uint16_t *out_height) {
+    if (!g_active_display) return NULL;
+    raylib_display_t *d = g_active_display;
+    if (out_width)  *out_width  = d->width;
+    if (out_height) *out_height = d->height;
+    return d->rgba_buffer;
+}
+
 /* ---- Input HAL ---- */
 
 typedef struct {

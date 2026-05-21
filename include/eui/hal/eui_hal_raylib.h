@@ -20,6 +20,8 @@ int eui_hal_raylib_window_should_close(void);
 
 void eui_hal_raylib_save_screenshot(const char *filename);
 
+const uint8_t* eui_hal_raylib_get_rgba_buffer(uint16_t *out_width, uint16_t *out_height);
+
 #ifdef __cplusplus
 }
 #endif
