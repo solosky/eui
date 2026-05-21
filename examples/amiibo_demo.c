@@ -10,7 +10,7 @@
 
 #define W 240
 #define H 240
-#define POOL_SIZE 131072
+#define POOL_SIZE 262144
 static uint8_t mem_pool[POOL_SIZE];
 static uint32_t get_tick(void) { return (uint32_t)(GetTime() * 1000.0); }
 
@@ -52,6 +52,10 @@ static void carousel_init(carousel_t *c, const item_t *items, uint8_t count,
     c->spring_params.stiffness = MC_FP_C(180);
     c->spring_params.damping = MC_FP_C(12);
     c->spring_params.mass = MC_FP_C(1);
+    /* target_pos = selected * item_step. scroll_pos animates toward target.
+       In carousel_draw, center_offset + i*step - scroll_pos places selected item at center. */
+    c->target_pos = MC_REAL_FROM_INT(c->selected * c->item_step);
+    c->scroll_pos = c->target_pos;
 }
 
 static void carousel_select(carousel_t *c, int8_t idx) {
@@ -72,25 +76,25 @@ static void carousel_draw(carousel_t *c, eui_canvas_t *canvas, eui_rect_t area) 
     int16_t perp_center = (c->dir == CAROUSEL_HORIZONTAL) ? center_y : center_x;
     int16_t half_step = (int16_t)(c->item_step / 2);
     int16_t half_size = (int16_t)(c->icon_size / 2);
+    int16_t center_offset = screen_center - half_step;  /* makes item 0 center at screen center */
     float scroll_f = MC_REAL_TO_FLOAT(c->scroll_pos);
 
     for (uint8_t i = 0; i < c->count; i++) {
-        float item_center = (float)(i * c->item_step) - scroll_f;
-        float dist = item_center - (float)(screen_center - area.x);
-        int16_t draw_pos = (int16_t)(area.x + item_center);
+        int16_t item_left = (int16_t)(center_offset + (float)(i * c->item_step) - scroll_f);
+        int16_t draw_pos = area.x + item_left;
         int16_t perp_pos = perp_center;
 
         /* Visibility check */
-        if (draw_pos + half_step < area.x || draw_pos - half_step > area.x + (int16_t)area.w)
+        if (draw_pos + c->item_step < area.x || draw_pos > area.x + (int16_t)area.w)
             continue;
 
         int16_t ix, iy;
         if (c->dir == CAROUSEL_HORIZONTAL) {
-            ix = draw_pos - half_size;
+            ix = draw_pos;
             iy = perp_pos - half_size - 10;
         } else {
             ix = perp_pos - half_size;
-            iy = draw_pos - half_size;
+            iy = draw_pos;
         }
 
         /* Selection highlight */
@@ -117,11 +121,11 @@ static void carousel_draw(carousel_t *c, eui_canvas_t *canvas, eui_rect_t area) 
         if (c->items[i].label) {
             uint16_t lw = eui_canvas_str_width(canvas, c->items[i].label);
             if (c->dir == CAROUSEL_HORIZONTAL) {
-                eui_canvas_draw_str(canvas, draw_pos - (int16_t)(lw / 2),
+                eui_canvas_draw_str(canvas, draw_pos + half_step - (int16_t)(lw / 2),
                                     perp_pos + half_size + 2, c->items[i].label);
             } else {
                 eui_canvas_draw_str(canvas, perp_pos + half_size + 4,
-                                    draw_pos - 6, c->items[i].label);
+                                    draw_pos + half_step - 6, c->items[i].label);
             }
         }
     }
