@@ -675,6 +675,11 @@ void eui_canvas_draw_xbm(eui_canvas_t *canvas, int16_t x, int16_t y,
 void eui_canvas_draw_bitmap(eui_canvas_t *canvas, int16_t x, int16_t y, const eui_bitmap_t *bmp)
 {
     if (!bmp || !bmp->data) return;
+
+    /* DEBUG: draw a yellow bounding box first to verify function is called */
+    eui_canvas_set_color(canvas, eui_color_from_rgb(255, 255, 0));
+    eui_canvas_draw_rect(canvas, x, y, bmp->width, bmp->height);
+
     uint8_t depth = bmp->color_depth;
     if (depth == 0) depth = 1;
     uint16_t bytes_per_pixel = (depth + 7) / 8;
