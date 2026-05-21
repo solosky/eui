@@ -98,6 +98,7 @@ static const uint8_t* find_glyph_data_unicode(const eui_font_t *font, uint16_t e
             }
             return NULL;
         }
+        glyph_ptr = block_end;
     }
 }
 
