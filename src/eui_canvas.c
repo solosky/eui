@@ -675,9 +675,28 @@ void eui_canvas_draw_xbm(eui_canvas_t *canvas, int16_t x, int16_t y,
 void eui_canvas_draw_bitmap(eui_canvas_t *canvas, int16_t x, int16_t y, const eui_bitmap_t *bmp)
 {
     if (!bmp || !bmp->data) return;
+    uint8_t depth = bmp->color_depth;
+    if (depth == 0) depth = 1;
+    uint16_t bytes_per_pixel = (depth + 7) / 8;
+    uint16_t row_bytes = bmp->width * bytes_per_pixel;
+    const uint8_t *src = bmp->data;
+
     for (uint16_t row = 0; row < bmp->height; row++) {
         for (uint16_t col = 0; col < bmp->width; col++) {
-            canvas_set_pixel(canvas, x + (int16_t)col, y + (int16_t)row, EUI_COLOR_BLACK);
+            uint32_t pixel_raw = 0;
+            uint16_t src_off = row * row_bytes + col * bytes_per_pixel;
+            for (uint8_t b = 0; b < bytes_per_pixel; b++) {
+                pixel_raw = (pixel_raw << 8) | src[src_off + b];
+            }
+            eui_color_t color;
+            if (bytes_per_pixel == 1) {
+                color = (pixel_raw & 1) ? EUI_COLOR_WHITE : EUI_COLOR_BLACK;
+            } else if (bytes_per_pixel == 2) {
+                color = (eui_color_t)(pixel_raw & 0xFFFF);
+            } else {
+                color = (eui_color_t)(pixel_raw & 0xFFFF);
+            }
+            canvas_set_pixel(canvas, x + (int16_t)col, y + (int16_t)row, color);
         }
     }
 }
