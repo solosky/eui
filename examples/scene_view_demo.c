@@ -139,11 +139,18 @@ static bool detail_view_handler(eui_view_event_t *evt, void *context) {
         eui_canvas_set_color(c, data->bg_color);
         eui_canvas_fill_rect(c, view->area.x, view->area.y,
                                 view->area.w, view->area.h);
+
+        /* yellow rect in center */
+        int16_t rx = view->area.x + (int16_t)(W / 2) - 16;
+        int16_t ry = view->area.y + (int16_t)(H / 2) - 12;
+        eui_canvas_set_color(c, eui_color_from_rgb(255, 255, 0));
+        eui_canvas_fill_rect(c, rx, ry, 32, 24);
+
+        /* text on top of yellow rect */
         eui_canvas_set_color(c, EUI_COLOR_WHITE);
         eui_canvas_set_font(c, &eui_font_builtin);
-        uint16_t tw = eui_canvas_str_width(c, data->name);
-        eui_canvas_draw_str(c, view->area.x + (W - (int16_t)tw) / 2,
-                            view->area.y + H / 2 - 4, data->name);
+        eui_canvas_draw_str(c, rx + 4, ry + 6, "OK");
+
         eui_canvas_draw_str(c, view->area.x + 4, view->area.y + H - 10, "ESC/OK:Back");
         return true;
     }
