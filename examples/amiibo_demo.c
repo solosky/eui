@@ -2,6 +2,7 @@
 #include "eui/eui_font_builtin.h"
 #include "eui/hal/eui_hal_raylib.h"
 #include "amiibo_font.h"
+#include "amiibo_icons.h"
 #include <raylib.h>
 #include <stdio.h>
 #include <string.h>
@@ -19,7 +20,7 @@ typedef enum { CAROUSEL_HORIZONTAL, CAROUSEL_VERTICAL } carousel_dir_t;
 /* ─── Item type ─── */
 typedef struct {
     const char *label;
-    void (*draw_icon)(eui_canvas_t *c, int16_t x, int16_t y, uint16_t size);
+    const eui_bitmap_t *icon;
     void *user_data;
 } item_t;
 
@@ -106,12 +107,8 @@ static void carousel_draw(carousel_t *c, eui_canvas_t *canvas, eui_rect_t area) 
         }
 
         /* Draw icon */
-        if (c->items[i].draw_icon) {
-            eui_canvas_save(canvas);
-            eui_rect_t clip = { ix, iy, c->icon_size, c->icon_size };
-            eui_canvas_set_clip(canvas, &clip);
-            c->items[i].draw_icon(canvas, ix, iy, c->icon_size);
-            eui_canvas_restore(canvas);
+        if (c->items[i].icon) {
+            eui_canvas_draw_bitmap(canvas, ix, iy, c->items[i].icon);
         }
 
         /* Label */
@@ -150,129 +147,11 @@ static bool carousel_input(carousel_t *c, const eui_event_t *e) {
     return false;
 }
 
-/* ─── Icon drawing functions ─── */
-static void draw_amiibo_icon(eui_canvas_t *c, int16_t x, int16_t y, uint16_t s) {
-    eui_canvas_set_color(c, eui_color_from_rgb(230, 50, 50));
-    eui_canvas_fill_round_rect(c, x + 4, y + 4, s - 8, s - 8, 12);
-    eui_canvas_set_color(c, EUI_COLOR_WHITE);
-    eui_canvas_set_font(c, &eui_font_builtin);
-    eui_canvas_draw_str(c, x + s/2 - 16, y + s/2 - 4, "Amiibo");
-}
-
-static void draw_nfc_icon(eui_canvas_t *c, int16_t x, int16_t y, uint16_t s) {
-    eui_canvas_set_color(c, eui_color_from_rgb(50, 130, 230));
-    eui_canvas_fill_round_rect(c, x + 4, y + 4, s - 8, s - 8, 12);
-    eui_canvas_set_color(c, EUI_COLOR_WHITE);
-    eui_canvas_set_font(c, &eui_font_builtin);
-    eui_canvas_draw_str(c, x + s/2 - 14, y + s/2 - 4, "NFC");
-}
-
-static void draw_settings_icon(eui_canvas_t *c, int16_t x, int16_t y, uint16_t s) {
-    eui_canvas_set_color(c, eui_color_from_rgb(100, 100, 100));
-    eui_canvas_fill_round_rect(c, x + 4, y + 4, s - 8, s - 8, 12);
-    eui_canvas_set_color(c, eui_color_from_rgb(200, 200, 200));
-    eui_canvas_fill_circle(c, x + s/2, y + s/2, s/4);
-    eui_canvas_set_color(c, eui_color_from_rgb(100, 100, 100));
-    eui_canvas_fill_circle(c, x + s/2, y + s/2, s/8);
-}
-
-/* Amiibo character icons */
-static void draw_mario(eui_canvas_t *c, int16_t x, int16_t y, uint16_t s) {
-    eui_canvas_set_color(c, eui_color_from_rgb(230, 50, 50));
-    eui_canvas_fill_round_rect(c, x, y, s, s, 8);
-    eui_canvas_set_color(c, eui_color_from_rgb(255, 200, 150));
-    eui_canvas_fill_circle(c, x + s/2, y + s/2, s/3);
-    eui_canvas_set_color(c, eui_color_from_rgb(255, 255, 255));
-    eui_canvas_fill_circle(c, x + s/2 - 8, y + s/2 - 6, 6);
-    eui_canvas_fill_circle(c, x + s/2 + 8, y + s/2 - 6, 6);
-    eui_canvas_set_color(c, eui_color_from_rgb(80, 40, 20));
-    eui_canvas_fill_circle(c, x + s/2 - 8, y + s/2 - 6, 3);
-    eui_canvas_fill_circle(c, x + s/2 + 8, y + s/2 - 6, 3);
-    eui_canvas_set_color(c, eui_color_from_rgb(50, 25, 10));
-    eui_canvas_draw_line(c, x + s/2 - 12, y + s/2 + 6, x + s/2 + 12, y + s/2 + 6);
-}
-
-static void draw_link(eui_canvas_t *c, int16_t x, int16_t y, uint16_t s) {
-    eui_canvas_set_color(c, eui_color_from_rgb(50, 180, 80));
-    eui_canvas_fill_round_rect(c, x, y, s, s, 8);
-    eui_canvas_set_color(c, eui_color_from_rgb(255, 220, 150));
-    eui_canvas_fill_circle(c, x + s/2, y + s/2 - 8, s/4);
-    eui_canvas_set_color(c, eui_color_from_rgb(255, 200, 50));
-    eui_canvas_fill_rect(c, x + s/2 - 16, y + s/2 - 32, 32, 20);
-    eui_canvas_fill_rect(c, x + s/2 - 8, y + s/2 - 36, 16, 8);
-}
-
-static void draw_zelda(eui_canvas_t *c, int16_t x, int16_t y, uint16_t s) {
-    eui_canvas_set_color(c, eui_color_from_rgb(180, 80, 180));
-    eui_canvas_fill_round_rect(c, x, y, s, s, 8);
-    eui_canvas_set_color(c, eui_color_from_rgb(255, 220, 150));
-    eui_canvas_fill_circle(c, x + s/2, y + s/2 - 6, s/4);
-    eui_canvas_set_color(c, eui_color_from_rgb(255, 200, 100));
-    eui_canvas_fill_rect(c, x + s/2 - 12, y + s/2 - 30, 24, 18);
-}
-
-static void draw_pikachu(eui_canvas_t *c, int16_t x, int16_t y, uint16_t s) {
-    eui_canvas_set_color(c, eui_color_from_rgb(255, 220, 50));
-    eui_canvas_fill_round_rect(c, x, y, s, s, 8);
-    eui_canvas_set_color(c, eui_color_from_rgb(255, 80, 80));
-    eui_canvas_fill_circle(c, x + s/2 - 16, y + s/2 + 4, 6);
-    eui_canvas_fill_circle(c, x + s/2 + 16, y + s/2 + 4, 6);
-    eui_canvas_set_color(c, eui_color_from_rgb(80, 40, 20));
-    eui_canvas_fill_circle(c, x + s/2 - 8, y + s/2 - 8, 4);
-    eui_canvas_fill_circle(c, x + s/2 + 8, y + s/2 - 8, 4);
-    eui_canvas_set_color(c, eui_color_from_rgb(255, 80, 80));
-    eui_canvas_draw_str(c, x + s/2 - 14, y + s/2 + 14, "~''~");
-}
-
-static void draw_kirby(eui_canvas_t *c, int16_t x, int16_t y, uint16_t s) {
-    eui_canvas_set_color(c, eui_color_from_rgb(255, 150, 200));
-    eui_canvas_fill_round_rect(c, x, y, s, s, 8);
-    eui_canvas_set_color(c, eui_color_from_rgb(200, 80, 150));
-    eui_canvas_fill_circle(c, x + s/2 - 12, y + s/2 - 8, 6);
-    eui_canvas_fill_circle(c, x + s/2 + 12, y + s/2 - 8, 6);
-    eui_canvas_set_color(c, eui_color_from_rgb(80, 40, 20));
-    eui_canvas_fill_circle(c, x + s/2 - 12, y + s/2 - 8, 3);
-    eui_canvas_fill_circle(c, x + s/2 + 12, y + s/2 - 8, 3);
-    eui_canvas_set_color(c, eui_color_from_rgb(255, 80, 120));
-    eui_canvas_fill_circle(c, x + s/2, y + s/2 + 4, 5);
-}
-
-static void draw_samus(eui_canvas_t *c, int16_t x, int16_t y, uint16_t s) {
-    eui_canvas_set_color(c, eui_color_from_rgb(230, 120, 30));
-    eui_canvas_fill_round_rect(c, x, y, s, s, 8);
-    eui_canvas_set_color(c, eui_color_from_rgb(100, 180, 255));
-    eui_canvas_fill_circle(c, x + s/2, y + s/2 - 6, s/5);
-    eui_canvas_set_color(c, eui_color_from_rgb(200, 100, 20));
-    eui_canvas_fill_rect(c, x + s/2 - 4, y + s/2 + 10, 8, 20);
-    eui_canvas_fill_rect(c, x + s/2 - 20, y + s/2 + 8, 40, 8);
-}
-
-static void draw_yoshi(eui_canvas_t *c, int16_t x, int16_t y, uint16_t s) {
-    eui_canvas_set_color(c, eui_color_from_rgb(80, 220, 80));
-    eui_canvas_fill_round_rect(c, x, y, s, s, 8);
-    eui_canvas_set_color(c, eui_color_from_rgb(255, 255, 255));
-    eui_canvas_fill_circle(c, x + s/2 - 10, y + s/2 - 8, 8);
-    eui_canvas_fill_circle(c, x + s/2 + 10, y + s/2 - 8, 8);
-    eui_canvas_set_color(c, eui_color_from_rgb(80, 40, 20));
-    eui_canvas_fill_circle(c, x + s/2 - 10, y + s/2 - 8, 4);
-    eui_canvas_fill_circle(c, x + s/2 + 10, y + s/2 - 8, 4);
-    eui_canvas_set_color(c, eui_color_from_rgb(230, 80, 80));
-    eui_canvas_fill_circle(c, x + s/2 - 4, y + s/2 + 10, 6);
-}
-
-static void draw_donkey_kong(eui_canvas_t *c, int16_t x, int16_t y, uint16_t s) {
-    eui_canvas_set_color(c, eui_color_from_rgb(120, 60, 20));
-    eui_canvas_fill_round_rect(c, x, y, s, s, 8);
-    eui_canvas_set_color(c, eui_color_from_rgb(200, 150, 80));
-    eui_canvas_fill_circle(c, x + s/2, y + s/2 - 4, s/3);
-    eui_canvas_set_color(c, eui_color_from_rgb(230, 180, 100));
-    eui_canvas_fill_circle(c, x + s/2, y + s/2 - 4, s/4);
-    eui_canvas_set_color(c, eui_color_from_rgb(80, 40, 20));
-    eui_canvas_fill_circle(c, x + s/2 - 12, y + s/2 - 8, 4);
-    eui_canvas_fill_circle(c, x + s/2 + 12, y + s/2 - 8, 4);
-    eui_canvas_set_color(c, eui_color_from_rgb(230, 80, 80));
-    eui_canvas_fill_rect(c, x + s/2 - 6, y + s/2 + 12, 12, 6);
-}
+/* ─── Amiibo icon array ─── */
+static const eui_bitmap_t* amiibo_icons[] = {
+    &g_icon_mario, &g_icon_link, &g_icon_zelda, &g_icon_pikachu,
+    &g_icon_kirby, &g_icon_samus, &g_icon_yoshi, &g_icon_dk,
+};
 
 /* ─── Amiibo detail data ─── */
 typedef struct {
@@ -280,18 +159,17 @@ typedef struct {
     const char *series;
     const char *drops[6];
     uint8_t drop_count;
-    void (*draw_icon)(eui_canvas_t *c, int16_t x, int16_t y, uint16_t size);
 } amiibo_detail_t;
 
 static amiibo_detail_t amiibo_data[] = {
-    { "马力欧", "超级马力欧系列", {"超级蘑菇", "火焰花", "无敌星", "超级铃铛"}, 4, draw_mario },
-    { "林克", "塞尔达传说系列", {"大师剑", "海利亚盾", "滑翔伞", "时之笛"}, 4, draw_link },
-    { "塞尔达", "塞尔达传说系列", {"光之箭", "时之笛", "三角力量", "塞尔达盾"}, 4, draw_zelda },
-    { "皮卡丘", "宝可梦系列", {"电气球", "雷之石", "十万伏特", "电珠"}, 4, draw_pikachu },
-    { "卡比", "星之卡比系列", {"复制能力", "星星杖", "番茄", "M番茄"}, 4, draw_kirby },
-    { "萨姆斯", "银河战士系列", {"能量罐", "导弹", "超炸", "加速器"}, 4, draw_samus },
-    { "耀西", "耀西系列", {"耀西蛋", "水果", "快乐花", "星星"}, 4, draw_yoshi },
-    { "森喜刚", "大金刚系列", {"大金刚桶", "香蕉", "矿车", "DK徽章"}, 4, draw_donkey_kong },
+    { "马力欧", "超级马力欧系列", {"超级蘑菇", "火焰花", "无敌星", "超级铃铛"}, 4 },
+    { "林克", "塞尔达传说系列", {"大师剑", "海利亚盾", "滑翔伞", "时之笛"}, 4 },
+    { "塞尔达", "塞尔达传说系列", {"光之箭", "时之笛", "三角力量", "塞尔达盾"}, 4 },
+    { "皮卡丘", "宝可梦系列", {"电气球", "雷之石", "十万伏特", "电珠"}, 4 },
+    { "卡比", "星之卡比系列", {"复制能力", "星星杖", "番茄", "M番茄"}, 4 },
+    { "萨姆斯", "银河战士系列", {"能量罐", "导弹", "超炸", "加速器"}, 4 },
+    { "耀西", "耀西系列", {"耀西蛋", "水果", "快乐花", "星星"}, 4 },
+    { "森喜刚", "大金刚系列", {"大金刚桶", "香蕉", "矿车", "DK徽章"}, 4 },
 };
 
 /* ─── Navigation ─── */
@@ -322,9 +200,9 @@ static void navigate_to(uint32_t scene_id, eui_anim_type_t anim) {
 
 /* ─── App list items ─── */
 static item_t app_items[] = {
-    { "Amiibo", draw_amiibo_icon, NULL },
-    { "NFC",    draw_nfc_icon,    NULL },
-    { "设置",    draw_settings_icon, NULL },
+    { "Amiibo", &g_icon_amiibo_app, NULL },
+    { "NFC",    &g_icon_nfc,        NULL },
+    { "设置",    &g_icon_settings,   NULL },
 };
 
 /* ─── Amiibo list items ─── */
@@ -418,11 +296,7 @@ static bool detail_handler(eui_view_event_t *evt, void *context) {
         y += 18;
 
         /* Icon */
-        eui_canvas_save(c);
-        eui_rect_t clip = { view->area.x + 60, y, 120, 120 };
-        eui_canvas_set_clip(c, &clip);
-        d->draw_icon(c, view->area.x + 60, y, 120);
-        eui_canvas_restore(c);
+        eui_canvas_draw_bitmap(c, view->area.x + 60, y, amiibo_icons[g_detail_index]);
         y += 126;
 
         /* Series */
@@ -523,7 +397,7 @@ int main(void) {
 
     for (uint8_t i = 0; i < 8; i++) {
         amiibo_items[i].label = amiibo_data[i].name;
-        amiibo_items[i].draw_icon = amiibo_data[i].draw_icon;
+        amiibo_items[i].icon = amiibo_icons[i];
         amiibo_items[i].user_data = NULL;
     }
     carousel_init(&g_amiibo_carousel, amiibo_items, 8, CAROUSEL_HORIZONTAL, 140, 120);
