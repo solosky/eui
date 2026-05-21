@@ -26,7 +26,8 @@ static int disp_init(void *ud) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(sw, sh, "EUI - raylib");
     d->fb = LoadRenderTexture(d->width, d->height);
-    SetTextureWrap(d->fb.texture, TEXTURE_WRAP_CLAMP);
+    if (d->fb.texture.id > 0)
+        SetTextureWrap(d->fb.texture, TEXTURE_WRAP_CLAMP);
     d->rgba_buffer = (uint8_t*)malloc((size_t)d->width * d->height * 4);
     g_active_display = d;
     SetTargetFPS(60);
