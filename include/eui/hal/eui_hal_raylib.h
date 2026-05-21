@@ -18,6 +18,8 @@ void eui_hal_raylib_destroy_input(eui_input_hal_t *hal);
 
 int eui_hal_raylib_window_should_close(void);
 
+void eui_hal_raylib_save_screenshot(const char *filename);
+
 #ifdef __cplusplus
 }
 #endif

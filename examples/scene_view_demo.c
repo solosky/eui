@@ -221,6 +221,11 @@ int main(void) {
     while (!eui_hal_raylib_window_should_close()) {
         eui_tick();
         eui_hal_raylib_refresh();
+
+        if (IsKeyPressed(KEY_F2)) {
+            eui_hal_raylib_save_screenshot("screenshot.ppm");
+            printf("Screenshot saved to screenshot.ppm\n");
+        }
     }
 
     display->deinit(display->user_data);

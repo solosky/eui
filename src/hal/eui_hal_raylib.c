@@ -3,6 +3,7 @@
 #include <raylib.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 /* ---- Display HAL ---- */
 
@@ -161,6 +162,28 @@ void eui_hal_raylib_refresh(void) {
 
 int eui_hal_raylib_window_should_close(void) {
     return WindowShouldClose();
+}
+
+void eui_hal_raylib_save_screenshot(const char *filename) {
+    if (!g_active_display) return;
+    raylib_display_t *d = g_active_display;
+    if (!d->rgba_buffer) return;
+
+    FILE *f = fopen(filename, "wb");
+    if (!f) return;
+
+    /* PPM P6 binary format: header + 24-bit RGB data */
+    fprintf(f, "P6\n%d %d\n255\n", (int)d->width, (int)d->height);
+
+    /* RGBA -> RGB, skipping alpha */
+    for (int y = 0; y < (int)d->height; y++) {
+        for (int x = 0; x < (int)d->width; x++) {
+            uint8_t *p = d->rgba_buffer + (size_t)(y * d->width + x) * 4;
+            fwrite(p, 1, 3, f);
+        }
+    }
+
+    fclose(f);
 }
 
 /* ---- Input HAL ---- */
