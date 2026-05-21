@@ -94,7 +94,17 @@ if(EXISTS ${U8G2_DIR})
         ${U8G2_DIR}/csrc/u8g2_font.c
         ${U8G2_DIR}/csrc/u8g2_ll_hvline.c
         ${U8G2_DIR}/csrc/u8g2_buffer.c
+        ${U8G2_DIR}/csrc/u8g2_kerning.c
+        ${U8G2_DIR}/csrc/u8g2_intersection.c
+        ${U8G2_DIR}/csrc/u8g2_hvline.c
         ${U8G2_DIR}/csrc/u8x8_setup.c
+        ${U8G2_DIR}/csrc/u8x8_display.c
+        ${U8G2_DIR}/csrc/u8x8_capture.c
+        ${U8G2_DIR}/csrc/u8x8_gpio.c
+        ${U8G2_DIR}/csrc/u8x8_u16toa.c
+        ${U8G2_DIR}/csrc/u8x8_byte.c
+        ${U8G2_DIR}/csrc/u8x8_8x8.c
+        ${U8G2_DIR}/csrc/u8x8_cad.c
     )
 
     target_include_directories(test_font_vs_u8g2 PRIVATE
