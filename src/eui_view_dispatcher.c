@@ -105,6 +105,19 @@ void eui_view_dispatcher_pop_overlay(eui_view_dispatcher_t *vd, eui_anim_type_t 
     }
 }
 
+/* Compute intersection of rect r with the screen [0,W)×[0,H). */
+static eui_rect_t clip_to_screen(const eui_rect_t *r, int16_t W, int16_t H) {
+    eui_rect_t out;
+    int16_t l = r->x < 0 ? 0 : r->x;
+    int16_t t = r->y < 0 ? 0 : r->y;
+    int16_t ri = r->x + (int16_t)r->w; if (ri > W) ri = W;
+    int16_t b = r->y + (int16_t)r->h;  if (b > H) b  = H;
+    out.x = l; out.y = t;
+    out.w = (uint16_t)(ri - l);
+    out.h = (uint16_t)(b  - t);
+    return out;
+}
+
 static void render_transition(eui_view_dispatcher_t *vd) {
     if (!vd->transition_prev_view || !vd->transition_start_ms) return;
 
@@ -130,32 +143,60 @@ static void render_transition(eui_view_dispatcher_t *vd) {
         eui_view_send_draw(new_view, vd->canvas);
         eui_canvas_restore(vd->canvas);
     } else {
-        /* Slide: offset both views */
-        eui_rect_t old_save = vd->transition_prev_view->area;
-        eui_rect_t new_save = new_view->area;
+        /* Slide: use clip-based approach.
+         * Views draw at their natural position (area is NOT offset), but
+         * only the relevant portion is visible through the clip rect.
+         * This avoids white bars caused by content drawn at negative
+         * coordinates when the view area was offset.                    */
+        eui_rect_t old_area = vd->transition_prev_view->area;
+        eui_rect_t new_area = new_view->area;
 
+        eui_canvas_save(vd->canvas);
         switch (vd->transition_type) {
-            case EUI_ANIM_SLIDE_LEFT:
-                vd->transition_prev_view->area.x = (int16_t)(-(float)W * progress);
-                new_view->area.x = (int16_t)((float)W * (1.0f - progress));
+            case EUI_ANIM_SLIDE_LEFT: {
+                int16_t off = (int16_t)((float)W * progress);
+                /* old view: clip to left portion (shrinks from right) */
+                eui_rect_t oc = { 0, 0, (uint16_t)(W - off), (uint16_t)H };
+                eui_canvas_set_clip(vd->canvas, &oc);
+                vd->transition_prev_view->area = old_area;
+                eui_view_send_draw(vd->transition_prev_view, vd->canvas);
+                /* new view: clip to right portion (grows from right)  */
+                eui_rect_t nc = { off, 0, (uint16_t)(W - off), (uint16_t)H };
+                eui_canvas_set_clip(vd->canvas, &nc);
+                new_view->area = new_area;
+                eui_view_send_draw(new_view, vd->canvas);
                 break;
-            case EUI_ANIM_SLIDE_RIGHT:
-                vd->transition_prev_view->area.x = (int16_t)((float)W * progress);
-                new_view->area.x = (int16_t)(-(float)W * (1.0f - progress));
+            }
+            case EUI_ANIM_SLIDE_RIGHT: {
+                int16_t off = (int16_t)((float)W * progress);
+                eui_rect_t oc = { off, 0, (uint16_t)(W - off), (uint16_t)H };
+                eui_canvas_set_clip(vd->canvas, &oc);
+                vd->transition_prev_view->area = old_area;
+                eui_view_send_draw(vd->transition_prev_view, vd->canvas);
+                eui_rect_t nc = { 0, 0, (uint16_t)off, (uint16_t)H };
+                eui_canvas_set_clip(vd->canvas, &nc);
+                new_view->area = new_area;
+                eui_view_send_draw(new_view, vd->canvas);
                 break;
-            case EUI_ANIM_SLIDE_UP:
-                vd->transition_prev_view->area.y = (int16_t)(-(float)H * progress);
-                new_view->area.y = (int16_t)((float)H * (1.0f - progress));
+            }
+            case EUI_ANIM_SLIDE_UP: {
+                int16_t off = (int16_t)((float)H * progress);
+                eui_rect_t oc = { 0, 0, (uint16_t)W, (uint16_t)(H - off) };
+                eui_canvas_set_clip(vd->canvas, &oc);
+                vd->transition_prev_view->area = old_area;
+                eui_view_send_draw(vd->transition_prev_view, vd->canvas);
+                eui_rect_t nc = { 0, off, (uint16_t)W, (uint16_t)(H - off) };
+                eui_canvas_set_clip(vd->canvas, &nc);
+                new_view->area = new_area;
+                eui_view_send_draw(new_view, vd->canvas);
                 break;
+            }
             default:
+                eui_view_send_draw(vd->transition_prev_view, vd->canvas);
+                eui_view_send_draw(new_view, vd->canvas);
                 break;
         }
-
-        eui_view_send_draw(vd->transition_prev_view, vd->canvas);
-        eui_view_send_draw(new_view, vd->canvas);
-
-        vd->transition_prev_view->area = old_save;
-        new_view->area = new_save;
+        eui_canvas_restore(vd->canvas);
     }
 
     if (progress >= 1.0f) {
