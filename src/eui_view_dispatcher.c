@@ -183,7 +183,11 @@ static void render_transition(eui_view_dispatcher_t *vd) {
                 break;
             }
             default:
+                eui_canvas_set_clip(vd->canvas, &old_area);
+                vd->transition_prev_view->area = old_area;
                 eui_view_send_draw(vd->transition_prev_view, vd->canvas);
+                eui_canvas_set_clip(vd->canvas, &new_area);
+                new_view->area = new_area;
                 eui_view_send_draw(new_view, vd->canvas);
                 break;
         }
