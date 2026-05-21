@@ -148,13 +148,11 @@ static void render_transition(eui_view_dispatcher_t *vd) {
         switch (vd->transition_type) {
             case EUI_ANIM_SLIDE_LEFT: {
                 int16_t off = (int16_t)((float)W * progress);
-                /* old view: clip to left portion (shrinks from right) */
                 eui_rect_t oc = { 0, 0, (uint16_t)(W - off), (uint16_t)H };
                 eui_canvas_set_clip(vd->canvas, &oc);
                 vd->transition_prev_view->area = old_area;
                 eui_view_send_draw(vd->transition_prev_view, vd->canvas);
-                /* new view: clip to right portion (grows from right)  */
-                eui_rect_t nc = { off, 0, (uint16_t)(W - off), (uint16_t)H };
+                eui_rect_t nc = { W - off, 0, (uint16_t)off, (uint16_t)H };
                 eui_canvas_set_clip(vd->canvas, &nc);
                 new_view->area = new_area;
                 eui_view_send_draw(new_view, vd->canvas);
@@ -178,7 +176,7 @@ static void render_transition(eui_view_dispatcher_t *vd) {
                 eui_canvas_set_clip(vd->canvas, &oc);
                 vd->transition_prev_view->area = old_area;
                 eui_view_send_draw(vd->transition_prev_view, vd->canvas);
-                eui_rect_t nc = { 0, off, (uint16_t)W, (uint16_t)(H - off) };
+                eui_rect_t nc = { 0, H - off, (uint16_t)W, (uint16_t)off };
                 eui_canvas_set_clip(vd->canvas, &nc);
                 new_view->area = new_area;
                 eui_view_send_draw(new_view, vd->canvas);
