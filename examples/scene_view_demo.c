@@ -37,9 +37,9 @@ static void draw_horizontal(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, in
         eui_canvas_draw_line(c, x + 2, py, x + w - 2, py);
 }
 
-static scene_data_t g_red_data   = { "Red Scene",   eui_color_from_rgb(180, 20, 20),   draw_vertical,   EUI_ANIM_SLIDE_LEFT, EUI_ANIM_SLIDE_RIGHT };
-static scene_data_t g_blue_data  = { "Blue Scene",  eui_color_from_rgb(20, 40, 180),   draw_diagonal,   EUI_ANIM_SLIDE_UP,   EUI_ANIM_SLIDE_RIGHT };
-static scene_data_t g_green_data = { "Green Scene", eui_color_from_rgb(20, 140, 20),   draw_horizontal, EUI_ANIM_FADE,       EUI_ANIM_SLIDE_RIGHT };
+static scene_data_t g_red_data   = { "Red Scene",   0,   draw_vertical,   EUI_ANIM_SLIDE_LEFT, EUI_ANIM_SLIDE_RIGHT };
+static scene_data_t g_blue_data  = { "Blue Scene",  0,   draw_diagonal,   EUI_ANIM_SLIDE_UP,   EUI_ANIM_SLIDE_RIGHT };
+static scene_data_t g_green_data = { "Green Scene", 0,   draw_horizontal, EUI_ANIM_FADE,       EUI_ANIM_SLIDE_RIGHT };
 
 /* ---- Main menu state ---- */
 typedef struct { const char *name; uint32_t scene_id; eui_anim_type_t anim; } menu_item_t;
@@ -168,6 +168,11 @@ static bool detail_view_handler(eui_view_event_t *evt, void *context) {
 /* ---- Main ---- */
 int main(void) {
     eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
+
+    g_red_data.bg_color   = eui_color_from_rgb(180, 20, 20);
+    g_blue_data.bg_color  = eui_color_from_rgb(20, 40, 180);
+    g_green_data.bg_color = eui_color_from_rgb(20, 140, 20);
+
     eui_display_hal_t *display = eui_hal_raylib_create_display(W, H, EUI_COLOR_DEPTH);
     eui_input_hal_t *input = eui_hal_raylib_create_input();
     eui_config_t cfg = { .display=display, .input=input };
