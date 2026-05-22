@@ -267,3 +267,54 @@ void eui_port_nrf5_spi_destroy(eui_hal_spi_t *hal)
     }
     eui_free(hal);
 }
+
+/* ── GPIO internal state ──────────────────────────────────── */
+
+typedef struct {
+    uint32_t pin_mask;
+} gpio_priv_t;
+
+static bool nrf5_gpio_read_pin(uint8_t pin_id, void *user_data)
+{
+    gpio_priv_t *p = (gpio_priv_t *)user_data;
+    if (!(p->pin_mask & (1UL << pin_id))) return false;
+    return nrf_gpio_pin_read(pin_id) != 0;
+}
+
+static void nrf5_gpio_delay_us(uint32_t us, void *user_data)
+{
+    (void)user_data;
+    nrf_delay_us(us);
+}
+
+eui_hal_gpio_t* eui_port_nrf5_gpio_create(const nrf5_gpio_config_t *cfg)
+{
+    for (uint8_t i = 0; i < cfg->num_buttons; i++) {
+        nrf_gpio_cfg_input(cfg->buttons[i], NRF_GPIO_PIN_PULLUP);
+    }
+
+    gpio_priv_t *priv = eui_malloc(sizeof(gpio_priv_t));
+    if (!priv) return NULL;
+    priv->pin_mask = cfg->pin_mask;
+
+    eui_hal_gpio_t *hal = eui_malloc(sizeof(eui_hal_gpio_t));
+    if (!hal) {
+        eui_free(priv);
+        return NULL;
+    }
+    memset(hal, 0, sizeof(*hal));
+    hal->read_pin = nrf5_gpio_read_pin;
+    hal->delay_us = nrf5_gpio_delay_us;
+    hal->user_data = priv;
+
+    return hal;
+}
+
+void eui_port_nrf5_gpio_destroy(eui_hal_gpio_t *hal)
+{
+    if (!hal) return;
+
+    gpio_priv_t *priv = (gpio_priv_t *)hal->user_data;
+    if (priv) eui_free(priv);
+    eui_free(hal);
+}
