@@ -17,9 +17,12 @@ if(DEFINED ENV{NRF5_SDK_ROOT})
         ${NRF5_SDK_ROOT}/components/toolchain
     )
 
+    set(NRF5_CHIP "NRF52832_XXAA" CACHE STRING "Target nRF5 chip variant")
+    set(NRF5_FAMILY "NRF52" CACHE STRING "Target nRF5 family")
+
     target_compile_definitions(eui_port_nrf5 PRIVATE
-        NRF52
-        NRF52832_XXAA
+        ${NRF5_FAMILY}
+        ${NRF5_CHIP}
     )
 
     target_link_libraries(eui_port_nrf5 PUBLIC eui)

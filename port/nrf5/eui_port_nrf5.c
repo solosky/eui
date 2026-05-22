@@ -24,17 +24,18 @@ static void nrf5_i2c_write_cmd(uint8_t cmd, void *user_data)
 {
     i2c_priv_t *p = (i2c_priv_t *)user_data;
     uint8_t buf[2] = { 0x00, cmd };
-    (void)nrf_drv_twi_tx(&p->twi, p->addr, buf, 2, false);
+    ret_code_t ret = nrf_drv_twi_tx(&p->twi, p->addr, buf, 2, false);
+    (void)ret;
 }
 
 static void nrf5_i2c_write_data(const uint8_t *buf, uint32_t len, void *user_data)
 {
     i2c_priv_t *p = (i2c_priv_t *)user_data;
     uint8_t tmp[255];
-    if (len > 254) return;
     tmp[0] = 0x40;
     memcpy(tmp + 1, buf, len);
-    (void)nrf_drv_twi_tx(&p->twi, p->addr, tmp, len + 1, false);
+    ret_code_t ret = nrf_drv_twi_tx(&p->twi, p->addr, tmp, len + 1, false);
+    (void)ret;
 }
 
 static void nrf5_i2c_delay_ms(uint32_t ms, void *user_data)
@@ -59,7 +60,7 @@ eui_hal_i2c_t* eui_port_nrf5_i2c_create(const nrf5_i2c_config_t *cfg)
 
     i2c_priv_t *priv = eui_malloc(sizeof(i2c_priv_t));
     if (!priv) return NULL;
-
+    memset(priv, 0, sizeof(*priv));
     priv->twi = twi_instances[cfg->instance_id];
     priv->addr = cfg->addr;
 
@@ -119,7 +120,8 @@ static void nrf5_spi_write_cmd(uint8_t cmd, void *user_data)
     if (p->cs_pin != NRF5_PIN_NOT_USED) {
         nrf_gpio_pin_clear(p->cs_pin);
     }
-    (void)nrf_drv_spi_transfer(&p->spi, &cmd, 1, NULL, 0);
+    ret_code_t ret = nrf_drv_spi_transfer(&p->spi, &cmd, 1, NULL, 0);
+    (void)ret;
     if (p->cs_pin != NRF5_PIN_NOT_USED) {
         nrf_gpio_pin_set(p->cs_pin);
     }
@@ -131,7 +133,8 @@ static void nrf5_spi_write_data(const uint8_t *buf, uint32_t len, void *user_dat
     if (p->cs_pin != NRF5_PIN_NOT_USED) {
         nrf_gpio_pin_clear(p->cs_pin);
     }
-    (void)nrf_drv_spi_transfer(&p->spi, buf, (uint8_t)len, NULL, 0);
+    ret_code_t ret = nrf_drv_spi_transfer(&p->spi, buf, (uint8_t)len, NULL, 0);
+    (void)ret;
     if (p->cs_pin != NRF5_PIN_NOT_USED) {
         nrf_gpio_pin_set(p->cs_pin);
     }
@@ -143,7 +146,8 @@ static void nrf5_spi_read_data(uint8_t *buf, uint32_t len, void *user_data)
     if (p->cs_pin != NRF5_PIN_NOT_USED) {
         nrf_gpio_pin_clear(p->cs_pin);
     }
-    (void)nrf_drv_spi_transfer(&p->spi, NULL, 0, buf, (uint8_t)len);
+    ret_code_t ret = nrf_drv_spi_transfer(&p->spi, NULL, 0, buf, (uint8_t)len);
+    (void)ret;
     if (p->cs_pin != NRF5_PIN_NOT_USED) {
         nrf_gpio_pin_set(p->cs_pin);
     }
@@ -213,7 +217,7 @@ eui_hal_spi_t* eui_port_nrf5_spi_create(const nrf5_spi_config_t *cfg)
 
     spi_priv_t *priv = eui_malloc(sizeof(spi_priv_t));
     if (!priv) return NULL;
-
+    memset(priv, 0, sizeof(*priv));
     priv->spi = spi_instances[cfg->instance_id];
     priv->dc_pin = cfg->dc;
     priv->cs_pin = cfg->cs;
@@ -289,12 +293,13 @@ static void nrf5_gpio_delay_us(uint32_t us, void *user_data)
 
 eui_hal_gpio_t* eui_port_nrf5_gpio_create(const nrf5_gpio_config_t *cfg)
 {
-    for (uint8_t i = 0; i < cfg->num_buttons; i++) {
+    for (uint8_t i = 0; i < cfg->num_buttons && i < 8; i++) {
         nrf_gpio_cfg_input(cfg->buttons[i], NRF_GPIO_PIN_PULLUP);
     }
 
     gpio_priv_t *priv = eui_malloc(sizeof(gpio_priv_t));
     if (!priv) return NULL;
+    memset(priv, 0, sizeof(*priv));
     priv->pin_mask = cfg->pin_mask;
 
     eui_hal_gpio_t *hal = eui_malloc(sizeof(eui_hal_gpio_t));
