@@ -221,7 +221,7 @@ static int input_poll(eui_event_t *evt, void *ud) {
 
     static int prev_states[EUI_KEY_COUNT] = {0};
     int keys[EUI_KEY_COUNT] = {
-        KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_ENTER, KEY_ESCAPE
+        KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_ENTER, KEY_BACKSPACE
     };
 
     for (int k = 0; k < EUI_KEY_COUNT; k++) {

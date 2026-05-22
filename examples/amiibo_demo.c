@@ -464,14 +464,29 @@ int main(void) {
         carousel_update(&g_app_carousel, dt);
         carousel_update(&g_amiibo_carousel, dt);
 
-        /* Mark views dirty during animation */
-        if (MC_REAL_TO_FLOAT(g_app_carousel.spring_state.velocity) > 0.5f ||
-            MC_REAL_TO_FLOAT(g_app_carousel.spring_state.velocity) < -0.5f) {
-            eui_view_mark_dirty(&app_view);
+        /* Mark views dirty during animation — check both velocity and position error */
+        {
+            float app_vel = MC_REAL_TO_FLOAT(g_app_carousel.spring_state.velocity);
+            float app_err = MC_REAL_TO_FLOAT(g_app_carousel.scroll_pos - g_app_carousel.target_pos);
+            if (fabsf(app_vel) > 0.5f || fabsf(app_err) > 0.5f) {
+                eui_view_mark_dirty(&app_view);
+            } else if (fabsf(app_err) > 0.01f) {
+                /* Snap to target when very close to prevent sub-pixel jitter */
+                g_app_carousel.scroll_pos = g_app_carousel.target_pos;
+                g_app_carousel.spring_state.velocity = 0;
+                eui_view_mark_dirty(&app_view);
+            }
         }
-        if (MC_REAL_TO_FLOAT(g_amiibo_carousel.spring_state.velocity) > 0.5f ||
-            MC_REAL_TO_FLOAT(g_amiibo_carousel.spring_state.velocity) < -0.5f) {
-            eui_view_mark_dirty(&amiibo_view);
+        {
+            float ami_vel = MC_REAL_TO_FLOAT(g_amiibo_carousel.spring_state.velocity);
+            float ami_err = MC_REAL_TO_FLOAT(g_amiibo_carousel.scroll_pos - g_amiibo_carousel.target_pos);
+            if (fabsf(ami_vel) > 0.5f || fabsf(ami_err) > 0.5f) {
+                eui_view_mark_dirty(&amiibo_view);
+            } else if (fabsf(ami_err) > 0.01f) {
+                g_amiibo_carousel.scroll_pos = g_amiibo_carousel.target_pos;
+                g_amiibo_carousel.spring_state.velocity = 0;
+                eui_view_mark_dirty(&amiibo_view);
+            }
         }
 
         eui_drv_raylib_refresh();

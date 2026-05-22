@@ -64,8 +64,8 @@ static uint16_t get_be16(const uint8_t *p)
 }
 
 /* Search the unicode encoding table for a glyph.
- * Offset semantics match u8g2: font += block_off (cumulative).
- * Returns pointer to packed glyph data, or NULL if not found. */
+ * Each block_off is an absolute offset from jump_table to that block's glyph data
+ * (standard u8g2 format). Returns pointer to packed glyph data, or NULL if not found. */
 static const uint8_t* find_glyph_data_unicode(const eui_font_t *font, uint16_t encoding)
 {
     const uint8_t *p = font->data;
@@ -74,12 +74,11 @@ static const uint8_t* find_glyph_data_unicode(const eui_font_t *font, uint16_t e
 
     const uint8_t *jump_table = p + U8G2_HEADER_SIZE + unicode_off;
     const uint8_t *lt = jump_table;
-    const uint8_t *glyph_ptr = jump_table;
 
     for (;;) {
         uint16_t block_off = get_be16(lt);
         uint16_t last_unicode = get_be16(lt + 2);
-        glyph_ptr += block_off;
+        const uint8_t *glyph_ptr = jump_table + block_off;
         lt += 4;
 
         if (last_unicode == 0xFFFF) return NULL;
