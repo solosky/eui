@@ -716,6 +716,7 @@ void eui_canvas_invert_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t
     if (x < 0) x = 0;
     if (y < 0) y = 0;
 
+#if EUI_COLOR_DEPTH == 1
     for (int16_t yi = y; yi < ey; yi++) {
         for (int16_t xi = x; xi < ex; xi++) {
             uint16_t byte_idx = (uint16_t)(yi * (int16_t)(screen_w / 8) + (xi / 8));
@@ -723,6 +724,20 @@ void eui_canvas_invert_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t
             canvas->buffer[byte_idx] ^= (1u << bit_pos);
         }
     }
+#elif EUI_COLOR_DEPTH == 8
+    for (int16_t yi = y; yi < ey; yi++) {
+        for (int16_t xi = x; xi < ex; xi++) {
+            canvas->buffer[yi * screen_w + xi] ^= 0xFF;
+        }
+    }
+#elif EUI_COLOR_DEPTH == 16
+    uint16_t *buf16 = (uint16_t*)canvas->buffer;
+    for (int16_t yi = y; yi < ey; yi++) {
+        for (int16_t xi = x; xi < ex; xi++) {
+            buf16[yi * screen_w + xi] ^= 0xFFFF;
+        }
+    }
+#endif
 }
 
 /* ---- Commit ---- */
