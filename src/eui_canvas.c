@@ -634,10 +634,10 @@ uint16_t eui_canvas_str_width(const eui_canvas_t *canvas, const char *str)
         const char *s = str;
         while (*s) {
             uint32_t cp = utf8_decode_next(&s);
-            int16_t idx = canvas->font->lookup_glyph(canvas->font, (uint16_t)cp, 0);
+            int32_t idx = canvas->font->lookup_glyph(canvas->font, (uint16_t)cp, 0);
             if (idx >= 0) {
                 u8g2_glyph_t g;
-                if (decode_glyph_at(canvas->font, (uint16_t)idx, &g)) {
+                if (decode_glyph_at(canvas->font, (uint32_t)idx, &g)) {
                     w += g.x_advance;
                 }
             }
