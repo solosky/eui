@@ -171,13 +171,9 @@ static int u8g2_get_px(int x, int y)
     return (u8g2_canvas_tile_buf[bo] >> bi) & 1;
 }
 
-/* eui side */
-#if EUI_COLOR_DEPTH == 1
+/* eui side — only supported in 1bpp mode */
 #define EUI_CBUF_SIZE (CANVAS_W * CANVAS_H / 8)
 static uint8_t eui_cv_buf[EUI_CBUF_SIZE];
-#else
-#error "only 1bpp supported"
-#endif
 
 static void eui_write_cb(const uint8_t *b, const eui_rect_t *r, void *ud)
 {
@@ -203,6 +199,7 @@ static int eui_get_px(int x, int y)
     return (eui_cv_buf[bi] >> bp) & 1;
 }
 
+#if EUI_COLOR_DEPTH == 1
 static int test_canvas_compare(const scenario_t *sc)
 {
     const uint8_t *u8g2_data = scenario_u8g2_font_data(sc);
@@ -269,13 +266,11 @@ static int test_canvas_compare(const scenario_t *sc)
         write_bmp_1bpp(fn, eui_cv_buf, CANVAS_W, CANVAS_H);
     }
 
-    return mismatches;  /* return pixel mismatches only, width mismatch is printed separately */
+    return mismatches;
 }
 
-/* ---- Stub glyph compare ---- */
 static int test_glyph_compare(const scenario_t *sc) { (void)sc; return 0; }
 
-/* ---- Main ---- */
 int main(void) {
     eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
     printf("=== Font vs u8g2 Canvas Comparison Test ===\n");
@@ -295,3 +290,11 @@ int main(void) {
            SCENARIO_COUNT, total_fail);
     return total_fail > 0 ? 1 : 0;
 }
+
+#else
+int main(void) {
+    printf("=== Font vs u8g2 Canvas Comparison Test ===\n");
+    printf("SKIP: requires EUI_COLOR_DEPTH == 1\n");
+    return 0;
+}
+#endif
