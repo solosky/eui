@@ -8,6 +8,7 @@
 #include "eui/eui_allocator.h"
 #include "eui/eui_config.h"
 #include "eui/eui_types.h"
+#include "eui/eui_font_wqy13.h"
 #include "../src/eui_font_u8g2_internal.h"
 
 #include "test_u8g2_profont10_data.h"
@@ -41,8 +42,15 @@ static const eui_font_t eui_wqy12 = {
     .lookup_glyph = eui_font_u8g2_lookup_glyph,
 };
 
+static const eui_font_t eui_wqy13 = {
+    .format = EUI_FONT_FORMAT_U8G2,
+    .line_height = 16, .baseline = 15, .flags = 0,
+    .data = eui_font_wqy13_data,
+    .lookup_glyph = eui_font_u8g2_lookup_glyph,
+};
+
 /* ---- Scenario definitions ---- */
-typedef enum { FONT_PROFONT10, FONT_WQY12 } scenario_font_t;
+typedef enum { FONT_PROFONT10, FONT_WQY12, FONT_WQY13 } scenario_font_t;
 
 typedef struct {
     const char      *desc;
@@ -67,19 +75,27 @@ static const scenario_t scenarios[] = {
     {"Chinese + symbols mix",     "\xe4\xb8\x80\xe4\xb8\x8a:123 \xe4\xb8\xad\xe4\xb8\xba\xe6\xb5\x8b\xe8\xaf\x95", FONT_WQY12, 1},
     {"All CJK",                  "\xe4\xb8\x80\xe4\xb8\x8a\xe4\xb8\x8b\xe4\xb8\xad\xe4\xb8\xba\xe4\xbb\xa5\xe4\xb9\x8b", FONT_WQY12, 1},
     {"Chinese punctuation",      "\xe3\x80\x8c\xe4\xbd\xa0\xe5\xa5\xbd\xe3\x80\x8d\xe3\x80\x8e\xe4\xb8\x96\xe7\x95\x8c\xe3\x80\x8f", FONT_WQY12, 1},
+    {"Amiibo app list",          "\xe5\xba\x94\xe7\x94\xa8\xe5\x88\x97\xe8\xa1\xa8",                               FONT_WQY13, 1},
+    {"Amiibo detail labels",     "\xe9\xa9\xac\xe5\x8a\x9b\xe6\xac\xa7 \xe6\x9e\x97\xe5\x85\x8b \xe5\xa1\x9e\xe5\xb0\x94\xe8\xbe\xbe \xe7\x9a\xae\xe5\x8d\xa1\xe4\xb8\x98 \xe6\xaf\x94 \xe8\x90\xa8\xe5\xa7\x86\xe6\x96\xaf \xe8\x80\x80\xe8\xa5\xbf \xe6\xa3\xae\xe5\x96\x9c\xe5\x88\x9a", FONT_WQY13, 1},
+    {"Amiibo drops",             "\xe8\xb6\x85\xe7\xba\xa7\xe8\x8f\x87\xe8\x8f\x87 \xe7\x81\xab\xe7\x84\xb0\xe8\x8a\xb1 \xe6\x97\xa0\xe6\x95\x8c\xe6\x98\x9f \xe8\xb6\x85\xe7\xba\xa7\xe9\x93\x83\xe9\x93\x9b \xe5\xa4\xa7\xe5\xb8\x88\xe5\x89\x91", FONT_WQY13, 1},
 };
 
 #define SCENARIO_COUNT (sizeof(scenarios) / sizeof(scenarios[0]))
 
 static const eui_font_t* scenario_eui_font(const scenario_t *sc) {
-    return (sc->font == FONT_PROFONT10) ? &eui_profont10 : &eui_wqy12;
+    if (sc->font == FONT_PROFONT10) return &eui_profont10;
+    if (sc->font == FONT_WQY12) return &eui_wqy12;
+    return &eui_wqy13;
 }
 static const uint8_t* scenario_u8g2_font_data(const scenario_t *sc) {
-    return (sc->font == FONT_PROFONT10)
-        ? u8g2_font_profont10_tf_data : u8g2_font_wqy12_ch1_data;
+    if (sc->font == FONT_PROFONT10) return u8g2_font_profont10_tf_data;
+    if (sc->font == FONT_WQY12) return u8g2_font_wqy12_ch1_data;
+    return eui_font_wqy13_data;
 }
 static int scenario_baseline(const scenario_t *sc) {
-    return (sc->font == FONT_PROFONT10) ? 8 : 10;
+    if (sc->font == FONT_PROFONT10) return 8;
+    if (sc->font == FONT_WQY12) return 10;
+    return 15;
 }
 
 /* ===== BMP writer ===== */
