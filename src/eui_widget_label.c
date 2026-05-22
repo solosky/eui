@@ -6,8 +6,9 @@
 static void label_draw(eui_widget_t *self, eui_canvas_t *canvas) {
     eui_label_t *l = (eui_label_t*)self;
     if (!l->text) return;
-    if (!canvas->font) {
-        eui_canvas_set_font(canvas, &eui_font_builtin);
+    const eui_font_t *use_font = l->font ? l->font : &eui_font_builtin;
+    if (canvas->font != use_font) {
+        eui_canvas_set_font(canvas, use_font);
     }
     eui_canvas_draw_str_aligned(canvas, self->area.x + self->area.w / 2,
                                  self->area.y + self->area.h / 2,
@@ -39,6 +40,12 @@ eui_widget_t* eui_label_create(const char *text, int16_t x, int16_t y) {
 void eui_label_set_text(eui_widget_t *label, const char *text) {
     if (!label) return;
     ((eui_label_t*)label)->text = text;
+    label->style |= EUI_STYLE_DIRTY;
+}
+
+void eui_label_set_font(eui_widget_t *label, const eui_font_t *font) {
+    if (!label) return;
+    ((eui_label_t*)label)->font = font;
     label->style |= EUI_STYLE_DIRTY;
 }
 
