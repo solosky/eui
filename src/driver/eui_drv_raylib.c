@@ -116,7 +116,7 @@ eui_display_hal_t* eui_drv_raylib_create_display(uint16_t width, uint16_t height
     d->width = width;
     d->height = height;
     d->color_depth = color_depth;
-    d->scale = 4;
+    d->scale = 1;
     d->base.caps.width = width;
     d->base.caps.height = height;
     d->base.caps.color_depth = color_depth;
@@ -139,9 +139,31 @@ void eui_drv_raylib_destroy_display(eui_display_hal_t *hal) {
     if (hal) eui_free(hal->user_data);
 }
 
+void eui_drv_raylib_set_scale(int scale) {
+    if (!g_active_display) return;
+    if (scale < 1) scale = 1;
+    if (scale > 16) scale = 16;
+    raylib_display_t *d = g_active_display;
+    d->scale = scale;
+    SetWindowSize(d->width * d->scale, d->height * d->scale);
+}
+
+int eui_drv_raylib_get_scale(void) {
+    if (!g_active_display) return 0;
+    return g_active_display->scale;
+}
+
 void eui_drv_raylib_refresh(void) {
     if (!g_active_display) return;
     raylib_display_t *d = g_active_display;
+
+    /* Handle zoom keys */
+    if (IsKeyPressed(KEY_KP_ADD) || (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_EQUAL))) {
+        eui_drv_raylib_set_scale(d->scale + 1);
+    }
+    if (IsKeyPressed(KEY_KP_SUBTRACT) || IsKeyPressed(KEY_MINUS)) {
+        eui_drv_raylib_set_scale(d->scale - 1);
+    }
 
     BeginDrawing();
     ClearBackground(BLACK);

@@ -18,6 +18,9 @@ void eui_drv_raylib_destroy_input(eui_input_hal_t *hal);
 
 int eui_drv_raylib_window_should_close(void);
 
+void eui_drv_raylib_set_scale(int scale);
+int  eui_drv_raylib_get_scale(void);
+
 void eui_drv_raylib_save_screenshot(const char *filename);
 
 const uint8_t* eui_drv_raylib_get_rgba_buffer(uint16_t *out_width, uint16_t *out_height);
