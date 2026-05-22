@@ -4,8 +4,8 @@
 
 typedef struct {
     eui_input_hal_t         base;
-    eui_drv_buttons_gpio_t  gpio;
-    const eui_drv_button_map_t *map;
+    eui_hal_gpio_t                gpio;
+    const eui_drv_buttons_map_t  *map;
     uint8_t                 count;
     uint8_t                 prev_state;
 } buttons_t;

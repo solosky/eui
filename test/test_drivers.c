@@ -1,6 +1,6 @@
 #include "eui/eui_display_hal.h"
 #include "eui/eui_input_hal.h"
-#include "eui/hal/eui_hal_transport.h"
+#include "eui/hal/eui_hal_types.h"
 #include "eui/eui_allocator.h"
 #include "eui/eui.h"
 #include "eui/driver/eui_drv_ssd1306.h"
@@ -151,7 +151,7 @@ static void mock_btn_delay_us(uint32_t us, void *ud) { (void)us; (void)ud; }
 
 static void test_buttons_press_release(void) {
     TEST("buttons poll detects press and release");
-    const eui_drv_button_map_t map[] = {
+    const eui_drv_buttons_map_t map[] = {
         { .pin_id = 0, .key = EUI_KEY_OK },
         { .pin_id = 1, .key = EUI_KEY_BACK },
     };
@@ -184,7 +184,7 @@ static void test_buttons_press_release(void) {
 
 static void test_buttons_press_back(void) {
     TEST("buttons poll detects BACK key");
-    const eui_drv_button_map_t map[] = {
+    const eui_drv_buttons_map_t map[] = {
         { .pin_id = 0, .key = EUI_KEY_UP },
         { .pin_id = 1, .key = EUI_KEY_BACK },
     };
@@ -283,7 +283,7 @@ static void test_xpt2046_touch_down_up(void) {
                  .set_cs = mock_spi_set_cs, .set_rst = mock_spi_set_rst,
                  .delay_ms = mock_spi_delay_ms, .user_data = NULL },
         .irq = { .read_irq = mock_xpt_irq, .user_data = NULL },
-        .screen_width = 320, .screen_height = 240,
+        .width = 320, .height = 240,
     };
     eui_input_hal_t *hal = eui_drv_xpt2046_create(&cfg);
     hal->init(hal->user_data);

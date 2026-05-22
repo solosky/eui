@@ -3,26 +3,21 @@
 
 #include <stdbool.h>
 #include "eui/eui_input_hal.h"
+#include "eui/hal/eui_hal_types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 typedef struct {
-    bool (*read_pin)(uint8_t pin_id, void *user_data);
-    void (*delay_us)(uint32_t us, void *user_data);
-    void *user_data;
-} eui_drv_buttons_gpio_t;
-
-typedef struct {
     uint8_t   pin_id;
     eui_key_t key;
-} eui_drv_button_map_t;
+} eui_drv_buttons_map_t;
 
 typedef struct {
-    eui_drv_buttons_gpio_t     gpio;
-    const eui_drv_button_map_t *map;
-    uint8_t                     count;
+    eui_hal_gpio_t                gpio;
+    const eui_drv_buttons_map_t  *map;
+    uint8_t                        count;
 } eui_drv_buttons_config_t;
 
 eui_input_hal_t* eui_drv_buttons_create(const eui_drv_buttons_config_t *cfg);

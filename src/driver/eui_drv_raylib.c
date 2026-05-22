@@ -1,4 +1,4 @@
-#include "eui/hal/eui_hal_raylib.h"
+#include "eui/driver/eui_drv_raylib.h"
 #include "eui/eui_allocator.h"
 #include <raylib.h>
 #include <string.h>
@@ -108,7 +108,7 @@ static void disp_fill_rect(int16_t x, int16_t y, uint16_t w, uint16_t h,
     (void)x; (void)y; (void)w; (void)h; (void)color; (void)ud;
 }
 
-eui_display_hal_t* eui_hal_raylib_create_display(uint16_t width, uint16_t height,
+eui_display_hal_t* eui_drv_raylib_create_display(uint16_t width, uint16_t height,
                                                   uint8_t color_depth) {
     raylib_display_t *d = eui_malloc(sizeof(raylib_display_t));
     if (!d) return NULL;
@@ -135,11 +135,11 @@ eui_display_hal_t* eui_hal_raylib_create_display(uint16_t width, uint16_t height
     return &d->base;
 }
 
-void eui_hal_raylib_destroy_display(eui_display_hal_t *hal) {
+void eui_drv_raylib_destroy_display(eui_display_hal_t *hal) {
     if (hal) eui_free(hal->user_data);
 }
 
-void eui_hal_raylib_refresh(void) {
+void eui_drv_raylib_refresh(void) {
     if (!g_active_display) return;
     raylib_display_t *d = g_active_display;
 
@@ -166,11 +166,11 @@ void eui_hal_raylib_refresh(void) {
     EndDrawing();
 }
 
-int eui_hal_raylib_window_should_close(void) {
+int eui_drv_raylib_window_should_close(void) {
     return WindowShouldClose();
 }
 
-void eui_hal_raylib_save_screenshot(const char *filename) {
+void eui_drv_raylib_save_screenshot(const char *filename) {
     if (!g_active_display) return;
     raylib_display_t *d = g_active_display;
     if (!d->rgba_buffer) return;
@@ -192,7 +192,7 @@ void eui_hal_raylib_save_screenshot(const char *filename) {
     fclose(f);
 }
 
-const uint8_t* eui_hal_raylib_get_rgba_buffer(uint16_t *out_width, uint16_t *out_height) {
+const uint8_t* eui_drv_raylib_get_rgba_buffer(uint16_t *out_width, uint16_t *out_height) {
     if (!g_active_display) return NULL;
     raylib_display_t *d = g_active_display;
     if (out_width)  *out_width  = d->width;
@@ -258,7 +258,7 @@ static void input_set_callback(void (*cb)(const eui_event_t *evt), void *user_da
     (void)user_data;
 }
 
-eui_input_hal_t* eui_hal_raylib_create_input(void) {
+eui_input_hal_t* eui_drv_raylib_create_input(void) {
     raylib_input_t *inp = eui_malloc(sizeof(raylib_input_t));
     if (!inp) return NULL;
     memset(inp, 0, sizeof(*inp));
@@ -270,6 +270,6 @@ eui_input_hal_t* eui_hal_raylib_create_input(void) {
     return &inp->base;
 }
 
-void eui_hal_raylib_destroy_input(eui_input_hal_t *hal) {
+void eui_drv_raylib_destroy_input(eui_input_hal_t *hal) {
     if (hal) eui_free(hal->user_data);
 }

@@ -3,7 +3,7 @@
 #include "eui/eui_view_dispatcher.h"
 #include "eui/eui_canvas.h"
 #include "eui/eui_allocator.h"
-#include "eui/hal/eui_hal_raylib.h"
+#include "eui/driver/eui_drv_raylib.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,10 +86,10 @@ static int run_transition_frame(eui_view_dispatcher_t *vd,
     vd->transition_prev_view = v1;
 
     eui_view_dispatcher_tick(vd);
-    eui_hal_raylib_refresh();
+    eui_drv_raylib_refresh();
 
     uint16_t rw, rh;
-    const uint8_t *rgba = eui_hal_raylib_get_rgba_buffer(&rw, &rh);
+    const uint8_t *rgba = eui_drv_raylib_get_rgba_buffer(&rw, &rh);
     if (!rgba) return -1;
     return count_black_rgba(rgba, rw, rh);
 }
@@ -99,8 +99,8 @@ static int run_transition_frame(eui_view_dispatcher_t *vd,
 static void test_all_transitions_zero_black(void) {
     TEST("e2e: all transitions 0 black pixels (full coverage)");
 
-    eui_display_hal_t *d = eui_hal_raylib_create_display(TW, TH, EUI_COLOR_DEPTH);
-    eui_input_hal_t *inp = eui_hal_raylib_create_input();
+    eui_display_hal_t *d = eui_drv_raylib_create_display(TW, TH, EUI_COLOR_DEPTH);
+    eui_input_hal_t *inp = eui_drv_raylib_create_input();
     eui_config_t cfg = { .display = d, .input = inp };
     eui_init(&cfg);
     eui_set_tick_callback(mock_get_tick);
@@ -140,15 +140,15 @@ static void test_all_transitions_zero_black(void) {
 cleanup:
     d->deinit(d->user_data);
     eui_deinit();
-    eui_hal_raylib_destroy_input(inp);
-    eui_hal_raylib_destroy_display(d);
+    eui_drv_raylib_destroy_input(inp);
+    eui_drv_raylib_destroy_display(d);
 }
 
 static void test_no_edge_wrap_artifacts(void) {
     TEST("e2e: no GL_REPEAT edge-wrap artifacts");
 
-    eui_display_hal_t *d = eui_hal_raylib_create_display(TW, TH, EUI_COLOR_DEPTH);
-    eui_input_hal_t *inp = eui_hal_raylib_create_input();
+    eui_display_hal_t *d = eui_drv_raylib_create_display(TW, TH, EUI_COLOR_DEPTH);
+    eui_input_hal_t *inp = eui_drv_raylib_create_input();
     eui_config_t cfg = { .display = d, .input = inp };
     eui_init(&cfg);
     eui_set_tick_callback(mock_get_tick);
@@ -176,10 +176,10 @@ static void test_no_edge_wrap_artifacts(void) {
         vd->transition_prev_view = vd->views[0].view;
 
         eui_view_dispatcher_tick(vd);
-        eui_hal_raylib_refresh();
+        eui_drv_raylib_refresh();
 
         uint16_t rw, rh;
-        const uint8_t *rgba = eui_hal_raylib_get_rgba_buffer(&rw, &rh);
+        const uint8_t *rgba = eui_drv_raylib_get_rgba_buffer(&rw, &rh);
         if (rgba) {
             int e = check_edge_wrap(rgba, rw, rh);
             if (e > 0) { total_err += e; }
@@ -195,8 +195,8 @@ static void test_no_edge_wrap_artifacts(void) {
 
     d->deinit(d->user_data);
     eui_deinit();
-    eui_hal_raylib_destroy_input(inp);
-    eui_hal_raylib_destroy_display(d);
+    eui_drv_raylib_destroy_input(inp);
+    eui_drv_raylib_destroy_display(d);
 }
 
 int main(void) {

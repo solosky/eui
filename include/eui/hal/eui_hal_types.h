@@ -1,5 +1,5 @@
-#ifndef EUI_HAL_TRANSPORT_H
-#define EUI_HAL_TRANSPORT_H
+#ifndef EUI_HAL_TYPES_H
+#define EUI_HAL_TYPES_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -27,8 +27,14 @@ typedef struct {
     void *user_data;
 } eui_hal_spi_t;
 
+typedef struct {
+    bool (*read_pin)(uint8_t pin_id, void *user_data);
+    void (*delay_us)(uint32_t us, void *user_data);
+    void *user_data;
+} eui_hal_gpio_t;
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* EUI_HAL_TRANSPORT_H */
+#endif /* EUI_HAL_TYPES_H */

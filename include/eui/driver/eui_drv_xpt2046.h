@@ -2,7 +2,7 @@
 #define EUI_DRV_XPT2046_H
 
 #include "eui/eui_input_hal.h"
-#include "eui/hal/eui_hal_transport.h"
+#include "eui/hal/eui_hal_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,8 +16,8 @@ typedef struct {
 typedef struct {
     eui_hal_spi_t         spi;
     eui_drv_xpt2046_irq_t irq;
-    uint16_t              screen_width;
-    uint16_t              screen_height;
+    uint16_t              width;
+    uint16_t              height;
 } eui_drv_xpt2046_config_t;
 
 eui_input_hal_t* eui_drv_xpt2046_create(const eui_drv_xpt2046_config_t *cfg);

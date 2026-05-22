@@ -10,8 +10,8 @@ typedef struct {
     eui_input_hal_t        base;
     eui_hal_spi_t          spi;
     eui_drv_xpt2046_irq_t  irq;
-    uint16_t               screen_w;
-    uint16_t               screen_h;
+    uint16_t               width;
+    uint16_t               height;
     bool                   touched;
 } xpt2046_t;
 
@@ -73,8 +73,8 @@ static int xpt2046_poll(eui_event_t *evt, void *ud) {
     if (pressed) {
         uint16_t rx, ry;
         _xpt2046_read_xy(t, &rx, &ry);
-        int16_t sx = (int16_t)((uint32_t)rx * t->screen_w / 4096);
-        int16_t sy = (int16_t)((uint32_t)ry * t->screen_h / 4096);
+        int16_t sx = (int16_t)((uint32_t)rx * t->width / 4096);
+        int16_t sy = (int16_t)((uint32_t)ry * t->height / 4096);
 
         evt->type = t->touched ? EUI_EVT_TOUCH_MOVE : EUI_EVT_TOUCH_DOWN;
         evt->data.touch.x = sx;
@@ -102,8 +102,8 @@ eui_input_hal_t* eui_drv_xpt2046_create(const eui_drv_xpt2046_config_t *cfg) {
     memset(t, 0, sizeof(*t));
     t->spi = cfg->spi;
     t->irq = cfg->irq;
-    t->screen_w = cfg->screen_width;
-    t->screen_h = cfg->screen_height;
+    t->width = cfg->width;
+    t->height = cfg->height;
     t->base.init = xpt2046_init;
     t->base.deinit = xpt2046_deinit;
     t->base.poll = xpt2046_poll;

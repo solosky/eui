@@ -1,6 +1,6 @@
 #include "eui/eui.h"
 #include "eui/eui_font_builtin.h"
-#include "eui/hal/eui_hal_raylib.h"
+#include "eui/driver/eui_drv_raylib.h"
 #include <raylib.h>
 #include <stdio.h>
 #include <string.h>
@@ -177,8 +177,8 @@ int main(void) {
     g_blue_data.bg_color  = eui_color_from_rgb(20, 40, 180);
     g_green_data.bg_color = eui_color_from_rgb(20, 140, 20);
 
-    eui_display_hal_t *display = eui_hal_raylib_create_display(W, H, EUI_COLOR_DEPTH);
-    eui_input_hal_t *input = eui_hal_raylib_create_input();
+    eui_display_hal_t *display = eui_drv_raylib_create_display(W, H, EUI_COLOR_DEPTH);
+    eui_input_hal_t *input = eui_drv_raylib_create_input();
     eui_config_t cfg = { .display=display, .input=input };
     eui_init(&cfg);
     eui_set_tick_callback(get_tick);
@@ -222,9 +222,9 @@ int main(void) {
     navigate_to(SCENE_MAIN, EUI_ANIM_NONE);
 
     /* Main loop */
-    while (!eui_hal_raylib_window_should_close()) {
+    while (!eui_drv_raylib_window_should_close()) {
         eui_tick();
-        eui_hal_raylib_refresh();
+        eui_drv_raylib_refresh();
 
         if (IsKeyPressed(KEY_F2)) {
             TakeScreenshot("screenshot.png");
@@ -234,7 +234,7 @@ int main(void) {
 
     display->deinit(display->user_data);
     eui_deinit();
-    eui_hal_raylib_destroy_input(input);
-    eui_hal_raylib_destroy_display(display);
+    eui_drv_raylib_destroy_input(input);
+    eui_drv_raylib_destroy_display(display);
     return 0;
 }

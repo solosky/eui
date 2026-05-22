@@ -80,7 +80,7 @@ add_test(NAME view_transition COMMAND test_view_transition)
 
 add_executable(test_view_transition_render test_view_transition_render.c)
 target_include_directories(test_view_transition_render PRIVATE ${CMAKE_BINARY_DIR}/include)
-target_link_libraries(test_view_transition_render PRIVATE eui_hal_raylib)
+target_link_libraries(test_view_transition_render PRIVATE eui_drv_raylib)
 add_test(NAME view_transition_render COMMAND test_view_transition_render)
 
 # ---- u8g2 reference comparison test ----

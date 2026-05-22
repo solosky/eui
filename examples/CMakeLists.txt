@@ -5,5 +5,5 @@ set(EXAMPLES basic_label button_test list_nav menu_system dialog_overlay
 foreach(ex ${EXAMPLES})
     add_executable(${ex} ${ex}.c)
     target_include_directories(${ex} PRIVATE ${CMAKE_BINARY_DIR}/include)
-    target_link_libraries(${ex} PRIVATE eui_hal_raylib)
+    target_link_libraries(${ex} PRIVATE eui_drv_raylib)
 endforeach()

@@ -5,7 +5,7 @@
 
 typedef struct {
     eui_input_hal_t        base;
-    eui_drv_encoder_gpio_t gpio;
+    eui_hal_gpio_t gpio;
     uint8_t                pin_a;
     uint8_t                pin_b;
     uint8_t                pin_sw;

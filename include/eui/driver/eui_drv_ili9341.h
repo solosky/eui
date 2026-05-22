@@ -2,7 +2,7 @@
 #define EUI_DRV_ILI9341_H
 
 #include "eui/eui_display_hal.h"
-#include "eui/hal/eui_hal_transport.h"
+#include "eui/hal/eui_hal_types.h"
 
 #ifdef __cplusplus
 extern "C" {

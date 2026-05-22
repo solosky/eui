@@ -1,5 +1,5 @@
 #include "eui/eui.h"
-#include "eui/hal/eui_hal_raylib.h"
+#include "eui/driver/eui_drv_raylib.h"
 #include <raylib.h>
 #include <stdio.h>
 #include <string.h>
@@ -42,8 +42,8 @@ static eui_widget_vtable_t counter_vt = {
 
 int main(void) {
     eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
-    eui_display_hal_t *display = eui_hal_raylib_create_display(W, H, EUI_COLOR_DEPTH);
-    eui_input_hal_t *input = eui_hal_raylib_create_input();
+    eui_display_hal_t *display = eui_drv_raylib_create_display(W, H, EUI_COLOR_DEPTH);
+    eui_input_hal_t *input = eui_drv_raylib_create_input();
     eui_config_t cfg = { .display=display, .input=input };
     eui_init(&cfg);
     eui_set_tick_callback(get_tick);
@@ -57,14 +57,14 @@ int main(void) {
     eui_view_dispatcher_add(vd, 1, &cw.widget.view);
     eui_view_dispatcher_switch_to(vd, 1, EUI_ANIM_NONE);
 
-    while (!eui_hal_raylib_window_should_close()) {
+    while (!eui_drv_raylib_window_should_close()) {
         eui_tick();
-        eui_hal_raylib_refresh();
+        eui_drv_raylib_refresh();
     }
 
     display->deinit(display->user_data);
     eui_deinit();
-    eui_hal_raylib_destroy_input(input);
-    eui_hal_raylib_destroy_display(display);
+    eui_drv_raylib_destroy_input(input);
+    eui_drv_raylib_destroy_display(display);
     return 0;
 }

@@ -270,7 +270,7 @@ cd build && ctest
 - 用 `EU I_BUILD_EXAMPLES` 在 PC 上先验证输入逻辑
 
 **Q: 如何添加新屏幕驱动？**
-参考 `src/eui_hal_raylib.c` 的 Display HAL 实现模式，实现你自己的 `eui_display_hal_t`。
+参考 `src/driver/eui_drv_raylib.c` 的 Display HAL 实现模式，实现你自己的 `eui_display_hal_t`。
 
 ---
 
@@ -308,7 +308,7 @@ eui_display_hal_t *display = eui_drv_ssd1306_create(&disp_cfg);
 ```c
 #include "eui/driver/eui_drv_buttons.h"
 
-const eui_drv_button_map_t map[] = {
+const eui_drv_buttons_map_t map[] = {
     { .pin_id = 0, .key = EUI_KEY_UP },
     { .pin_id = 1, .key = EUI_KEY_DOWN },
     { .pin_id = 2, .key = EUI_KEY_OK },
@@ -333,4 +333,4 @@ eui_input_hal_t *input = eui_drv_buttons_create(&btn_cfg);
 | 旋转编码器 | `eui/driver/eui_drv_encoder.h` | Input |
 | XPT2046 触摸屏 | `eui/driver/eui_drv_xpt2046.h` | Input |
 
-传输层定义见 `eui/hal/eui_hal_transport.h`。
+传输层定义见 `eui/hal/eui_hal_types.h`。
