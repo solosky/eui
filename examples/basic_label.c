@@ -5,7 +5,8 @@
 
 #define W 128
 #define H 64
-#define POOL_SIZE 16384
+/* W*H*2 for 16bpp framebuffer + overhead for TLSF + structs */
+#define POOL_SIZE (128 * 64 * 2 + 8192)
 static uint8_t mem_pool[POOL_SIZE];
 
 static uint32_t get_tick(void) { return (uint32_t)(GetTime() * 1000.0); }
@@ -16,7 +17,7 @@ int main(void) {
     eui_input_hal_t *input = eui_drv_raylib_create_input();
 
     eui_config_t cfg = { .display=display, .input=input };
-    eui_init(&cfg);
+    if (eui_init(&cfg) != 0) { fprintf(stderr, "eui_init failed\n"); return 1; }
     eui_set_tick_callback(get_tick);
     display->init(display->user_data);
 
