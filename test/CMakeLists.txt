@@ -63,6 +63,11 @@ target_include_directories(test_font_wqy12_chinese PRIVATE ${CMAKE_BINARY_DIR}/i
 target_link_libraries(test_font_wqy12_chinese PRIVATE eui)
 add_test(NAME font_wqy12_chinese COMMAND test_font_wqy12_chinese)
 
+add_executable(test_font_wqy13_render test_font_wqy13_render.c)
+target_include_directories(test_font_wqy13_render PRIVATE ${CMAKE_BINARY_DIR}/include)
+target_link_libraries(test_font_wqy13_render PRIVATE eui)
+add_test(NAME font_wqy13_render COMMAND test_font_wqy13_render)
+
 add_executable(test_drivers test_drivers.c)
 target_include_directories(test_drivers PRIVATE ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(test_drivers PRIVATE eui)
