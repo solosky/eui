@@ -60,7 +60,7 @@ typedef struct {
 
 struct eui_font;
 
-typedef int16_t (*eui_font_lookup_fn)(const struct eui_font *font,
+typedef int32_t (*eui_font_lookup_fn)(const struct eui_font *font,
                                        uint16_t encoding, uint16_t prev);
 
 typedef struct eui_font {

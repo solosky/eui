@@ -24,7 +24,7 @@ uint8_t  eui_font_u8g2_draw_char(const eui_font_t *font, char c,
 uint8_t  eui_font_u8g2_draw_glyph(const eui_font_t *font, uint16_t encoding,
                                    uint8_t *buf, uint16_t buf_stride,
                                    uint8_t color_depth);
-int16_t  eui_font_u8g2_lookup_glyph(const eui_font_t *font, uint16_t encoding, uint16_t prev);
+int32_t  eui_font_u8g2_lookup_glyph(const eui_font_t *font, uint16_t encoding, uint16_t prev);
 #endif
 
 #endif

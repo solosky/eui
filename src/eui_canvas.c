@@ -7,7 +7,7 @@
 #if EUI_FONT_ENABLE_U8G2
 #include "eui_font_u8g2_internal.h"
 /* Needed by draw_u8g2_glyph */
-int16_t eui_font_u8g2_lookup_glyph(const eui_font_t *font, uint16_t encoding, uint16_t prev);
+int32_t eui_font_u8g2_lookup_glyph(const eui_font_t *font, uint16_t encoding, uint16_t prev);
 #endif
 
 #define CANVAS_PAGE_BAND_HEIGHT 8
@@ -481,8 +481,8 @@ static void draw_u8g2_glyph(eui_canvas_t *canvas, const eui_font_t *font,
                             uint16_t encoding, int16_t x, int16_t y, uint8_t *adv_out)
 {
     u8g2_glyph_t g;
-    int16_t idx = eui_font_u8g2_lookup_glyph(font, encoding, 0);
-    if (idx < 0 || !decode_glyph_at(font, (uint16_t)idx, &g)) {
+    int32_t idx = eui_font_u8g2_lookup_glyph(font, encoding, 0);
+    if (idx < 0 || !decode_glyph_at(font, (uint32_t)idx, &g)) {
         if (adv_out) *adv_out = 0;
         return;
     }
@@ -504,7 +504,7 @@ static void draw_u8g2_glyph(eui_canvas_t *canvas, const eui_font_t *font,
 /* Draw a u8g2 glyph by data offset (for kerning) */
 static void draw_u8g2_glyph_by_index(eui_canvas_t *canvas,
                                       const eui_font_t *font,
-                                      uint16_t idx, int16_t x, int16_t y,
+                                      uint32_t idx, int16_t x, int16_t y,
                                       uint8_t *adv_out)
 {
     u8g2_glyph_t g;

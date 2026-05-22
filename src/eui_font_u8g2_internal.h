@@ -10,12 +10,12 @@ typedef struct {
     uint8_t width;
     uint8_t height;
     uint8_t x_advance;
-    uint16_t bitmap_byte;
+    uint32_t bitmap_byte;
     uint8_t  bitmap_bit;
 } u8g2_glyph_t;
 
-uint8_t decode_glyph_at(const eui_font_t *font, uint16_t data_off, u8g2_glyph_t *glyph);
-uint8_t get_bitmap_pixel(const uint8_t *data, uint16_t byte_off,
+uint8_t decode_glyph_at(const eui_font_t *font, uint32_t data_off, u8g2_glyph_t *glyph);
+uint8_t get_bitmap_pixel(const uint8_t *data, uint32_t byte_off,
                            uint8_t bit_off, uint16_t pixel_idx,
                            uint8_t glyph_width, uint8_t glyph_height);
 

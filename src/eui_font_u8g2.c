@@ -20,7 +20,7 @@
 
 typedef struct {
     const uint8_t *data;
-    uint16_t byte_pos;
+    uint32_t byte_pos;
     uint8_t  bit_pos;
 } bit_reader_t;
 
@@ -130,13 +130,13 @@ static const uint8_t* find_glyph_data(const eui_font_t *font, uint16_t encoding)
     return NULL;
 }
 
-int16_t eui_font_u8g2_lookup_glyph(const eui_font_t *font, uint16_t encoding, uint16_t prev)
+int32_t eui_font_u8g2_lookup_glyph(const eui_font_t *font, uint16_t encoding, uint16_t prev)
 {
     if (!font || !font->data) return -1;
     (void)prev;
     const uint8_t *gd = find_glyph_data(font, encoding);
     if (!gd) return -1;
-    return (int16_t)(gd - font->data);
+    return (int32_t)(gd - font->data);
 }
 
 static void rle_decode(bit_reader_t *br, uint8_t width, uint8_t height,
@@ -188,7 +188,7 @@ static void rle_decode(bit_reader_t *br, uint8_t width, uint8_t height,
     }
 }
 
-uint8_t decode_glyph_at(const eui_font_t *font, uint16_t data_off, u8g2_glyph_t *glyph)
+uint8_t decode_glyph_at(const eui_font_t *font, uint32_t data_off, u8g2_glyph_t *glyph)
 {
     const uint8_t *p = font->data;
     uint8_t bpcw = p[HDR_BITS_PER_CHAR_W], bpch = p[HDR_BITS_PER_CHAR_H];
@@ -230,7 +230,7 @@ static uint8_t decode_glyph_metrics(const eui_font_t *font,
 
     bit_reader_t br;
     br.data = p;
-    br.byte_pos = (uint16_t)(glyph_data - p);
+    br.byte_pos = (uint32_t)(glyph_data - p);
     br.bit_pos = 0;
 
     uint8_t cw = br_read(&br, bpcw);
@@ -312,7 +312,7 @@ uint8_t eui_font_u8g2_draw_char(const eui_font_t *font, char c,
 }
 
 /* Alternative draw using bitmap pixel approach */
-uint8_t get_bitmap_pixel(const uint8_t *data, uint16_t byte_off,
+uint8_t get_bitmap_pixel(const uint8_t *data, uint32_t byte_off,
                            uint8_t bit_off, uint16_t pixel_idx,
                            uint8_t glyph_width, uint8_t glyph_height)
 {

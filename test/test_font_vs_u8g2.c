@@ -17,7 +17,7 @@
 #include "u8g2.h"
 
 /* extern: lookup_glyph from eui internal */
-extern int16_t eui_font_u8g2_lookup_glyph(const eui_font_t *font, uint16_t encoding, uint16_t prev);
+extern int32_t eui_font_u8g2_lookup_glyph(const eui_font_t *font, uint16_t encoding, uint16_t prev);
 
 #define POOL_SIZE 131072
 static uint8_t mem_pool[POOL_SIZE];

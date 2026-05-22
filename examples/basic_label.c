@@ -2,6 +2,7 @@
 #include <raylib.h>
 #include <stdio.h>
 #include <string.h>
+#include "eui/eui_font_wqy13.h"
 
 #define W 128
 #define H 64
@@ -23,7 +24,8 @@ int main(void) {
 
     eui_view_dispatcher_t *vd = eui_get_view_dispatcher();
 
-    eui_widget_t *label = eui_label_create("Hello EUI!", 20, 20);
+    eui_widget_t *label = eui_label_create("应用列表Amiibo", 20, 20);
+    eui_label_set_font(label, &eui_font_wqy13);
     eui_view_dispatcher_add(vd, 1, &label->view);
     eui_view_dispatcher_switch_to(vd, 1, EUI_ANIM_NONE);
 
