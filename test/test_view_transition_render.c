@@ -99,8 +99,8 @@ static int run_transition_frame(eui_view_dispatcher_t *vd,
 static void test_all_transitions_zero_black(void) {
     TEST("e2e: all transitions 0 black pixels (full coverage)");
 
-    eui_display_hal_t *d = eui_drv_raylib_create_display(TW, TH, EUI_COLOR_DEPTH);
-    eui_input_hal_t *inp = eui_drv_raylib_create_input();
+    eui_display_drv_t *d = eui_drv_raylib_create_display(TW, TH, EUI_COLOR_DEPTH);
+    eui_input_drv_t *inp = eui_drv_raylib_create_input();
     eui_config_t cfg = { .display = d, .input = inp };
     eui_init(&cfg);
     eui_set_tick_callback(mock_get_tick);
@@ -147,8 +147,8 @@ cleanup:
 static void test_no_edge_wrap_artifacts(void) {
     TEST("e2e: no GL_REPEAT edge-wrap artifacts");
 
-    eui_display_hal_t *d = eui_drv_raylib_create_display(TW, TH, EUI_COLOR_DEPTH);
-    eui_input_hal_t *inp = eui_drv_raylib_create_input();
+    eui_display_drv_t *d = eui_drv_raylib_create_display(TW, TH, EUI_COLOR_DEPTH);
+    eui_input_drv_t *inp = eui_drv_raylib_create_input();
     eui_config_t cfg = { .display = d, .input = inp };
     eui_init(&cfg);
     eui_set_tick_callback(mock_get_tick);

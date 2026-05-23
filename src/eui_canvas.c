@@ -75,7 +75,7 @@ static size_t canvas_buf_size(eui_canvas_t *c)
 
 /* ---- Lifecycle ---- */
 
-eui_canvas_t* eui_canvas_create(eui_display_hal_t *display)
+eui_canvas_t* eui_canvas_create(eui_display_drv_t *display)
 {
     eui_canvas_t *c = (eui_canvas_t *)eui_malloc(sizeof(eui_canvas_t));
     if (!c) return NULL;

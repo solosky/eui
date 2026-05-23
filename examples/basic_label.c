@@ -14,8 +14,8 @@ static uint32_t get_tick(void) { return (uint32_t)(GetTime() * 1000.0); }
 
 int main(void) {
     eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
-    eui_display_hal_t *display = eui_drv_raylib_create_display(W, H, EUI_COLOR_DEPTH);
-    eui_input_hal_t *input = eui_drv_raylib_create_input();
+    eui_display_drv_t *display = eui_drv_raylib_create_display(W, H, EUI_COLOR_DEPTH);
+    eui_input_drv_t *input = eui_drv_raylib_create_input();
 
     eui_config_t cfg = { .display=display, .input=input };
     if (eui_init(&cfg) != 0) { fprintf(stderr, "eui_init failed\n"); return 1; }

@@ -1,7 +1,7 @@
 #ifndef EUI_DRV_SSD1306_H
 #define EUI_DRV_SSD1306_H
 
-#include "eui/eui_display_hal.h"
+#include "eui/eui_display_drv.h"
 #include "eui/hal/eui_hal_types.h"
 
 #ifdef __cplusplus
@@ -15,8 +15,8 @@ typedef struct {
     uint8_t       i2c_addr;
 } eui_drv_ssd1306_config_t;
 
-eui_display_hal_t* eui_drv_ssd1306_create(const eui_drv_ssd1306_config_t *cfg);
-void eui_drv_ssd1306_destroy(eui_display_hal_t *hal);
+eui_display_drv_t* eui_drv_ssd1306_create(const eui_drv_ssd1306_config_t *cfg);
+void eui_drv_ssd1306_destroy(eui_display_drv_t *hal);
 
 #ifdef __cplusplus
 }

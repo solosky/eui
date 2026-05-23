@@ -7,7 +7,7 @@
 #define XPT2046_SAMPLES 3
 
 typedef struct {
-    eui_input_hal_t        base;
+    eui_input_drv_t        base;
     eui_hal_spi_t          spi;
     eui_drv_xpt2046_irq_t  irq;
     uint16_t               width;
@@ -96,7 +96,7 @@ static void xpt2046_set_callback(void (*cb)(const eui_event_t *evt), void *user_
     (void)cb; (void)user_data;
 }
 
-eui_input_hal_t* eui_drv_xpt2046_create(const eui_drv_xpt2046_config_t *cfg) {
+eui_input_drv_t* eui_drv_xpt2046_create(const eui_drv_xpt2046_config_t *cfg) {
     xpt2046_t *t = eui_malloc(sizeof(xpt2046_t));
     if (!t) return NULL;
     memset(t, 0, sizeof(*t));
@@ -112,6 +112,6 @@ eui_input_hal_t* eui_drv_xpt2046_create(const eui_drv_xpt2046_config_t *cfg) {
     return &t->base;
 }
 
-void eui_drv_xpt2046_destroy(eui_input_hal_t *hal) {
+void eui_drv_xpt2046_destroy(eui_input_drv_t *hal) {
     if (hal) eui_free(hal->user_data);
 }

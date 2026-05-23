@@ -59,7 +59,7 @@ int main(void) {
         .height   = cfg.display_height,
         .i2c_addr = CONFIG_EUI_EXAMPLE_I2C_ADDR,
     };
-    eui_display_hal_t *display = eui_drv_ssd1306_create(&dcfg);
+    eui_display_drv_t *display = eui_drv_ssd1306_create(&dcfg);
 
     eui_config_t eui_cfg = {
         .display         = display,

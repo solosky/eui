@@ -394,8 +394,8 @@ static void scene_exit(void *ctx)  { (void)ctx; printf("[SCENE] Exit\n"); }
 int main(void) {
     eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
 
-    eui_display_hal_t *display = eui_drv_raylib_create_display(W, H, 16);
-    eui_input_hal_t *input = eui_drv_raylib_create_input();
+    eui_display_drv_t *display = eui_drv_raylib_create_display(W, H, 16);
+    eui_input_drv_t *input = eui_drv_raylib_create_input();
     eui_config_t cfg = { .display = display, .input = input };
     eui_init(&cfg);
     eui_set_tick_callback(get_tick);

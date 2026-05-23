@@ -77,7 +77,7 @@ static int count_pixels(void)
 #endif
 }
 
-static eui_display_hal_t mock_display = {
+static eui_display_drv_t mock_display = {
     .caps = { .width = MOCK_W, .height = MOCK_H, .color_depth = EUI_COLOR_DEPTH, .buffer_mode = EUI_BUFFER_FULL, .has_gram = false },
     .init = NULL,
     .write_buffer = mock_write_buffer,

@@ -40,7 +40,7 @@ static void process_raw_event(eui_input_manager_t *mgr, const eui_event_t *raw, 
     }
 }
 
-void eui_input_init(eui_input_manager_t *mgr, eui_input_hal_t *hal)
+void eui_input_init(eui_input_manager_t *mgr, eui_input_drv_t *hal)
 {
     memset(mgr, 0, sizeof(*mgr));
     mgr->hal = hal;

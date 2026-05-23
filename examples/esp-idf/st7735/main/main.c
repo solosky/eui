@@ -64,7 +64,7 @@ void app_main(void) {
         .height = SCREEN_H,
         .variant = 1,
     };
-    eui_display_hal_t *display = eui_drv_st7735_create(&dcfg);
+    eui_display_drv_t *display = eui_drv_st7735_create(&dcfg);
 
     eui_config_t eui_cfg = { .display = display, .input = NULL };
     eui_init(&eui_cfg);

@@ -4,7 +4,7 @@
 #include <string.h>
 
 typedef struct {
-    eui_input_hal_t        base;
+    eui_input_drv_t        base;
     eui_hal_gpio_t gpio;
     uint8_t                pin_a;
     uint8_t                pin_b;
@@ -66,7 +66,7 @@ static void encoder_set_callback(void (*cb)(const eui_event_t *evt), void *user_
     (void)user_data;
 }
 
-eui_input_hal_t* eui_drv_encoder_create(const eui_drv_encoder_config_t *cfg) {
+eui_input_drv_t* eui_drv_encoder_create(const eui_drv_encoder_config_t *cfg) {
     encoder_t *e = eui_malloc(sizeof(encoder_t));
     if (!e) return NULL;
     memset(e, 0, sizeof(*e));
@@ -82,6 +82,6 @@ eui_input_hal_t* eui_drv_encoder_create(const eui_drv_encoder_config_t *cfg) {
     return &e->base;
 }
 
-void eui_drv_encoder_destroy(eui_input_hal_t *hal) {
+void eui_drv_encoder_destroy(eui_input_drv_t *hal) {
     if (hal) eui_free(hal->user_data);
 }

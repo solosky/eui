@@ -3,7 +3,7 @@
 #include <string.h>
 
 typedef struct {
-    eui_display_hal_t base;
+    eui_display_drv_t base;
     eui_hal_i2c_t     i2c;
     uint16_t          width;
     uint16_t          height;
@@ -86,7 +86,7 @@ static void sh1106_fill_rect(int16_t x, int16_t y, uint16_t w, uint16_t h,
     (void)x; (void)y; (void)w; (void)h; (void)color; (void)ud;
 }
 
-eui_display_hal_t* eui_drv_sh1106_create(const eui_drv_sh1106_config_t *cfg) {
+eui_display_drv_t* eui_drv_sh1106_create(const eui_drv_sh1106_config_t *cfg) {
     sh1106_t *d = eui_malloc(sizeof(sh1106_t));
     if (!d) return NULL;
     memset(d, 0, sizeof(*d));
@@ -113,6 +113,6 @@ eui_display_hal_t* eui_drv_sh1106_create(const eui_drv_sh1106_config_t *cfg) {
     return &d->base;
 }
 
-void eui_drv_sh1106_destroy(eui_display_hal_t *hal) {
+void eui_drv_sh1106_destroy(eui_display_drv_t *hal) {
     if (hal) eui_free(hal->user_data);
 }

@@ -19,7 +19,7 @@ static void mock_write_buffer(const uint8_t *b, const eui_rect_t *r, void *ud) {
                b + row * bpr, bpr);
 }
 
-static eui_display_hal_t mock_display = {
+static eui_display_drv_t mock_display = {
     .caps = { .width = 128, .height = 64, .color_depth = 1, .buffer_mode = 1 },
     .write_buffer = mock_write_buffer,
 };

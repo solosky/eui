@@ -1,5 +1,5 @@
-#include "eui/eui_display_hal.h"
-#include "eui/eui_input_hal.h"
+#include "eui/eui_display_drv.h"
+#include "eui/eui_input_drv.h"
 #include "eui/hal/eui_hal_types.h"
 #include "eui/eui_allocator.h"
 #include "eui/eui.h"
@@ -64,7 +64,7 @@ static void test_ssd1306_create_and_caps(void) {
                  .delay_ms = mock_i2c_delay_ms, .user_data = NULL },
         .width = 128, .height = 64, .i2c_addr = 0x3C,
     };
-    eui_display_hal_t *hal = eui_drv_ssd1306_create(&cfg);
+    eui_display_drv_t *hal = eui_drv_ssd1306_create(&cfg);
     if (!hal) FAIL("create returned NULL");
     if (hal->caps.width != 128) FAIL("width mismatch");
     if (hal->caps.height != 64) FAIL("height mismatch");
@@ -82,7 +82,7 @@ static void test_ssd1306_init_sends_commands(void) {
                  .delay_ms = mock_i2c_delay_ms, .user_data = NULL },
         .width = 128, .height = 64, .i2c_addr = 0x3C,
     };
-    eui_display_hal_t *hal = eui_drv_ssd1306_create(&cfg);
+    eui_display_drv_t *hal = eui_drv_ssd1306_create(&cfg);
     hal->init(hal->user_data);
     if (test_ssd1306_write_cmd_count < 10) FAIL("too few init commands sent");
     eui_drv_ssd1306_destroy(hal);
@@ -96,7 +96,7 @@ static void test_sh1106_create_and_caps(void) {
                  .delay_ms = mock_i2c_delay_ms, .user_data = NULL },
         .width = 128, .height = 64, .i2c_addr = 0x3C,
     };
-    eui_display_hal_t *hal = eui_drv_sh1106_create(&cfg);
+    eui_display_drv_t *hal = eui_drv_sh1106_create(&cfg);
     if (!hal) FAIL("create returned NULL");
     if (hal->caps.width != 128) FAIL("width mismatch");
     if (hal->caps.height != 64) FAIL("height mismatch");
@@ -115,7 +115,7 @@ static void test_st7735_create_and_caps(void) {
                  .delay_ms = mock_spi_delay_ms, .user_data = NULL },
         .width = 128, .height = 160, .variant = 0,
     };
-    eui_display_hal_t *hal = eui_drv_st7735_create(&cfg);
+    eui_display_drv_t *hal = eui_drv_st7735_create(&cfg);
     if (!hal) FAIL("create returned NULL");
     if (hal->caps.width != 128) FAIL("width mismatch");
     if (hal->caps.height != 160) FAIL("height mismatch");
@@ -133,7 +133,7 @@ static void test_ili9341_create_and_caps(void) {
                  .delay_ms = mock_spi_delay_ms, .user_data = NULL },
         .width = 240, .height = 320,
     };
-    eui_display_hal_t *hal = eui_drv_ili9341_create(&cfg);
+    eui_display_drv_t *hal = eui_drv_ili9341_create(&cfg);
     if (!hal) FAIL("create returned NULL");
     if (hal->caps.width != 240) FAIL("width mismatch");
     if (hal->caps.height != 320) FAIL("height mismatch");
@@ -159,7 +159,7 @@ static void test_buttons_press_release(void) {
         .gpio = { .read_pin = mock_btn_read_pin, .delay_us = mock_btn_delay_us, .user_data = NULL },
         .map = map, .count = 2,
     };
-    eui_input_hal_t *hal = eui_drv_buttons_create(&cfg);
+    eui_input_drv_t *hal = eui_drv_buttons_create(&cfg);
     if (!hal) FAIL("create returned NULL");
 
     hal->init(hal->user_data);
@@ -192,7 +192,7 @@ static void test_buttons_press_back(void) {
         .gpio = { .read_pin = mock_btn_read_pin, .delay_us = mock_btn_delay_us, .user_data = NULL },
         .map = map, .count = 2,
     };
-    eui_input_hal_t *hal = eui_drv_buttons_create(&cfg);
+    eui_input_drv_t *hal = eui_drv_buttons_create(&cfg);
     hal->init(hal->user_data);
 
     test_btn_pin_state = 0x02;
@@ -218,7 +218,7 @@ static void test_encoder_cw(void) {
         .gpio = { .read_pin = mock_enc_read_pin, .delay_us = mock_enc_delay_us, .user_data = NULL },
         .pin_a = 0, .pin_b = 1, .pin_sw = 2, .poll_interval_us = 1000,
     };
-    eui_input_hal_t *hal = eui_drv_encoder_create(&cfg);
+    eui_input_drv_t *hal = eui_drv_encoder_create(&cfg);
     hal->init(hal->user_data);
 
     test_enc_pins = 0x00; hal->poll(NULL, hal->user_data);
@@ -237,7 +237,7 @@ static void test_encoder_ccw(void) {
         .gpio = { .read_pin = mock_enc_read_pin, .delay_us = mock_enc_delay_us, .user_data = NULL },
         .pin_a = 0, .pin_b = 1, .pin_sw = 2, .poll_interval_us = 1000,
     };
-    eui_input_hal_t *hal = eui_drv_encoder_create(&cfg);
+    eui_input_drv_t *hal = eui_drv_encoder_create(&cfg);
     hal->init(hal->user_data);
 
     test_enc_pins = 0x00; hal->poll(NULL, hal->user_data);
@@ -256,7 +256,7 @@ static void test_encoder_click(void) {
         .gpio = { .read_pin = mock_enc_read_pin, .delay_us = mock_enc_delay_us, .user_data = NULL },
         .pin_a = 0, .pin_b = 1, .pin_sw = 2, .poll_interval_us = 1000,
     };
-    eui_input_hal_t *hal = eui_drv_encoder_create(&cfg);
+    eui_input_drv_t *hal = eui_drv_encoder_create(&cfg);
     hal->init(hal->user_data);
 
     test_enc_pins = 0x04;
@@ -285,7 +285,7 @@ static void test_xpt2046_touch_down_up(void) {
         .irq = { .read_irq = mock_xpt_irq, .user_data = NULL },
         .width = 320, .height = 240,
     };
-    eui_input_hal_t *hal = eui_drv_xpt2046_create(&cfg);
+    eui_input_drv_t *hal = eui_drv_xpt2046_create(&cfg);
     hal->init(hal->user_data);
 
     /* no touch: IRQ high */

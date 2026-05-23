@@ -1,7 +1,7 @@
 #ifndef EUI_DRV_ILI9341_H
 #define EUI_DRV_ILI9341_H
 
-#include "eui/eui_display_hal.h"
+#include "eui/eui_display_drv.h"
 #include "eui/hal/eui_hal_types.h"
 
 #ifdef __cplusplus
@@ -14,8 +14,8 @@ typedef struct {
     uint16_t      height;
 } eui_drv_ili9341_config_t;
 
-eui_display_hal_t* eui_drv_ili9341_create(const eui_drv_ili9341_config_t *cfg);
-void eui_drv_ili9341_destroy(eui_display_hal_t *hal);
+eui_display_drv_t* eui_drv_ili9341_create(const eui_drv_ili9341_config_t *cfg);
+void eui_drv_ili9341_destroy(eui_display_drv_t *hal);
 
 #ifdef __cplusplus
 }

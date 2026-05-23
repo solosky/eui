@@ -177,8 +177,8 @@ int main(void) {
     g_blue_data.bg_color  = eui_color_from_rgb(20, 40, 180);
     g_green_data.bg_color = eui_color_from_rgb(20, 140, 20);
 
-    eui_display_hal_t *display = eui_drv_raylib_create_display(W, H, EUI_COLOR_DEPTH);
-    eui_input_hal_t *input = eui_drv_raylib_create_input();
+    eui_display_drv_t *display = eui_drv_raylib_create_display(W, H, EUI_COLOR_DEPTH);
+    eui_input_drv_t *input = eui_drv_raylib_create_input();
     eui_config_t cfg = { .display=display, .input=input };
     eui_init(&cfg);
     eui_set_tick_callback(get_tick);

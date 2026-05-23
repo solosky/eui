@@ -5,8 +5,8 @@
 #include "eui/eui_types.h"
 #include "eui/eui_allocator.h"
 #include "eui/eui_str.h"
-#include "eui/eui_display_hal.h"
-#include "eui/eui_input_hal.h"
+#include "eui/eui_display_drv.h"
+#include "eui/eui_input_drv.h"
 #include "eui/eui_event.h"
 #include "eui/eui_input.h"
 #include "eui/eui_canvas.h"
@@ -30,8 +30,8 @@
 extern "C" {
 #endif
 
-struct eui_display_hal_t;
-struct eui_input_hal_t;
+struct eui_display_drv_t;
+struct eui_input_drv_t;
 
 /**
  * @brief Library-level configuration parameters.
@@ -42,8 +42,8 @@ struct eui_input_hal_t;
 typedef struct {
     uint8_t  *mem_pool_buffer;   /**< Pointer to the memory pool for internal allocations. */
     size_t    mem_pool_size;      /**< Size in bytes of the memory pool buffer. */
-    struct eui_display_hal_t *display;  /**< Display HAL implementation (cannot be NULL). */
-    struct eui_input_hal_t   *input;    /**< Input HAL implementation (may be NULL). */
+    struct eui_display_drv_t *display;  /**< Display HAL implementation (cannot be NULL). */
+    struct eui_input_drv_t   *input;    /**< Input HAL implementation (may be NULL). */
     uint16_t  fps_target;        /**< Desired frame rate in frames-per-second. */
     uint8_t   max_views;         /**< Maximum number of concurrent views. */
     uint8_t   max_animations;    /**< Maximum number of simultaneous animations. */

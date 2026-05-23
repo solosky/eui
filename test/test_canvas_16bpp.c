@@ -55,7 +55,7 @@ static void mock_write_buffer(const uint8_t *b, const eui_rect_t *r, void *ud)
     }
 }
 
-static eui_display_hal_t mock_display = {
+static eui_display_drv_t mock_display = {
     .caps = { .width = CANVAS_W, .height = CANVAS_H, .color_depth = 16,
               .buffer_mode = EUI_BUFFER_FULL, .has_gram = false },
     .init = NULL,

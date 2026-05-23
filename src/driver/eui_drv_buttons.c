@@ -3,7 +3,7 @@
 #include <string.h>
 
 typedef struct {
-    eui_input_hal_t         base;
+    eui_input_drv_t         base;
     eui_hal_gpio_t                gpio;
     const eui_drv_buttons_map_t  *map;
     uint8_t                 count;
@@ -54,7 +54,7 @@ static void buttons_set_callback(void (*cb)(const eui_event_t *evt), void *user_
     (void)user_data;
 }
 
-eui_input_hal_t* eui_drv_buttons_create(const eui_drv_buttons_config_t *cfg) {
+eui_input_drv_t* eui_drv_buttons_create(const eui_drv_buttons_config_t *cfg) {
     buttons_t *b = eui_malloc(sizeof(buttons_t));
     if (!b) return NULL;
     memset(b, 0, sizeof(*b));
@@ -69,6 +69,6 @@ eui_input_hal_t* eui_drv_buttons_create(const eui_drv_buttons_config_t *cfg) {
     return &b->base;
 }
 
-void eui_drv_buttons_destroy(eui_input_hal_t *hal) {
+void eui_drv_buttons_destroy(eui_input_drv_t *hal) {
     if (hal) eui_free(hal->user_data);
 }

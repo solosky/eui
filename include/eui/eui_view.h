@@ -3,7 +3,7 @@
 
 #include "eui_types.h"
 #include "eui_canvas.h"
-#include "eui_input_hal.h"
+#include "eui_input_drv.h"
 #include <stdint.h>
 #include <stdbool.h>
 

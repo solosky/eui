@@ -1,7 +1,7 @@
 #ifndef EUI_EVENT_H
 #define EUI_EVENT_H
 
-#include "eui/eui_input_hal.h"
+#include "eui/eui_input_drv.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include "eui/eui_config.h"

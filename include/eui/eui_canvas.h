@@ -2,7 +2,7 @@
 #define EUI_CANVAS_H
 
 #include "eui/eui_types.h"
-#include "eui/eui_display_hal.h"
+#include "eui/eui_display_drv.h"
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -14,7 +14,7 @@
  * eui_canvas_commit() flushes the result to the physical display.
  */
 typedef struct eui_canvas_t {
-    eui_display_hal_t *display;
+    eui_display_drv_t *display;
     uint8_t           *buffer;
     uint16_t           buf_width;
     uint16_t           buf_height;
@@ -39,10 +39,10 @@ typedef struct eui_canvas_t {
  * Allocates and initializes an internal framebuffer matching the
  * display dimensions and color depth.
  *
- * @param display  Pointer to an initialized eui_display_hal_t.
+ * @param display  Pointer to an initialized eui_display_drv_t.
  * @return A pointer to the new canvas, or NULL on allocation failure.
  */
-eui_canvas_t* eui_canvas_create(eui_display_hal_t *display);
+eui_canvas_t* eui_canvas_create(eui_display_drv_t *display);
 
 /**
  * @brief Destroy a canvas and free its framebuffer and resources.

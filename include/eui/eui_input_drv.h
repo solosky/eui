@@ -1,5 +1,5 @@
-#ifndef EUI_INPUT_HAL_H
-#define EUI_INPUT_HAL_H
+#ifndef EUI_INPUT_DRV_H
+#define EUI_INPUT_DRV_H
 
 #include <stdint.h>
 
@@ -53,17 +53,17 @@ typedef struct {
  * The application implements these callbacks to provide low-level
  * input from hardware (buttons, encoder, touch) to the EUI framework.
  */
-typedef struct eui_input_hal_t {
+typedef struct eui_input_drv_t {
     /**
      * @brief Initialize the input hardware.
-     * @param user_data  The eui_input_hal_t::user_data pointer.
+     * @param user_data  The eui_input_drv_t::user_data pointer.
      * @return 0 on success, negative on error.
      */
     int  (*init)(void *user_data);
 
     /**
      * @brief Deinitialize the input hardware.
-     * @param user_data  The eui_input_hal_t::user_data pointer.
+     * @param user_data  The eui_input_drv_t::user_data pointer.
      * @return 0 on success, negative on error.
      */
     int  (*deinit)(void *user_data);
@@ -71,7 +71,7 @@ typedef struct eui_input_hal_t {
     /**
      * @brief Poll for a single input event (non-blocking).
      * @param event     [out] Receives the next pending event.
-     * @param user_data The eui_input_hal_t::user_data pointer.
+     * @param user_data The eui_input_drv_t::user_data pointer.
      * @return 0 if an event was written, 1 if no events pending,
      *         negative on error.
      */
@@ -84,11 +84,11 @@ typedef struct eui_input_hal_t {
      * from interrupt context when new input is available.
      *
      * @param cb         Callback to invoke with new events.
-     * @param user_data  The eui_input_hal_t::user_data pointer.
+     * @param user_data  The eui_input_drv_t::user_data pointer.
      */
     void (*set_callback)(void (*cb)(const eui_event_t *evt), void *user_data);
 
     void *user_data; /**< Application-defined pointer passed to all callbacks. */
-} eui_input_hal_t;
+} eui_input_drv_t;
 
-#endif /* EUI_INPUT_HAL_H */
+#endif /* EUI_INPUT_DRV_H */

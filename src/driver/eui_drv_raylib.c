@@ -8,7 +8,7 @@
 /* ---- Display HAL ---- */
 
 typedef struct {
-    eui_display_hal_t base;
+    eui_display_drv_t base;
     RenderTexture2D   fb;
     uint16_t          width;
     uint16_t          height;
@@ -108,7 +108,7 @@ static void disp_fill_rect(int16_t x, int16_t y, uint16_t w, uint16_t h,
     (void)x; (void)y; (void)w; (void)h; (void)color; (void)ud;
 }
 
-eui_display_hal_t* eui_drv_raylib_create_display(uint16_t width, uint16_t height,
+eui_display_drv_t* eui_drv_raylib_create_display(uint16_t width, uint16_t height,
                                                   uint8_t color_depth) {
     raylib_display_t *d = eui_malloc(sizeof(raylib_display_t));
     if (!d) return NULL;
@@ -135,7 +135,7 @@ eui_display_hal_t* eui_drv_raylib_create_display(uint16_t width, uint16_t height
     return &d->base;
 }
 
-void eui_drv_raylib_destroy_display(eui_display_hal_t *hal) {
+void eui_drv_raylib_destroy_display(eui_display_drv_t *hal) {
     if (hal) eui_free(hal->user_data);
 }
 
@@ -225,7 +225,7 @@ const uint8_t* eui_drv_raylib_get_rgba_buffer(uint16_t *out_width, uint16_t *out
 /* ---- Input HAL ---- */
 
 typedef struct {
-    eui_input_hal_t base;
+    eui_input_drv_t base;
 } raylib_input_t;
 
 static int input_init(void *ud) {
@@ -280,7 +280,7 @@ static void input_set_callback(void (*cb)(const eui_event_t *evt), void *user_da
     (void)user_data;
 }
 
-eui_input_hal_t* eui_drv_raylib_create_input(void) {
+eui_input_drv_t* eui_drv_raylib_create_input(void) {
     raylib_input_t *inp = eui_malloc(sizeof(raylib_input_t));
     if (!inp) return NULL;
     memset(inp, 0, sizeof(*inp));
@@ -292,6 +292,6 @@ eui_input_hal_t* eui_drv_raylib_create_input(void) {
     return &inp->base;
 }
 
-void eui_drv_raylib_destroy_input(eui_input_hal_t *hal) {
+void eui_drv_raylib_destroy_input(eui_input_drv_t *hal) {
     if (hal) eui_free(hal->user_data);
 }

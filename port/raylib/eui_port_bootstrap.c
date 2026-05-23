@@ -21,14 +21,14 @@ int main(void) {
         .display_height = 64,
     };
 
-    eui_display_hal_t *display = eui_drv_raylib_create_display(
+    eui_display_drv_t *display = eui_drv_raylib_create_display(
         cfg.display_width, cfg.display_height, EUI_COLOR_DEPTH);
     if (!display) {
         fprintf(stderr, "Failed to create raylib display\n");
         return 1;
     }
 
-    eui_input_hal_t *input = eui_drv_raylib_create_input();
+    eui_input_drv_t *input = eui_drv_raylib_create_input();
     if (!input) {
         fprintf(stderr, "Failed to create raylib input\n");
         eui_drv_raylib_destroy_display(display);

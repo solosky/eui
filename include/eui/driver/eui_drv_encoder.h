@@ -2,7 +2,7 @@
 #define EUI_DRV_ENCODER_H
 
 #include <stdbool.h>
-#include "eui/eui_input_hal.h"
+#include "eui/eui_input_drv.h"
 #include "eui/hal/eui_hal_types.h"
 
 #ifdef __cplusplus
@@ -17,8 +17,8 @@ typedef struct {
     uint32_t       poll_interval_us;
 } eui_drv_encoder_config_t;
 
-eui_input_hal_t* eui_drv_encoder_create(const eui_drv_encoder_config_t *cfg);
-void eui_drv_encoder_destroy(eui_input_hal_t *hal);
+eui_input_drv_t* eui_drv_encoder_create(const eui_drv_encoder_config_t *cfg);
+void eui_drv_encoder_destroy(eui_input_drv_t *hal);
 
 #ifdef __cplusplus
 }

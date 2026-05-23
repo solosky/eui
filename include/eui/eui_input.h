@@ -1,7 +1,7 @@
 #ifndef EUI_INPUT_H
 #define EUI_INPUT_H
 
-#include "eui_input_hal.h"
+#include "eui_input_drv.h"
 #include "eui_event.h"
 #include <stdint.h>
 #include <stdbool.h>
@@ -9,12 +9,12 @@
 /**
  * @brief High-level input manager with debounce, long-press and repeat.
  *
- * Wraps an eui_input_hal_t and provides polling, debouncing, key repeat,
+ * Wraps an eui_input_drv_t and provides polling, debouncing, key repeat,
  * and long-press detection.  Consumed events are placed into an internal
  * eui_event_queue_t for the application to read.
  */
 typedef struct {
-    eui_input_hal_t *hal;
+    eui_input_drv_t *hal;
     eui_event_queue_t queue;
     uint32_t last_poll_ms;
     uint32_t debounce_ms;
@@ -35,7 +35,7 @@ typedef struct {
  * @param mgr  Pointer to the input manager to initialize.
  * @param hal  Pointer to the input HAL implementation.
  */
-void eui_input_init(eui_input_manager_t *mgr, eui_input_hal_t *hal);
+void eui_input_init(eui_input_manager_t *mgr, eui_input_drv_t *hal);
 
 /**
  * @brief Set the debounce interval for key inputs.

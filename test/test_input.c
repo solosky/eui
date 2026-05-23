@@ -20,7 +20,7 @@ static int mock_poll(eui_event_t *event, void *ud) {
     return 1;
 }
 
-static eui_input_hal_t mock_hal = {
+static eui_input_drv_t mock_hal = {
     .poll = mock_poll,
     .init = NULL,
     .deinit = NULL,

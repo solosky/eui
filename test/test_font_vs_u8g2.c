@@ -184,7 +184,7 @@ static void eui_write_cb(const uint8_t *b, const eui_rect_t *r, void *ud)
                b + row * bprow, bprow);
 }
 
-static eui_display_hal_t eui_cv_display = {
+static eui_display_drv_t eui_cv_display = {
     .caps = { .width = CANVAS_W, .height = CANVAS_H,
               .color_depth = EUI_COLOR_DEPTH, .buffer_mode = EUI_BUFFER_FULL,
               .has_gram = false },

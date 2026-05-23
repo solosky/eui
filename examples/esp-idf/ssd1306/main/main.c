@@ -38,7 +38,7 @@ void app_main(void) {
         .height = 64,
         .i2c_addr = I2C_ADDR,
     };
-    eui_display_hal_t *display = eui_drv_ssd1306_create(&dcfg);
+    eui_display_drv_t *display = eui_drv_ssd1306_create(&dcfg);
 
     eui_config_t eui_cfg = { .display = display, .input = NULL };
     eui_init(&eui_cfg);

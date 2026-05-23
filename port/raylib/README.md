@@ -6,8 +6,8 @@
 
 | HAL | 实现 | 驱动 |
 |-----|------|------|
-| `eui_display_hal_t` | 窗口渲染 OLED 模拟 | `eui_drv_raylib` |
-| `eui_input_hal_t` | 键盘/鼠标输入映射 | `eui_drv_raylib` |
+| `eui_display_drv_t` | 窗口渲染 OLED 模拟 | `eui_drv_raylib` |
+| `eui_input_drv_t` | 键盘/鼠标输入映射 | `eui_drv_raylib` |
 
 > 此端口 **不** 实现 I2C/SPI/GPIO HAL——它使用 `eui_drv_raylib` 直接渲染 framebuffer 到 Raylib 窗口。
 
