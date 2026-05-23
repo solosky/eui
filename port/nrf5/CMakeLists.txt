@@ -1,10 +1,11 @@
 if(DEFINED ENV{NRF5_SDK_ROOT})
     set(NRF5_SDK_ROOT $ENV{NRF5_SDK_ROOT})
 
-    add_library(eui_port_nrf5 STATIC eui_port_nrf5.c)
+    add_library(eui_port_nrf5 STATIC eui_port_nrf5.c eui_port_bootstrap.c)
 
     target_include_directories(eui_port_nrf5 PUBLIC
         .
+        ${CMAKE_SOURCE_DIR}/include
         ${NRF5_SDK_ROOT}/components
         ${NRF5_SDK_ROOT}/components/drivers_nrf/twi_master
         ${NRF5_SDK_ROOT}/components/drivers_nrf/spi_master
@@ -27,7 +28,10 @@ if(DEFINED ENV{NRF5_SDK_ROOT})
 
     target_link_libraries(eui_port_nrf5 PUBLIC eui)
 else()
-    add_library(eui_port_nrf5 STATIC eui_port_nrf5.c)
-    target_include_directories(eui_port_nrf5 PUBLIC .)
+    add_library(eui_port_nrf5 STATIC eui_port_nrf5.c eui_port_bootstrap.c)
+    target_include_directories(eui_port_nrf5 PUBLIC
+        .
+        ${CMAKE_SOURCE_DIR}/include
+    )
     target_link_libraries(eui_port_nrf5 PUBLIC eui)
 endif()
