@@ -120,3 +120,8 @@ if(EXISTS ${U8G2_DIR})
     target_link_libraries(test_font_vs_u8g2 PRIVATE eui)
     add_test(NAME font_vs_u8g2 COMMAND test_font_vs_u8g2)
 endif()
+
+add_executable(test_str test_str.c)
+target_include_directories(test_str PRIVATE ${CMAKE_BINARY_DIR}/include)
+target_link_libraries(test_str PRIVATE eui)
+add_test(NAME str COMMAND test_str)
