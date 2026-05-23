@@ -3,6 +3,7 @@
 
 #include "eui/widget/eui_widget.h"
 #include "eui/eui_types.h"
+#include "eui/eui_str.h"
 
 typedef void (*eui_button_callback_t)(void *ctx);
 

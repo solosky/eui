@@ -1,6 +1,7 @@
 #include "eui/widget/eui_widget_dialog.h"
 #include "eui/eui_allocator.h"
 #include "eui/eui_font_builtin.h"
+#include "eui/eui_str.h"
 #include <string.h>
 
 static void dialog_draw(eui_widget_t *self, eui_canvas_t *canvas) {
@@ -26,11 +27,11 @@ static void dialog_draw(eui_widget_t *self, eui_canvas_t *canvas) {
     eui_canvas_fill_rect(canvas, dlg_x, dlg_y, dlg_w, dlg_h);
     eui_canvas_invert_rect(canvas, dlg_x, dlg_y, dlg_w, dlg_h);
 
-    if (d->title) {
-        eui_canvas_draw_str(canvas, dlg_x + 2, dlg_y + 2, d->title);
+    if (!eui_str_empty(&d->title)) {
+        eui_canvas_draw_str(canvas, dlg_x + 2, dlg_y + 2, eui_str_cstr(&d->title));
     }
-    if (d->message) {
-        eui_canvas_draw_str(canvas, dlg_x + 2, dlg_y + 14, d->message);
+    if (!eui_str_empty(&d->message)) {
+        eui_canvas_draw_str(canvas, dlg_x + 2, dlg_y + 14, eui_str_cstr(&d->message));
     }
 
     /* Draw buttons */
@@ -42,7 +43,7 @@ static void dialog_draw(eui_widget_t *self, eui_canvas_t *canvas) {
         }
         eui_canvas_set_color(canvas, i == d->focused_button
                              ? EUI_COLOR_BLACK : EUI_COLOR_WHITE);
-        eui_canvas_draw_str(canvas, bx + 2, by + 2, d->buttons[i].label);
+        eui_canvas_draw_str(canvas, bx + 2, by + 2, eui_str_cstr(&d->buttons[i].label));
     }
 }
 
@@ -73,13 +74,23 @@ static bool dialog_input(eui_widget_t *self, const eui_event_t *evt) {
     return true;
 }
 
+static void dialog_destroy(eui_widget_t *self) {
+    eui_dialog_t *d = (eui_dialog_t*)self;
+    eui_str_clear(&d->title);
+    eui_str_clear(&d->message);
+    for (uint8_t i = 0; i < d->button_count; i++) {
+        eui_str_clear(&d->buttons[i].label);
+    }
+    eui_free(self);
+}
+
 static const eui_widget_vtable_t dialog_vtable = {
     .draw = dialog_draw,
     .input = dialog_input,
     .enter = NULL,
     .exit = NULL,
     .layout = NULL,
-    .destroy = NULL
+    .destroy = dialog_destroy
 };
 
 eui_widget_t* eui_dialog_create(const char *title, const char *msg) {
@@ -88,8 +99,10 @@ eui_widget_t* eui_dialog_create(const char *title, const char *msg) {
     memset(d, 0, sizeof(*d));
     eui_widget_init(&d->widget, &dialog_vtable, 0, 0, 128, 64);
     d->widget.focus_policy = EUI_FOCUS_STRONG;
-    d->title = title;
-    d->message = msg;
+    eui_str_init(&d->title);
+    eui_str_init(&d->message);
+    if (title) eui_str_set(&d->title, title);
+    if (msg) eui_str_set(&d->message, msg);
     return &d->widget;
 }
 
@@ -97,7 +110,8 @@ void eui_dialog_add_button(eui_widget_t *dlg, const char *label, eui_dialog_resu
     if (!dlg) return;
     eui_dialog_t *d = (eui_dialog_t*)dlg;
     if (d->button_count >= EUI_DIALOG_MAX_BUTTONS) return;
-    d->buttons[d->button_count].label = label;
+    eui_str_init(&d->buttons[d->button_count].label);
+    if (label) eui_str_set(&d->buttons[d->button_count].label, label);
     d->buttons[d->button_count].result = result;
     d->button_count++;
 }

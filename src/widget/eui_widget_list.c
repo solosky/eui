@@ -127,6 +127,8 @@ static void list_exit(eui_widget_t *self) {
     self->style &= ~EUI_STYLE_FOCUSED;
 }
 
+static void list_destroy(eui_widget_t *self);
+
 static const eui_widget_vtable_t list_vtable = {
     .draw = list_draw, .input = list_input,
     .enter = list_enter, .exit = list_exit,

@@ -2,6 +2,7 @@
 #define EUI_WIDGET_LABEL_H
 
 #include "eui/widget/eui_widget.h"
+#include "eui/eui_str.h"
 
 typedef struct {
     eui_widget_t       widget;

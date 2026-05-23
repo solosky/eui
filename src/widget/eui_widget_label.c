@@ -1,6 +1,7 @@
 #include "eui/widget/eui_widget_label.h"
 #include "eui/eui_allocator.h"
 #include "eui/eui_font_builtin.h"
+#include "eui/eui_str.h"
 #include <string.h>
 
 static void label_draw(eui_widget_t *self, eui_canvas_t *canvas) {

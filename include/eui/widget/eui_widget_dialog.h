@@ -3,6 +3,7 @@
 
 #include "eui/widget/eui_widget.h"
 #include "eui/eui_view_dispatcher.h"
+#include "eui/eui_str.h"
 
 typedef enum {
     EUI_DIALOG_OK,
@@ -17,9 +18,10 @@ typedef void (*eui_dialog_callback_t)(eui_dialog_result_t result, void *ctx);
 
 typedef struct {
     eui_widget_t widget;
-    const char *title, *message;
+    eui_str_t title;
+    eui_str_t message;
     struct {
-        const char *label;
+        eui_str_t label;
         eui_dialog_result_t result;
     } buttons[EUI_DIALOG_MAX_BUTTONS];
     uint8_t button_count, focused_button;
