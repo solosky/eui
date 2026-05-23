@@ -5,7 +5,7 @@
 
 typedef struct {
     eui_widget_t       widget;
-    const char        *text;
+    eui_str_t          text;
     const eui_font_t  *font;
     eui_align_t        h_align;
     eui_align_t        v_align;
