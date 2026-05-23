@@ -14,6 +14,8 @@ static uint32_t get_tick_ms(void) {
 }
 
 int main(void) {
+    eui_allocator_init_tlsf(mem_pool, sizeof(mem_pool));
+
     eui_example_config_t cfg = {
         .display_width  = 128,
         .display_height = 64,
@@ -34,8 +36,6 @@ int main(void) {
     }
 
     eui_config_t eui_cfg = {
-        .mem_pool_buffer = mem_pool,
-        .mem_pool_size   = sizeof(mem_pool),
         .display         = display,
         .input           = input,
     };

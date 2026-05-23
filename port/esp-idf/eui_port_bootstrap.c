@@ -42,6 +42,8 @@ static uint32_t get_tick_ms(void) {
 }
 
 void app_main(void) {
+    eui_allocator_init_tlsf(mem_pool, sizeof(mem_pool));
+
     eui_example_config_t cfg = {
         .display_width  = CONFIG_EUI_EXAMPLE_DISPLAY_WIDTH,
         .display_height = CONFIG_EUI_EXAMPLE_DISPLAY_HEIGHT,
@@ -68,8 +70,6 @@ void app_main(void) {
     eui_display_hal_t *display = eui_drv_ssd1306_create(&dcfg);
 
     eui_config_t eui_cfg = {
-        .mem_pool_buffer = mem_pool,
-        .mem_pool_size   = sizeof(mem_pool),
         .display         = display,
         .input           = NULL,
     };
