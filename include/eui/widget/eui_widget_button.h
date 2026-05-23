@@ -8,7 +8,7 @@ typedef void (*eui_button_callback_t)(void *ctx);
 
 typedef struct {
     eui_widget_t widget;
-    const char  *label;
+    eui_str_t   label;
     const eui_bitmap_t *icon;
     eui_button_callback_t callback;
     void *callback_ctx;

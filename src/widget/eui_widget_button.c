@@ -29,13 +29,13 @@ static void button_draw(eui_widget_t *self, eui_canvas_t *canvas) {
     if (b->icon) {
         int16_t icon_x = self->area.x + (self->area.w - b->icon->width) / 2;
         int16_t icon_y = self->area.y + (self->area.h - b->icon->height) / 2;
-        if (b->label) {
+        if (!eui_str_empty(&b->label)) {
             icon_x = self->area.x + 4;
         }
         eui_canvas_draw_bitmap(canvas, icon_x, icon_y, b->icon);
     }
 
-    if (b->label) {
+    if (!eui_str_empty(&b->label)) {
         int16_t tx = self->area.x + self->area.w / 2;
         int16_t ty = self->area.y + self->area.h / 2;
         if (b->icon) {
@@ -43,7 +43,7 @@ static void button_draw(eui_widget_t *self, eui_canvas_t *canvas) {
                 + (self->area.w - b->icon->width - 8) / 2;
         }
         eui_canvas_draw_str_aligned(canvas, tx, ty,
-            EUI_ALIGN_CENTER, EUI_ALIGN_MIDDLE, b->label);
+            EUI_ALIGN_CENTER, EUI_ALIGN_MIDDLE, eui_str_cstr(&b->label));
     }
 
     if (self->style & EUI_STYLE_FOCUSED) {
@@ -78,13 +78,19 @@ static void button_exit(eui_widget_t *self) {
     self->style |= EUI_STYLE_DIRTY;
 }
 
+static void button_destroy(eui_widget_t *self) {
+    eui_button_t *b = (eui_button_t*)self;
+    eui_str_clear(&b->label);
+    eui_free(self);
+}
+
 static const eui_widget_vtable_t button_vtable = {
     .draw = button_draw,
     .input = button_input,
     .enter = button_enter,
     .exit = button_exit,
     .layout = NULL,
-    .destroy = NULL
+    .destroy = button_destroy
 };
 
 eui_widget_t* eui_button_create(const char *label, int16_t x, int16_t y,
@@ -94,7 +100,8 @@ eui_widget_t* eui_button_create(const char *label, int16_t x, int16_t y,
     memset(b, 0, sizeof(*b));
     eui_widget_init(&b->widget, &button_vtable, x, y, w, h);
     b->widget.focus_policy = EUI_FOCUS_STRONG;
-    b->label = label;
+    eui_str_init(&b->label);
+    if (label) eui_str_set(&b->label, label);
     return &b->widget;
 }
 
