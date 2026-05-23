@@ -83,10 +83,12 @@ target_include_directories(test_view_transition PRIVATE ${CMAKE_BINARY_DIR}/incl
 target_link_libraries(test_view_transition PRIVATE eui)
 add_test(NAME view_transition COMMAND test_view_transition)
 
+if(TARGET eui_drv_raylib)
 add_executable(test_view_transition_render test_view_transition_render.c)
 target_include_directories(test_view_transition_render PRIVATE ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(test_view_transition_render PRIVATE eui_drv_raylib)
 add_test(NAME view_transition_render COMMAND test_view_transition_render)
+endif()
 
 # ---- u8g2 reference comparison test ----
 set(U8G2_DIR "${CMAKE_SOURCE_DIR}/../u8g2" CACHE PATH "u8g2 source directory")
