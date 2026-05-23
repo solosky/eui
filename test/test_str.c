@@ -216,9 +216,9 @@ static void test_growth_geometric(void) {
     for (int i = 0; i < 200; i++) {
         eui_str_append_char(&s, 'a' + (char)(i % 26));
         if (s.cap > last_cap) {
-            /* cap should at least double or be >= min step */
-            if (last_cap > 0 && s.cap < last_cap) FAIL("cap shrank");
             last_cap = s.cap;
+        } else if (s.cap < last_cap) {
+            FAIL("cap shrank");
         }
     }
     if (eui_str_len(&s) != 200) FAIL("len wrong after growth");
