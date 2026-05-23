@@ -42,7 +42,7 @@ target_include_directories(eui PRIVATE
 )
 target_link_libraries(eui PUBLIC tlsf mc)
 
-if((EUI_BUILD_EXAMPLES OR EUI_BUILD_CROSS_EXAMPLES) AND TARGET raylib)
+if((EUI_BUILD_EXAMPLES OR EUI_BUILD_CROSS_EXAMPLES OR EUI_BUILD_TESTS) AND TARGET raylib)
 add_library(eui_drv_raylib STATIC driver/eui_drv_raylib.c)
 target_include_directories(eui_drv_raylib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 target_link_libraries(eui_drv_raylib PUBLIC eui raylib)

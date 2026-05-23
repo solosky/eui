@@ -25,9 +25,13 @@ configure_file(
     ${CMAKE_CURRENT_BINARY_DIR}/include/eui/eui_config.h
 )
 
-# Build raylib if targeting raylib port (must be before src for eui_drv_raylib)
-if(EUI_BUILD_EXAMPLES OR (EUI_BUILD_CROSS_EXAMPLES AND
-   (NOT DEFINED EUI_TARGET_PORT OR EUI_TARGET_PORT STREQUAL "raylib")))
+# Build raylib when needed (must be before src for eui_drv_raylib)
+# - raylib/desktop examples
+# - cross-platform raylib port
+# - unit tests (e.g. test_view_transition_render)
+if(EUI_BUILD_EXAMPLES OR
+   (EUI_BUILD_CROSS_EXAMPLES AND (NOT DEFINED EUI_TARGET_PORT OR EUI_TARGET_PORT STREQUAL "raylib")) OR
+   EUI_BUILD_TESTS)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(USE_EXTERNAL_GLFW OFF CACHE BOOL "" FORCE)
     add_subdirectory(third_party/raylib)
