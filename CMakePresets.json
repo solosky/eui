@@ -24,6 +24,7 @@
         {
             "name": "nrf52",
             "displayName": "nRF52 (nRF5 SDK)",
+            "toolchainFile": "${sourceDir}/port/nrf5/toolchain.cmake",
             "cacheVariables": {
                 "EUI_TARGET_PORT": "nrf5",
                 "EUI_BUILD_CROSS_EXAMPLES": "ON",
