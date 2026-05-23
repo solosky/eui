@@ -213,7 +213,7 @@ void eui_str_substr(eui_str_t *dst, const eui_str_t *src, size_t start, size_t l
     size_t need = len + 1;
     reserve(dst, need);
     if (src->data) {
-        memcpy(dst->data, src->data + start, len);
+        memmove(dst->data, src->data + start, len);
     }
     dst->data[len] = '\0';
     dst->len = len;
