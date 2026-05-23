@@ -1,4 +1,4 @@
-#include "eui/eui_widget.h"
+#include "eui/widget/eui_widget.h"
 #include <string.h>
 #include <stddef.h>
 

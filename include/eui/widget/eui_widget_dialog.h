@@ -1,7 +1,7 @@
 #ifndef EUI_WIDGET_DIALOG_H
 #define EUI_WIDGET_DIALOG_H
 
-#include "eui/eui_widget.h"
+#include "eui/widget/eui_widget.h"
 #include "eui/eui_view_dispatcher.h"
 
 typedef enum {

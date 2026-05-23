@@ -1,4 +1,4 @@
-#include "eui/eui_widget_slider.h"
+#include "eui/widget/eui_widget_slider.h"
 #include "eui/eui_allocator.h"
 #include <string.h>
 

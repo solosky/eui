@@ -1,8 +1,8 @@
 #ifndef EUI_WIDGET_BUTTON_H
 #define EUI_WIDGET_BUTTON_H
 
-#include "eui_widget.h"
-#include "eui_types.h"
+#include "eui/widget/eui_widget.h"
+#include "eui/eui_types.h"
 
 typedef void (*eui_button_callback_t)(void *ctx);
 

@@ -1,8 +1,8 @@
 #ifndef EUI_WIDGET_H
 #define EUI_WIDGET_H
 
-#include "eui_view.h"
-#include "eui_canvas.h"
+#include "eui/eui_view.h"
+#include "eui/eui_canvas.h"
 #include "eui/eui_config.h"
 #include <stdint.h>
 #include <stdbool.h>

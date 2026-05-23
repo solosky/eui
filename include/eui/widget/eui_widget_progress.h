@@ -1,7 +1,7 @@
 #ifndef EUI_WIDGET_PROGRESS_H
 #define EUI_WIDGET_PROGRESS_H
 
-#include "eui/eui_widget.h"
+#include "eui/widget/eui_widget.h"
 
 typedef struct {
     eui_widget_t widget;

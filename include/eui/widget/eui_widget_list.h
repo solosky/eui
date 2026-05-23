@@ -1,7 +1,7 @@
 #ifndef EUI_WIDGET_LIST_H
 #define EUI_WIDGET_LIST_H
 
-#include "eui_widget.h"
+#include "eui/widget/eui_widget.h"
 
 typedef void (*eui_list_callback_t)(uint8_t index, void *ctx);
 

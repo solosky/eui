@@ -1,4 +1,4 @@
-#include "eui/eui_widget_progress.h"
+#include "eui/widget/eui_widget_progress.h"
 #include "eui/eui_allocator.h"
 #include <string.h>
 

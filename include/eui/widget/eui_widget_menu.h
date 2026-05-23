@@ -1,7 +1,7 @@
 #ifndef EUI_WIDGET_MENU_H
 #define EUI_WIDGET_MENU_H
 
-#include "eui_widget.h"
+#include "eui/widget/eui_widget.h"
 
 typedef void (*eui_menu_callback_t)(void *ctx);
 

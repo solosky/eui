@@ -1,4 +1,4 @@
-#include "eui/eui_widget_dialog.h"
+#include "eui/widget/eui_widget_dialog.h"
 #include "eui/eui_allocator.h"
 #include "eui/eui_font_builtin.h"
 #include <string.h>

@@ -1,7 +1,7 @@
 #ifndef EUI_ANIM_H
 #define EUI_ANIM_H
 
-#include "eui_widget.h"
+#include "eui/widget/eui_widget.h"
 #include "mc.h"
 #include <stdint.h>
 
