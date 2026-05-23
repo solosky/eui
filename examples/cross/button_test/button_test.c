@@ -49,17 +49,17 @@ void eui_example_setup(const eui_example_config_t *cfg) {
 
     eui_view_dispatcher_t *vd = eui_get_view_dispatcher();
 
-    eui_widget_t root;
-    eui_widget_init(&root, &container_vt, 0, 0, 128, 64);
+    eui_widget_t *root = eui_malloc(sizeof(eui_widget_t));
+    eui_widget_init(root, &container_vt, 0, 0, 128, 64);
 
     eui_widget_t *btn_a = eui_button_create("Btn A", 10, 20, 50, 20);
     eui_button_set_callback(btn_a, on_btn_a, NULL);
-    eui_widget_add_child(&root, btn_a);
+    eui_widget_add_child(root, btn_a);
 
     eui_widget_t *btn_b = eui_button_create("Btn B", 68, 20, 50, 20);
     eui_button_set_callback(btn_b, on_btn_b, NULL);
-    eui_widget_add_child(&root, btn_b);
+    eui_widget_add_child(root, btn_b);
 
-    eui_view_dispatcher_add(vd, 1, &root.view);
+    eui_view_dispatcher_add(vd, 1, &root->view);
     eui_view_dispatcher_switch_to(vd, 1, EUI_ANIM_NONE);
 }
