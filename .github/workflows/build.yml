@@ -16,7 +16,7 @@ jobs:
           submodules: recursive
 
       - name: Configure
-        run: cmake -B build -DEUI_BUILD_TESTS=ON -DEUI_BUILD_EXAMPLES=OFF -DEUI_COLOR_DEPTH=${{ matrix.color_depth }} -DEUI_FONT_ENABLE_U8G2=ON -DEUI_FONT_ENABLE_KERNING=ON -DEUI_FONT_ENABLE_MULTILINE=ON
+        run: cmake -B build -DEUI_BUILD_TESTS=ON -DEUI_BUILD_EXAMPLES=OFF -DEUI_BUILD_CROSS_EXAMPLES=OFF -DEUI_COLOR_DEPTH=${{ matrix.color_depth }} -DEUI_FONT_ENABLE_U8G2=ON -DEUI_FONT_ENABLE_KERNING=ON -DEUI_FONT_ENABLE_MULTILINE=ON
 
       - name: Build
         run: cmake --build build -j
@@ -37,6 +37,7 @@ jobs:
           cmake -B build \
             -DEUI_BUILD_TESTS=ON \
             -DEUI_BUILD_EXAMPLES=OFF \
+            -DEUI_BUILD_CROSS_EXAMPLES=OFF \
             -DEUI_COLOR_DEPTH=1 \
             -DEUI_FONT_ENABLE_U8G2=ON \
             -DEUI_FONT_ENABLE_KERNING=ON \
