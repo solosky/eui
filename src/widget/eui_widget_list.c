@@ -55,7 +55,7 @@ static void list_draw(eui_widget_t *self, eui_canvas_t *canvas) {
                         || (animating && idx == (uint8_t)l->anim_from);
         eui_canvas_set_color(canvas, highlighted
                              ? EUI_COLOR_BLACK : EUI_COLOR_WHITE);
-        eui_canvas_draw_str(canvas, self->area.x + 2, y + 2, l->items[idx].text);
+        eui_canvas_draw_str(canvas, self->area.x + 2, y + 2, eui_str_cstr(&l->items[idx].text));
     }
     eui_canvas_restore(canvas);
 }
@@ -130,7 +130,7 @@ static void list_exit(eui_widget_t *self) {
 static const eui_widget_vtable_t list_vtable = {
     .draw = list_draw, .input = list_input,
     .enter = list_enter, .exit = list_exit,
-    .layout = NULL, .destroy = NULL
+    .layout = NULL, .destroy = list_destroy
 };
 
 eui_widget_t* eui_list_create(int16_t x, int16_t y, uint16_t w, uint16_t h) {
@@ -147,9 +147,7 @@ int eui_list_add_item(eui_widget_t *list, const char *text, const eui_bitmap_t *
     if (!list) return -1;
     eui_list_t *l = (eui_list_t*)list;
     if (l->item_count >= EUI_LIST_MAX_ITEMS) return -1;
-    l->items[l->item_count].text[0] = '\0';
-    if (text) strncpy(l->items[l->item_count].text, text, sizeof(l->items[0].text) - 1);
-    l->items[l->item_count].text[sizeof(l->items[0].text) - 1] = '\0';
+    eui_str_set(&l->items[l->item_count].text, text ? text : "");
     l->items[l->item_count].icon = icon;
     l->item_count++;
     list->style |= EUI_STYLE_DIRTY;
@@ -177,8 +175,19 @@ void eui_list_set_callback(eui_widget_t *list, eui_list_callback_t cb, void *ctx
 void eui_list_clear(eui_widget_t *list) {
     if (!list) return;
     eui_list_t *l = (eui_list_t*)list;
+    for (uint8_t i = 0; i < l->item_count; i++) {
+        eui_str_clear(&l->items[i].text);
+    }
     l->item_count = 0;
     l->selected_index = 0;
     l->scroll_offset = 0;
     list->style |= EUI_STYLE_DIRTY;
+}
+
+static void list_destroy(eui_widget_t *self) {
+    eui_list_t *l = (eui_list_t*)self;
+    for (uint8_t i = 0; i < l->item_count; i++) {
+        eui_str_clear(&l->items[i].text);
+    }
+    eui_free(l);
 }

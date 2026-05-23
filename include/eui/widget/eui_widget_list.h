@@ -1,6 +1,7 @@
 #ifndef EUI_WIDGET_LIST_H
 #define EUI_WIDGET_LIST_H
 
+#include "eui/eui_str.h"
 #include "eui/widget/eui_widget.h"
 
 typedef void (*eui_list_callback_t)(uint8_t index, void *ctx);
@@ -8,7 +9,7 @@ typedef void (*eui_list_callback_t)(uint8_t index, void *ctx);
 #define EUI_LIST_MAX_ITEMS 32
 
 typedef struct {
-    char                text[32];       /* null-terminated, owned by list */
+    eui_str_t           text;
     const eui_bitmap_t *icon;
 } eui_list_item_t;
 
