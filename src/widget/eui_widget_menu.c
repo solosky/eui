@@ -28,7 +28,7 @@ static void menu_draw(eui_widget_t *self, eui_canvas_t *canvas) {
         }
         eui_canvas_set_color(canvas, idx == active->selected_index
                              ? EUI_COLOR_BLACK : EUI_COLOR_WHITE);
-        eui_canvas_draw_str(canvas, self->area.x + 2, y + 2, item->label ? item->label : "");
+        eui_canvas_draw_str(canvas, self->area.x + 2, y + 2, eui_str_cstr(&item->label));
 
         /* Draw submenu indicator */
         if (item->submenu) {
@@ -96,10 +96,24 @@ static bool menu_input(eui_widget_t *self, const eui_event_t *evt) {
 static void menu_enter(eui_widget_t *self) { self->style |= EUI_STYLE_FOCUSED; }
 static void menu_exit(eui_widget_t *self) { self->style &= ~EUI_STYLE_FOCUSED; }
 
+static void menu_destroy(eui_widget_t *self) {
+    eui_menu_t *m = (eui_menu_t*)self;
+    for (uint8_t i = 0; i < m->item_count; i++) {
+        eui_str_clear(&m->items[i].label);
+        if (m->items[i].submenu) {
+            for (uint8_t j = 0; j < m->items[i].submenu->item_count; j++) {
+                eui_str_clear(&m->items[i].submenu->items[j].label);
+            }
+            eui_free(m->items[i].submenu);
+        }
+    }
+    eui_free(self);
+}
+
 static const eui_widget_vtable_t menu_vtable = {
     .draw = menu_draw, .input = menu_input,
     .enter = menu_enter, .exit = menu_exit,
-    .layout = NULL, .destroy = NULL
+    .layout = NULL, .destroy = menu_destroy
 };
 
 eui_widget_t* eui_menu_create(int16_t x, int16_t y, uint16_t w, uint16_t h) {
@@ -117,7 +131,8 @@ eui_menu_item_t* eui_menu_add_item(eui_widget_t *menu, const char *label, eui_me
     eui_menu_t *m = (eui_menu_t*)menu;
     if (m->item_count >= EUI_MENU_MAX_ITEMS) return NULL;
     eui_menu_item_t *item = &m->items[m->item_count++];
-    item->label = label;
+    eui_str_init(&item->label);
+    if (label) eui_str_set(&item->label, label);
     item->callback = cb;
     item->submenu = NULL;
     item->callback_ctx = NULL;

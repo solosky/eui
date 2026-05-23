@@ -2,13 +2,14 @@
 #define EUI_WIDGET_MENU_H
 
 #include "eui/widget/eui_widget.h"
+#include "eui/eui_str.h"
 
 typedef void (*eui_menu_callback_t)(void *ctx);
 
 typedef struct eui_menu_t eui_menu_t;
 
 typedef struct eui_menu_item {
-    const char *label;
+    eui_str_t label;
     eui_menu_callback_t callback;
     void *callback_ctx;
     eui_menu_t *submenu;
