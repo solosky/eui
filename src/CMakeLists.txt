@@ -12,15 +12,15 @@ add_library(eui STATIC
     eui_font_wqy13.c
     eui_view.c
     eui_view_dispatcher.c
-    eui_widget.c
-    eui_widget_button.c
-    eui_widget_label.c
-    eui_widget_menu.c
-    eui_widget_list.c
-    eui_widget_progress.c
-    eui_widget_slider.c
-    eui_widget_scroll.c
-    eui_widget_dialog.c
+    widget/eui_widget.c
+    widget/eui_widget_button.c
+    widget/eui_widget_label.c
+    widget/eui_widget_menu.c
+    widget/eui_widget_list.c
+    widget/eui_widget_progress.c
+    widget/eui_widget_slider.c
+    widget/eui_widget_scroll.c
+    widget/eui_widget_dialog.c
     eui_scene.c
     eui_anim.c
     driver/eui_drv_ssd1306.c
@@ -42,7 +42,7 @@ target_include_directories(eui PRIVATE
 )
 target_link_libraries(eui PUBLIC tlsf mc)
 
-if(EUI_BUILD_EXAMPLES)
+if(EUI_BUILD_EXAMPLES OR EUI_BUILD_CROSS_EXAMPLES)
 add_library(eui_drv_raylib STATIC driver/eui_drv_raylib.c)
 target_include_directories(eui_drv_raylib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 target_link_libraries(eui_drv_raylib PUBLIC eui raylib)

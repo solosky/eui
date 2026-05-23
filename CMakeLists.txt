@@ -6,6 +6,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 option(EUI_BUILD_TESTS "Build unit tests" ON)
 option(EUI_BUILD_EXAMPLES "Build raylib examples" ON)
+option(EUI_BUILD_CROSS_EXAMPLES "Build cross-platform examples" OFF)
 
 # Compile-time config
 set(EUI_COLOR_DEPTH 1 CACHE STRING "Color depth: 1, 4, 8, 16")
@@ -36,9 +37,37 @@ if(EUI_BUILD_TESTS)
     add_subdirectory(test)
 endif()
 
-if(EUI_BUILD_EXAMPLES)
+# Build raylib if needed for either legacy or cross-platform examples
+if(EUI_BUILD_EXAMPLES OR EUI_BUILD_CROSS_EXAMPLES)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(USE_EXTERNAL_GLFW OFF CACHE BOOL "" FORCE)
     add_subdirectory(third_party/raylib)
+endif()
+
+# Legacy raylib-only examples
+if(EUI_BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+# Cross-platform examples
+if(EUI_BUILD_CROSS_EXAMPLES)
+    if(NOT DEFINED EUI_TARGET_PORT)
+        set(EUI_TARGET_PORT "raylib" CACHE STRING "Target port: raylib, esp-idf, nrf5")
+    endif()
+    set_property(CACHE EUI_TARGET_PORT PROPERTY STRINGS "raylib" "esp-idf" "nrf5")
+
+    if(EUI_TARGET_PORT STREQUAL "raylib")
+        set(BOOTSTRAP_LIB eui_port_raylib)
+        add_subdirectory(port/raylib)
+    elseif(EUI_TARGET_PORT STREQUAL "esp-idf")
+        set(BOOTSTRAP_LIB eui_port_esp_idf)
+        add_subdirectory(port/esp-idf)
+    elseif(EUI_TARGET_PORT STREQUAL "nrf5")
+        set(BOOTSTRAP_LIB eui_port_nrf5)
+        add_subdirectory(port/nrf5)
+    else()
+        message(FATAL_ERROR "Unknown EUI_TARGET_PORT: ${EUI_TARGET_PORT}")
+    endif()
+
+    add_subdirectory(examples/cross)
 endif()

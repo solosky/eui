@@ -1,0 +1,35 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "pc",
+            "displayName": "PC (Raylib)",
+            "cacheVariables": {
+                "EUI_TARGET_PORT": "raylib",
+                "EUI_BUILD_CROSS_EXAMPLES": "ON",
+                "EUI_BUILD_EXAMPLES": "OFF",
+                "EUI_BUILD_TESTS": "OFF"
+            }
+        },
+        {
+            "name": "esp32",
+            "displayName": "ESP32 (ESP-IDF)",
+            "cacheVariables": {
+                "EUI_TARGET_PORT": "esp-idf",
+                "EUI_BUILD_CROSS_EXAMPLES": "ON",
+                "EUI_BUILD_EXAMPLES": "OFF",
+                "EUI_BUILD_TESTS": "OFF"
+            }
+        },
+        {
+            "name": "nrf52",
+            "displayName": "nRF52 (nRF5 SDK)",
+            "cacheVariables": {
+                "EUI_TARGET_PORT": "nrf5",
+                "EUI_BUILD_CROSS_EXAMPLES": "ON",
+                "EUI_BUILD_EXAMPLES": "OFF",
+                "EUI_BUILD_TESTS": "OFF"
+            }
+        }
+    ]
+}
