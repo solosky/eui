@@ -37,15 +37,11 @@ if(EUI_BUILD_TESTS)
     add_subdirectory(test)
 endif()
 
-# Build raylib if needed for either legacy or cross-platform examples
-if(EUI_BUILD_EXAMPLES OR EUI_BUILD_CROSS_EXAMPLES)
+# Build raylib for legacy examples
+if(EUI_BUILD_EXAMPLES)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(USE_EXTERNAL_GLFW OFF CACHE BOOL "" FORCE)
     add_subdirectory(third_party/raylib)
-endif()
-
-# Legacy raylib-only examples
-if(EUI_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 
@@ -57,6 +53,11 @@ if(EUI_BUILD_CROSS_EXAMPLES)
     set_property(CACHE EUI_TARGET_PORT PROPERTY STRINGS "raylib" "esp-idf" "nrf5")
 
     if(EUI_TARGET_PORT STREQUAL "raylib")
+        if(NOT TARGET raylib)
+            set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+            set(USE_EXTERNAL_GLFW OFF CACHE BOOL "" FORCE)
+            add_subdirectory(third_party/raylib)
+        endif()
         set(BOOTSTRAP_LIB eui_port_raylib)
         add_subdirectory(port/raylib)
     elseif(EUI_TARGET_PORT STREQUAL "esp-idf")
