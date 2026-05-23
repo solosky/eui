@@ -2,6 +2,7 @@
 #include "eui/eui.h"
 #include "eui/driver/eui_drv_raylib.h"
 #include "eui/eui_port_bootstrap.h"
+#include <raylib.h>
 #include <stdio.h>
 #include <stdlib.h>
 
