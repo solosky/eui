@@ -25,6 +25,14 @@ configure_file(
     ${CMAKE_CURRENT_BINARY_DIR}/include/eui/eui_config.h
 )
 
+# Build raylib if targeting raylib port (must be before src for eui_drv_raylib)
+if(EUI_BUILD_EXAMPLES OR (EUI_BUILD_CROSS_EXAMPLES AND
+   (NOT DEFINED EUI_TARGET_PORT OR EUI_TARGET_PORT STREQUAL "raylib")))
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(USE_EXTERNAL_GLFW OFF CACHE BOOL "" FORCE)
+    add_subdirectory(third_party/raylib)
+endif()
+
 add_subdirectory(third_party/tlsf)
 set(MC_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
 set(MC_BUILD_TEST OFF CACHE BOOL "" FORCE)
@@ -39,9 +47,6 @@ endif()
 
 # Build raylib for legacy examples
 if(EUI_BUILD_EXAMPLES)
-    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(USE_EXTERNAL_GLFW OFF CACHE BOOL "" FORCE)
-    add_subdirectory(third_party/raylib)
     add_subdirectory(examples)
 endif()
 
@@ -53,11 +58,6 @@ if(EUI_BUILD_CROSS_EXAMPLES)
     set_property(CACHE EUI_TARGET_PORT PROPERTY STRINGS "raylib" "esp-idf" "nrf5")
 
     if(EUI_TARGET_PORT STREQUAL "raylib")
-        if(NOT TARGET raylib)
-            set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-            set(USE_EXTERNAL_GLFW OFF CACHE BOOL "" FORCE)
-            add_subdirectory(third_party/raylib)
-        endif()
         set(BOOTSTRAP_LIB eui_port_raylib)
         add_subdirectory(port/raylib)
     elseif(EUI_TARGET_PORT STREQUAL "esp-idf")
