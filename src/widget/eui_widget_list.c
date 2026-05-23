@@ -55,8 +55,7 @@ static void list_draw(eui_widget_t *self, eui_canvas_t *canvas) {
                         || (animating && idx == (uint8_t)l->anim_from);
         eui_canvas_set_color(canvas, highlighted
                              ? EUI_COLOR_BLACK : EUI_COLOR_WHITE);
-        eui_canvas_draw_str(canvas, self->area.x + 2, y + 2,
-                            l->items[idx].text ? l->items[idx].text : "");
+        eui_canvas_draw_str(canvas, self->area.x + 2, y + 2, l->items[idx].text);
     }
     eui_canvas_restore(canvas);
 }
@@ -148,7 +147,9 @@ int eui_list_add_item(eui_widget_t *list, const char *text, const eui_bitmap_t *
     if (!list) return -1;
     eui_list_t *l = (eui_list_t*)list;
     if (l->item_count >= EUI_LIST_MAX_ITEMS) return -1;
-    l->items[l->item_count].text = text;
+    l->items[l->item_count].text[0] = '\0';
+    if (text) strncpy(l->items[l->item_count].text, text, sizeof(l->items[0].text) - 1);
+    l->items[l->item_count].text[sizeof(l->items[0].text) - 1] = '\0';
     l->items[l->item_count].icon = icon;
     l->item_count++;
     list->style |= EUI_STYLE_DIRTY;

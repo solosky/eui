@@ -8,7 +8,7 @@ typedef void (*eui_list_callback_t)(uint8_t index, void *ctx);
 #define EUI_LIST_MAX_ITEMS 32
 
 typedef struct {
-    const char         *text;
+    char                text[32];       /* null-terminated, owned by list */
     const eui_bitmap_t *icon;
 } eui_list_item_t;
 
