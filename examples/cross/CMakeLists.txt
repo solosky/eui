@@ -1,14 +1,44 @@
 # examples/cross/CMakeLists.txt
-# Cross-platform examples — linked against BOOTSTRAP_LIB based on EUI_TARGET_PORT
-add_subdirectory(basic_label)
-add_subdirectory(button_test)
-add_subdirectory(list_nav)
-add_subdirectory(menu_system)
-add_subdirectory(dialog_overlay)
-add_subdirectory(animation_demo)
-add_subdirectory(custom_widget)
-add_subdirectory(page_buffer)
-add_subdirectory(benchmark)
-add_subdirectory(scene_view_demo)
-add_subdirectory(color_demo)
-add_subdirectory(amiibo_demo)
+# Cross-platform examples — constraint-checked against active config profile
+
+function(add_cross_example name)
+    set(example_dir "${CMAKE_CURRENT_SOURCE_DIR}/${name}")
+
+    # Skip if requirements not met
+    if(EXISTS "${example_dir}/requirements.cmake")
+        include("${example_dir}/requirements.cmake")
+
+        if(DEFINED EXAMPLE_REQUIRES_COLOR_DEPTH_MIN AND EUI_COLOR_DEPTH LESS EXAMPLE_REQUIRES_COLOR_DEPTH_MIN)
+            message(WARNING "Skipping ${name}: requires color_depth >= ${EXAMPLE_REQUIRES_COLOR_DEPTH_MIN} (got ${EUI_COLOR_DEPTH})")
+            return()
+        endif()
+        if(DEFINED EXAMPLE_REQUIRES_WIDTH_MIN AND EUI_DISPLAY_WIDTH LESS EXAMPLE_REQUIRES_WIDTH_MIN)
+            message(WARNING "Skipping ${name}: requires width >= ${EXAMPLE_REQUIRES_WIDTH_MIN} (got ${EUI_DISPLAY_WIDTH})")
+            return()
+        endif()
+        if(DEFINED EXAMPLE_REQUIRES_HEIGHT_MIN AND EUI_DISPLAY_HEIGHT LESS EXAMPLE_REQUIRES_HEIGHT_MIN)
+            message(WARNING "Skipping ${name}: requires height >= ${EXAMPLE_REQUIRES_HEIGHT_MIN} (got ${EUI_DISPLAY_HEIGHT})")
+            return()
+        endif()
+    endif()
+
+    add_subdirectory(${name})
+
+    # Ensure profile config header is generated before building any cross example
+    if(TARGET gen_profile_config)
+        add_dependencies(${name} gen_profile_config)
+    endif()
+endfunction()
+
+add_cross_example(basic_label)
+add_cross_example(button_test)
+add_cross_example(list_nav)
+add_cross_example(menu_system)
+add_cross_example(dialog_overlay)
+add_cross_example(animation_demo)
+add_cross_example(custom_widget)
+add_cross_example(page_buffer)
+add_cross_example(benchmark)
+add_cross_example(scene_view_demo)
+add_cross_example(color_demo)
+add_cross_example(amiibo_demo)
