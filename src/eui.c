@@ -70,6 +70,10 @@ eui_view_dispatcher_t* eui_get_view_dispatcher(void) {
     return &g_eui.vd;
 }
 
+eui_display_drv_t* eui_get_display(void) {
+    return g_eui.config.display;
+}
+
 void eui_set_fps(uint16_t fps) { g_eui.config.fps_target = fps; }
 
 uint16_t eui_get_fps(void) { return g_eui.config.fps_target; }

@@ -134,6 +134,13 @@ uint32_t eui_get_tick_ms(void);
  */
 eui_view_dispatcher_t* eui_get_view_dispatcher(void);
 
+/**
+ * @brief Get the display driver instance passed to eui_init().
+ *
+ * @return Pointer to the display driver, or NULL if eui_init() has not been called.
+ */
+eui_display_drv_t* eui_get_display(void);
+
 #ifdef __cplusplus
 }
 #endif
