@@ -339,9 +339,51 @@ void eui_example_setup(const eui_example_config_t *cfg) {
 - 引导程序支持 `configs/` 树之外的用户自定义配置描述文件
 - CI 矩阵生成脚本（使用简单的 shell 循环即可）
 
+## CI 适配
+
+### 测试矩阵（保持不变）
+
+测试不依赖配置描述文件，直接使用 `EUI_COLOR_DEPTH` 矩阵覆盖三种色深：
+
+```yaml
+test:
+  strategy:
+    matrix:
+      color_depth: [1, 8, 16]
+```
+
+### 示例构建（新增）
+
+新增 `examples` job，矩阵覆盖两种色深，在 raylib 桌面环境下编译验证所有 cross 示例：
+
+```yaml
+examples:
+  strategy:
+    matrix:
+      color_depth: [1, 16]
+  steps:
+    - name: Configure
+      run: cmake -B build -DEUI_BUILD_CROSS_EXAMPLES=ON -DEUI_TARGET_PORT=raylib -DEUI_COLOR_DEPTH=${{ matrix.color_depth }}
+```
+
+### 过渡计划
+
+当前 CI 使用 `EUI_TARGET_PORT` + `EUI_COLOR_DEPTH` 直接构建。配置描述文件系统实现后（第一阶段），CI 示例矩阵切换为：
+
+```yaml
+examples:
+  strategy:
+    matrix:
+      profile: [raylib_128x64_1bpp, raylib_240x240_16bpp]
+  steps:
+    - name: Configure
+      run: cmake -B build -DEUI_CONFIG_PROFILE=configs/pc/${{ matrix.profile }}.cmake
+```
+
 ## 参考
 
 - 跨平台引导设计：[2026-05-23-cross-platform-examples-design.md](2026-05-23-cross-platform-examples-design.md)
 - HAL 驱动头文件：`include/eui/driver/eui_drv_ssd1306.h`、`eui_drv_st7735.h` 等
 - 框架配置：`include/eui/eui_config.h.in`
 - 根构建文件：`CMakeLists.txt`（EUI_TARGET_PORT、EUI_BUILD_CROSS_EXAMPLES）
+- CI 工作流：`.github/workflows/build.yml`

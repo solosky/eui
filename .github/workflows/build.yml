@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 jobs:
   test:
-    name: Test (color=${{ matrix.color_depth }})
+    name: Test (bpp=${{ matrix.color_depth }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -16,13 +16,50 @@ jobs:
           submodules: recursive
 
       - name: Configure
-        run: cmake -B build -DEUI_BUILD_TESTS=ON -DEUI_BUILD_EXAMPLES=OFF -DEUI_BUILD_CROSS_EXAMPLES=OFF -DEUI_COLOR_DEPTH=${{ matrix.color_depth }} -DEUI_FONT_ENABLE_U8G2=ON -DEUI_FONT_ENABLE_KERNING=ON -DEUI_FONT_ENABLE_MULTILINE=ON
+        run: |
+          cmake -B build \
+            -DEUI_BUILD_TESTS=ON \
+            -DEUI_BUILD_EXAMPLES=OFF \
+            -DEUI_BUILD_CROSS_EXAMPLES=OFF \
+            -DEUI_COLOR_DEPTH=${{ matrix.color_depth }} \
+            -DEUI_FONT_ENABLE_U8G2=ON \
+            -DEUI_FONT_ENABLE_KERNING=ON \
+            -DEUI_FONT_ENABLE_MULTILINE=ON
 
       - name: Build
         run: cmake --build build -j
 
       - name: Run tests
         run: cd build && ctest --output-on-failure
+
+  examples:
+    name: Examples (bpp=${{ matrix.color_depth }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        color_depth: [1, 16]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install raylib system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DEUI_BUILD_TESTS=OFF \
+            -DEUI_BUILD_EXAMPLES=OFF \
+            -DEUI_BUILD_CROSS_EXAMPLES=ON \
+            -DEUI_TARGET_PORT=raylib \
+            -DEUI_COLOR_DEPTH=${{ matrix.color_depth }}
+
+      - name: Build
+        run: cmake --build build -j
 
   coverage:
     name: Coverage
