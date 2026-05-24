@@ -1,21 +1,19 @@
 #include <stdint.h>
 
-#include "test_u8g2_profont10_data.h"
-#include "test_u8g2_wqy12_ch1_data.h"
+#include "data/test_u8g2_profont10_data.h"
+#include "data/test_u8g2_wqy12_ch1_data.h"
 
 #include "eui/eui_canvas.h"
 #include "eui/eui_font.h"
 #include "eui/eui_allocator.h"
+#include "common/eui_test.h"
 #include "eui/eui_config.h"
 #include "eui/eui_types.h"
-#include "../src/eui_font_u8g2_internal.h"
-#include "../src/eui_font_internal.h"
+#include "eui/eui_font_u8g2_internal.h"
+#include "eui/eui_font_internal.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
-#define POOL_SIZE 65536
-static uint8_t mem_pool[POOL_SIZE];
 
 static const eui_font_t profont10_font = {
     .format = EUI_FONT_FORMAT_U8G2,
@@ -223,7 +221,7 @@ static int discover_unicode_glyphs(const eui_font_t *font, uint16_t *codes, int 
 
 int main(void)
 {
-    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
+    eui_test_init();
     printf("=== Real U8G2 Font Render Test ===\n");
 
     memset(img_buf, 0, sizeof(img_buf));

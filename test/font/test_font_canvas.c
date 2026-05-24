@@ -3,21 +3,14 @@
 #include "eui/eui_font_builtin.h"
 #include "eui/eui_types.h"
 #include "eui/eui_allocator.h"
+#include "common/eui_test.h"
 #include "eui/eui_config.h"
 #include <stdio.h>
 #include <string.h>
 
 #if EUI_FONT_ENABLE_U8G2
-#include "test_u8g2_font.h"
+#include "data/test_u8g2_font.h"
 #endif
-
-#define POOL_SIZE 32768
-static uint8_t mem_pool[POOL_SIZE];
-
-static int tests_run = 0, tests_passed = 0;
-#define TEST(n) do { printf("  %s... ", n); tests_run++; } while(0)
-#define PASS() do { printf("PASS\n"); tests_passed++; } while(0)
-#define FAIL(m) do { printf("FAIL: %s\n", m); return; } while(0)
 
 #define MOCK_W 128
 #define MOCK_H 64
@@ -409,7 +402,7 @@ static void test_str_aligned_v_center(void)
 
 int main(void)
 {
-    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
+    eui_test_init();
     printf("=== Canvas Font Tests ===\n");
     test_set_font();
     test_draw_str_renders();
@@ -423,6 +416,5 @@ int main(void)
     test_clipped_no_draw_outside();
     test_ellipsis_no_truncation();
     test_str_aligned_v_center();
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return eui_test_summary();
 }

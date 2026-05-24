@@ -6,26 +6,16 @@
 #include "eui/eui_canvas.h"
 #include "eui/eui_font.h"
 #include "eui/eui_allocator.h"
+#include "common/eui_test.h"
 #include "eui/eui_config.h"
 #include "eui/eui_types.h"
 #include "eui/eui_font_wqy13.h"
-#include "../src/eui_font_u8g2_internal.h"
+#include "eui/eui_font_u8g2_internal.h"
 
-#include "test_u8g2_profont10_data.h"
-#include "test_u8g2_wqy12_ch1_data.h"
+#include "data/test_u8g2_profont10_data.h"
+#include "data/test_u8g2_wqy12_ch1_data.h"
 
 #include "u8g2.h"
-
-/* extern: lookup_glyph from eui internal */
-extern int32_t eui_font_u8g2_lookup_glyph(const eui_font_t *font, uint16_t encoding, uint16_t prev);
-
-#define POOL_SIZE 131072
-static uint8_t mem_pool[POOL_SIZE];
-
-static int tests_run = 0, tests_passed = 0;
-#define TEST(n)  do { printf("  %-45s ... ", n); tests_run++; } while(0)
-#define PASS()   do { printf("PASS\n"); tests_passed++; } while(0)
-#define FAIL(m)  do { printf("FAIL: %s\n", m); } while(0)
 
 /* ---- Shared font definitions ---- */
 static const eui_font_t eui_profont10 = {
@@ -272,7 +262,7 @@ static int test_canvas_compare(const scenario_t *sc)
 static int test_glyph_compare(const scenario_t *sc) { (void)sc; return 0; }
 
 int main(void) {
-    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
+    eui_test_init();
     printf("=== Font vs u8g2 Canvas Comparison Test ===\n");
     printf("Scenarios: %zu\n\n", SCENARIO_COUNT);
 

@@ -1,14 +1,8 @@
 #include "eui/eui.h"
 #include "eui/eui_font_wqy13.h"
+#include "common/eui_test.h"
 #include <string.h>
 #include <stdio.h>
-
-#define POOL_SIZE (65536)
-static uint8_t mem_pool[POOL_SIZE];
-static int tests_run = 0, tests_passed = 0;
-#define TEST(n)   do { printf("  %s... ", n); tests_run++; } while(0)
-#define PASS()    do { printf("PASS\n"); tests_passed++; } while(0)
-#define FAIL(m)   do { printf("FAIL: %s\n", m); return; } while(0)
 
 #define MOCK_W 128
 #define MOCK_H 64
@@ -106,11 +100,10 @@ static void test_wqy13_font_metadata(void)
 
 int main(void)
 {
-    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
+    eui_test_init();
     printf("=== wqy13 Font Render Test ===\n");
     test_wqy13_font_metadata();
     test_wqy13_str_width();
     test_wqy13_renders_chinese();
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return eui_test_summary();
 }
