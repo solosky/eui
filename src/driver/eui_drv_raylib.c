@@ -70,6 +70,19 @@ static void disp_write_buffer(const uint8_t *buffer, const eui_rect_t *rect, voi
                 }
             }
         }
+    } else if (d->color_depth == 2) {
+        int bytes_per_row = (int)d->width / 4;
+        for (int y = 0; y < (int)d->height; y++) {
+            int flipped_y = (int)d->height - 1 - y;
+            for (int x = 0; x < (int)d->width; x++) {
+                int byte_idx = y * bytes_per_row + (x / 4);
+                int shift = 6 - 2 * (x % 4);
+                uint8_t pixel = (buffer[byte_idx] >> shift) & 3;
+                uint8_t *dst = d->rgba_buffer + (size_t)(flipped_y * d->width + x) * 4;
+                uint8_t v = (uint8_t)(pixel * 85);
+                dst[0] = v; dst[1] = v; dst[2] = v; dst[3] = 255;
+            }
+        }
     } else if (d->color_depth == 16) {
         const uint16_t *src16 = (const uint16_t*)buffer;
         for (int y = 0; y < (int)d->height; y++) {
