@@ -19,7 +19,6 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 option(EUI_BUILD_TESTS "Build unit tests" ON)
-option(EUI_BUILD_EXAMPLES "Build raylib examples" ON)
 option(EUI_BUILD_CROSS_EXAMPLES "Build cross-platform examples" OFF)
 
 # Compile-time config
@@ -43,8 +42,7 @@ configure_file(
 # - raylib/desktop examples
 # - cross-platform raylib port
 # - unit tests (e.g. test_view_transition_render)
-if(EUI_BUILD_EXAMPLES OR
-   (EUI_BUILD_CROSS_EXAMPLES AND (NOT DEFINED EUI_TARGET_PORT OR EUI_TARGET_PORT STREQUAL "raylib")) OR
+if((EUI_BUILD_CROSS_EXAMPLES AND (NOT DEFINED EUI_TARGET_PORT OR EUI_TARGET_PORT STREQUAL "raylib")) OR
    EUI_BUILD_TESTS)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(USE_EXTERNAL_GLFW OFF CACHE BOOL "" FORCE)
@@ -61,11 +59,6 @@ add_subdirectory(src)
 if(EUI_BUILD_TESTS)
     enable_testing()
     add_subdirectory(test)
-endif()
-
-# Build raylib for legacy examples
-if(EUI_BUILD_EXAMPLES)
-    add_subdirectory(examples)
 endif()
 
 # Cross-platform examples
