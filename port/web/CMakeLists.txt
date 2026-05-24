@@ -13,11 +13,11 @@ endif()
 
 # Emscripten flags injected into every executable that links this lib
 target_link_options(eui_port_web INTERFACE
-    -sWASM=1
-    -sEXPORTED_FUNCTIONS='["_main","_eui_web_push_key_event","_malloc","_free"]'
-    -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap"]'
-    -sEXIT_RUNTIME=0
-    -sINITIAL_MEMORY=16MB
+    "SHELL:-s WASM=1"
+    "SHELL:-s EXPORTED_FUNCTIONS=[_main,_eui_web_push_key_event,_malloc,_free]"
+    "SHELL:-s EXPORTED_RUNTIME_METHODS=ccall,cwrap"
+    "SHELL:-s EXIT_RUNTIME=0"
+    "SHELL:-s INITIAL_MEMORY=16MB"
 )
 
 # ── Per-example HTML generation ────────────────────────────────────
