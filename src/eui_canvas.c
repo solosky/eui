@@ -216,8 +216,12 @@ void eui_canvas_clear(eui_canvas_t *canvas)
     size_t size = canvas_buf_size(canvas);
 #if EUI_COLOR_DEPTH == 1
     memset(canvas->buffer, canvas->bg_color ? 0xFF : 0x00, size);
+#elif EUI_COLOR_DEPTH == 2
+    uint8_t fill = (uint8_t)(canvas->bg_color & 3u);
+    fill = (uint8_t)(fill | (fill << 2) | (fill << 4) | (fill << 6));
+    memset(canvas->buffer, fill, size);
 #else
-    /* For 8bpp/16bpp, fill with bg_color */
+    /* For 4bpp/8bpp/16bpp, fill with bg_color */
     if (canvas->bg_color == 0) {
         memset(canvas->buffer, 0, size);
 #if EUI_COLOR_DEPTH == 16
@@ -229,7 +233,6 @@ void eui_canvas_clear(eui_canvas_t *canvas)
         }
 #else
     } else {
-        /* Fill with bg_color byte by byte for simplicity */
         for (size_t i = 0; i < size; i++) {
             canvas->buffer[i] = (uint8_t)canvas->bg_color;
         }
@@ -817,6 +820,10 @@ bool eui_canvas_begin_page(eui_canvas_t *canvas)
     if (canvas->buffer) {
 #if EUI_COLOR_DEPTH == 1
         memset(canvas->buffer, canvas->bg_color ? 0xFF : 0x00, canvas_buf_size(canvas));
+#elif EUI_COLOR_DEPTH == 2
+        uint8_t fill = (uint8_t)(canvas->bg_color & 3u);
+        fill = (uint8_t)(fill | (fill << 2) | (fill << 4) | (fill << 6));
+        memset(canvas->buffer, fill, canvas_buf_size(canvas));
 #elif EUI_COLOR_DEPTH == 16
         uint16_t *buf16 = (uint16_t *)canvas->buffer;
         size_t pixels = (size_t)canvas->buf_width * canvas->buf_height;
@@ -853,6 +860,10 @@ bool eui_canvas_next_page(eui_canvas_t *canvas)
     if (canvas->buffer) {
 #if EUI_COLOR_DEPTH == 1
         memset(canvas->buffer, canvas->bg_color ? 0xFF : 0x00, canvas_buf_size(canvas));
+#elif EUI_COLOR_DEPTH == 2
+        uint8_t fill = (uint8_t)(canvas->bg_color & 3u);
+        fill = (uint8_t)(fill | (fill << 2) | (fill << 4) | (fill << 6));
+        memset(canvas->buffer, fill, canvas_buf_size(canvas));
 #elif EUI_COLOR_DEPTH == 16
         uint16_t *buf16 = (uint16_t *)canvas->buffer;
         size_t pixels = (size_t)canvas->buf_width * canvas->buf_height;
