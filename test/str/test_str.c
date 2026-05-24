@@ -3,16 +3,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
-
-#define POOL_SIZE 65536
-static uint8_t mem_pool[POOL_SIZE];
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { tests_run++; printf("  %s... ", name); } while(0)
-#define PASS() do { tests_passed++; printf("PASS\n"); return; } while(0)
-#define FAIL(msg) do { printf("FAIL: %s\n", msg); return; } while(0)
+#include "common/eui_test.h"
 
 /* --------- empty string --------- */
 
@@ -493,13 +484,11 @@ static int all_tests(void) {
     test_create_destroy();
     test_empty_check();
     test_many_appends();
-    return (tests_passed == tests_run) ? 0 : 1;
+    return eui_test_summary();
 }
 
 int main(void) {
-    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
+    eui_test_init();
     printf("=== eui_str Tests ===\n");
-    int result = all_tests();
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return result;
+    return all_tests();
 }

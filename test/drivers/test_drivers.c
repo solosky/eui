@@ -12,12 +12,7 @@
 #include "eui/driver/eui_drv_xpt2046.h"
 #include <stdio.h>
 #include <string.h>
-
-static int tests_run = 0;
-static int tests_passed = 0;
-#define TEST(n) do { printf("  %s... ", n); tests_run++; } while(0)
-#define PASS() do { printf("PASS\n"); tests_passed++; } while(0)
-#define FAIL(m) do { printf("FAIL: %s\n", m); return; } while(0)
+#include "common/eui_test.h"
 
 static int test_ssd1306_write_cmd_count;
 static int test_ssd1306_write_data_count;
@@ -348,7 +343,6 @@ int main(void) {
     printf("--- XPT2046 ---\n");
     test_xpt2046_touch_down_up();
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
     eui_deinit();
-    return tests_passed == tests_run ? 0 : 1;
+    return eui_test_summary();
 }

@@ -1,12 +1,7 @@
 #include "eui/eui_input.h"
 #include <stdio.h>
 #include <string.h>
-
-static int tests_run = 0;
-static int tests_passed = 0;
-#define TEST(n) do { printf("  %s... ", n); tests_run++; } while(0)
-#define PASS() do { printf("PASS\n"); tests_passed++; } while(0)
-#define FAIL(m) do { printf("FAIL: %s\n", m); return; } while(0)
+#include "common/eui_test.h"
 
 /* Mock HAL: returns pre-loaded events one at a time */
 static eui_event_t mock_events[10];
@@ -112,6 +107,5 @@ int main(void) {
     test_long_press();
     test_key_release();
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return eui_test_summary();
 }

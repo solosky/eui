@@ -2,16 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
-
-#define POOL_SIZE 32768
-static uint8_t mem_pool[POOL_SIZE];
-
-static int tests_run = 0;
-static int tests_passed = 0;
-
-#define TEST(name) do { tests_run++; printf("  %s... ", name); } while(0)
-#define PASS() do { tests_passed++; printf("PASS\n"); return; } while(0)
-#define FAIL(msg) do { printf("FAIL: %s\n", msg); return; } while(0)
+#include "common/eui_test.h"
 
 static void test_alloc_basic(void) {
     TEST("basic alloc/free");
@@ -95,14 +86,10 @@ static void test_custom_allocator(void) {
 }
 
 int main(void) {
+    eui_test_init();
     printf("=== Allocator Tests ===\n");
-
-    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
-
     test_alloc_basic();
     test_alloc_stats();
     test_custom_allocator();
-
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return eui_test_summary();
 }

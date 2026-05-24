@@ -1,13 +1,7 @@
 #include "eui/eui_event.h"
 #include <stdio.h>
 #include <string.h>
-
-#define TEST(name) do { printf("  %s... ", name); } while(0)
-#define PASS() do { printf("PASS\n"); tests_passed++; tests_run++; } while(0)
-#define FAIL(msg) do { printf("FAIL: %s\n", msg); tests_run++; return; } while(0)
-
-static int tests_run = 0;
-static int tests_passed = 0;
+#include "common/eui_test.h"
 
 static void test_push_pop(void) {
     TEST("push and pop single event");
@@ -101,6 +95,5 @@ int main(void) {
     test_overwrite_mode();
     test_empty_queue();
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return eui_test_summary();
 }
