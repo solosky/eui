@@ -1,5 +1,5 @@
 #include "eui/eui_font.h"
-#include "eui_font_internal.h"
+#include "eui/eui_font_internal.h"
 
 #define VLW_HEADER_SIZE 24
 #define VLW_GLYPH_HEADER_SIZE 28

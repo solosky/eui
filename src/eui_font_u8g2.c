@@ -1,5 +1,5 @@
 #include "eui/eui_font.h"
-#include "eui_font_u8g2_internal.h"
+#include "eui/eui_font_u8g2_internal.h"
 #include <stddef.h>
 
 #define HDR_GLYPH_CNT       0
@@ -83,8 +83,6 @@ static const uint8_t* find_glyph_data_unicode(const eui_font_t *font, uint16_t e
         glyph_ptr += block_off;
         lt += 4;
 
-        if (last_unicode == 0xFFFF) return NULL;
-
         if (last_unicode >= encoding) {
             const uint8_t *entry = glyph_ptr;
             for (;;) {
@@ -94,6 +92,7 @@ static const uint8_t* find_glyph_data_unicode(const eui_font_t *font, uint16_t e
                 entry += entry[2];
             }
         }
+        if (last_unicode == 0xFFFF) return NULL;
     }
 }
 
@@ -133,7 +132,15 @@ static const uint8_t* find_glyph_data(const eui_font_t *font, uint16_t encoding)
 int32_t eui_font_u8g2_lookup_glyph(const eui_font_t *font, uint16_t encoding, uint16_t prev)
 {
     if (!font || !font->data) return -1;
-    (void)prev;
+
+#if EUI_FONT_ENABLE_KERNING
+    if (prev != 0 && (font->flags & EUI_FONT_HAS_KERNING)) {
+        uint16_t kerning_code = (prev << 8) | encoding;
+        const uint8_t *gd = find_glyph_data_unicode(font, kerning_code);
+        if (gd) return (int32_t)(gd - font->data);
+    }
+#endif
+
     const uint8_t *gd = find_glyph_data(font, encoding);
     if (!gd) return -1;
     return (int32_t)(gd - font->data);

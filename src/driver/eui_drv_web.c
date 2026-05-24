@@ -49,7 +49,7 @@ static void js_render_1bpp(const uint8_t *buf, int w, int h) {
             for (var x = 0; x < sw; x++) {
                 var bit = (HEAPU8[src + y * rb + (x >> 3)] >> (x & 7)) & 1;
                 var i = (y * sw + x) * 4;
-                d[i] = d[i+1] = d[i+2] = bit ? 0 : 255;
+                d[i] = d[i+1] = d[i+2] = bit ? 255 : 0;
                 d[i+3] = 255;
             }
         }

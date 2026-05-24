@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 #if EUI_FONT_ENABLE_U8G2
-#include "eui_font_u8g2_internal.h"
+#include "eui/eui_font_u8g2_internal.h"
 /* Needed by draw_u8g2_glyph */
 int32_t eui_font_u8g2_lookup_glyph(const eui_font_t *font, uint16_t encoding, uint16_t prev);
 #endif
@@ -214,11 +214,20 @@ void eui_canvas_clear(eui_canvas_t *canvas)
     /* For 8bpp/16bpp, fill with bg_color */
     if (canvas->bg_color == 0) {
         memset(canvas->buffer, 0, size);
+#if EUI_COLOR_DEPTH == 16
+    } else {
+        uint16_t *buf16 = (uint16_t *)canvas->buffer;
+        size_t pixels = (size_t)canvas->buf_width * canvas->buf_height;
+        for (size_t i = 0; i < pixels; i++) {
+            buf16[i] = canvas->bg_color;
+        }
+#else
     } else {
         /* Fill with bg_color byte by byte for simplicity */
         for (size_t i = 0; i < size; i++) {
             canvas->buffer[i] = (uint8_t)canvas->bg_color;
         }
+#endif
     }
 #endif
 }
@@ -478,10 +487,11 @@ void eui_canvas_set_font(eui_canvas_t *canvas, const eui_font_t *font)
 
 #if EUI_FONT_ENABLE_U8G2
 static void draw_u8g2_glyph(eui_canvas_t *canvas, const eui_font_t *font,
-                            uint16_t encoding, int16_t x, int16_t y, uint8_t *adv_out)
+                            uint16_t encoding, uint16_t prev,
+                            int16_t x, int16_t y, uint8_t *adv_out)
 {
     u8g2_glyph_t g;
-    int32_t idx = eui_font_u8g2_lookup_glyph(font, encoding, 0);
+    int32_t idx = eui_font_u8g2_lookup_glyph(font, encoding, prev);
     if (idx < 0 || !decode_glyph_at(font, (uint32_t)idx, &g)) {
         if (adv_out) *adv_out = 0;
         return;
@@ -569,14 +579,14 @@ static void draw_bdf_glyph(eui_canvas_t *canvas, const eui_font_t *font,
 }
 
 static void draw_glyph(eui_canvas_t *canvas, const eui_font_t *font,
-                       char c, int16_t x, int16_t y, uint8_t *adv_out)
+                       char c, uint16_t prev, int16_t x, int16_t y, uint8_t *adv_out)
 {
     if (!font || !font->data) { if (adv_out) *adv_out = 0; return; }
     if (font->format == EUI_FONT_FORMAT_BDF) {
         draw_bdf_glyph(canvas, font, c, x, y, adv_out);
 #if EUI_FONT_ENABLE_U8G2
     } else if (font->format == EUI_FONT_FORMAT_U8G2) {
-        draw_u8g2_glyph(canvas, font, (uint16_t)(uint8_t)c, x, y, adv_out);
+        draw_u8g2_glyph(canvas, font, (uint16_t)(uint8_t)c, (uint16_t)(uint8_t)prev, x, y, adv_out);
 #endif
     } else {
         if (adv_out) *adv_out = 0;
@@ -589,19 +599,22 @@ uint16_t eui_canvas_draw_str(eui_canvas_t *canvas, int16_t x, int16_t y, const c
 
     int16_t cur_x = x;
     const char *s = str;
+    uint16_t prev = 0;
     while (*s) {
         uint32_t cp = utf8_decode_next(&s);
         uint8_t adv = 0;
+        uint16_t encoding = (uint16_t)(cp > 0xFF ? cp : (cp & 0xFF));
 #if EUI_FONT_ENABLE_U8G2
         if (canvas->font->format == EUI_FONT_FORMAT_U8G2 && canvas->font->lookup_glyph && cp > 0xFF) {
-            draw_u8g2_glyph(canvas, canvas->font, (uint16_t)cp, cur_x, y, &adv);
+            draw_u8g2_glyph(canvas, canvas->font, (uint16_t)cp, 0, cur_x, y, &adv);
         } else {
-            draw_glyph(canvas, canvas->font, (char)(cp & 0xFF), cur_x, y, &adv);
+            draw_glyph(canvas, canvas->font, (char)(encoding & 0xFF), prev, cur_x, y, &adv);
         }
 #else
-        draw_glyph(canvas, canvas->font, (char)(cp & 0xFF), cur_x, y, &adv);
+        draw_glyph(canvas, canvas->font, (char)(encoding & 0xFF), prev, cur_x, y, &adv);
 #endif
         cur_x += adv;
+        prev = encoding;
     }
     return (uint16_t)(cur_x - x);
 }
@@ -632,15 +645,18 @@ uint16_t eui_canvas_str_width(const eui_canvas_t *canvas, const char *str)
     if (canvas->font->format == EUI_FONT_FORMAT_U8G2 && canvas->font->lookup_glyph) {
         uint16_t w = 0;
         const char *s = str;
+        uint16_t prev = 0;
         while (*s) {
             uint32_t cp = utf8_decode_next(&s);
-            int32_t idx = canvas->font->lookup_glyph(canvas->font, (uint16_t)cp, 0);
+            uint16_t encoding = (uint16_t)(cp > 0xFF ? cp : (cp & 0xFF));
+            int32_t idx = canvas->font->lookup_glyph(canvas->font, encoding, prev);
             if (idx >= 0) {
                 u8g2_glyph_t g;
                 if (decode_glyph_at(canvas->font, (uint32_t)idx, &g)) {
                     w += g.x_advance;
                 }
             }
+            prev = encoding;
         }
         return w;
     }
@@ -793,7 +809,15 @@ bool eui_canvas_begin_page(eui_canvas_t *canvas)
     canvas->page_total = (canvas->display->caps.height + CANVAS_PAGE_BAND_HEIGHT - 1) / CANVAS_PAGE_BAND_HEIGHT;
     canvas->page_y_offset = 0;
     if (canvas->buffer) {
+#if EUI_COLOR_DEPTH == 1
         memset(canvas->buffer, canvas->bg_color ? 0xFF : 0x00, canvas_buf_size(canvas));
+#elif EUI_COLOR_DEPTH == 16
+        uint16_t *buf16 = (uint16_t *)canvas->buffer;
+        size_t pixels = (size_t)canvas->buf_width * canvas->buf_height;
+        for (size_t i = 0; i < pixels; i++) buf16[i] = canvas->bg_color;
+#else
+        memset(canvas->buffer, (uint8_t)canvas->bg_color, canvas_buf_size(canvas));
+#endif
     }
     return canvas->page_total > 0;
 }
@@ -821,7 +845,15 @@ bool eui_canvas_next_page(eui_canvas_t *canvas)
 
     canvas->page_y_offset = (uint16_t)canvas->page_current * CANVAS_PAGE_BAND_HEIGHT;
     if (canvas->buffer) {
+#if EUI_COLOR_DEPTH == 1
         memset(canvas->buffer, canvas->bg_color ? 0xFF : 0x00, canvas_buf_size(canvas));
+#elif EUI_COLOR_DEPTH == 16
+        uint16_t *buf16 = (uint16_t *)canvas->buffer;
+        size_t pixels = (size_t)canvas->buf_width * canvas->buf_height;
+        for (size_t i = 0; i < pixels; i++) buf16[i] = canvas->bg_color;
+#else
+        memset(canvas->buffer, (uint8_t)canvas->bg_color, canvas_buf_size(canvas));
+#endif
     }
     return true;
 }
@@ -865,14 +897,16 @@ uint16_t eui_canvas_draw_str_ellipsis(eui_canvas_t *canvas,
     uint16_t avail = max_width - ellipsis_w;
     uint16_t cur_w = 0;
     int16_t cur_x = x;
+    char prev = 0;
     const char *s;
     for (s = str; *s; s++) {
         uint8_t cw = eui_font_get_char_width(font, *s);
         if (cur_w + cw > avail) break;
         uint8_t adv = 0;
-        draw_glyph(canvas, font, *s, cur_x, y, &adv);
+        draw_glyph(canvas, font, *s, (uint16_t)(uint8_t)prev, cur_x, y, &adv);
         cur_x += adv;
         cur_w += cw;
+        prev = *s;
     }
     cur_x += eui_canvas_draw_str(canvas, cur_x, y, "...");
     return (uint16_t)(cur_x - x);
@@ -975,10 +1009,12 @@ uint16_t eui_canvas_draw_str_multiline(eui_canvas_t *canvas,
         if (h_align & EUI_ALIGN_RIGHT)  dx = rect->x + (int16_t)(max_w - line_w);
 
         int16_t cx = dx;
+        char prevc = 0;
         for (uint16_t j = 0; j < lines[i].len; j++) {
             uint8_t adv = 0;
-            draw_glyph(canvas, font, lines[i].start[j], cx, y, &adv);
+            draw_glyph(canvas, font, lines[i].start[j], (uint16_t)(uint8_t)prevc, cx, y, &adv);
             cx += adv;
+            prevc = lines[i].start[j];
         }
 
         y += lh;

@@ -1,5 +1,5 @@
 #include "eui/eui_font.h"
-#include "eui_font_internal.h"
+#include "eui/eui_font_internal.h"
 
 uint8_t eui_font_get_char_width(const eui_font_t *font, char c)
 {

@@ -1,6 +1,6 @@
 #include "eui/eui_font_wqy13.h"
 #include "eui/eui_font.h"
-#include "eui_font_internal.h"
+#include "eui/eui_font_internal.h"
 
 const uint8_t eui_font_wqy13_data[] =
   "s\0\3\2\4\4\5\5\5\15\20\0\375\11\375\12\376\1\206\3\30\5v \5\0\20Z!\10\241\363"
