@@ -156,6 +156,30 @@ static void render_glyph_buf(const uint8_t *glyph_buf, uint8_t buf_stride,
     }
 }
 
+static void render_glyph(int img_x, int img_y, uint16_t encoding, int stride)
+{
+    uint8_t buf[256] = {0};
+    uint8_t adv = eui_font_u8g2_draw_glyph(&wqy12_font, encoding, buf, stride, 1);
+    if (adv == 0) return;
+
+    for (int r = 0; r < wqy12_font.line_height + 4; r++) {
+        for (int b = 0; b < stride; b++) {
+            uint8_t byte = buf[r * stride + b];
+            if (byte == 0) continue;
+            for (int bit = 0; bit < 8; bit++) {
+                if (byte & (1 << (7 - bit))) {
+                    int px = img_y + r;
+                    int py = img_x + b * 8 + bit;
+                    if (px >= 0 && px < IMG_H && py >= 0 && py < IMG_W) {
+                        int idx = px * (IMG_W / 8) + py / 8;
+                        img_buf[idx] |= (1 << (7 - (py % 8)));
+                    }
+                }
+            }
+        }
+    }
+}
+
 static int discover_font_glyphs(const eui_font_t *font, uint8_t *encodings, int max_count)
 {
     const uint8_t *p = font->data;
@@ -217,6 +241,57 @@ static int discover_unicode_glyphs(const eui_font_t *font, uint16_t *codes, int 
         }
     }
     return count;
+}
+
+static void test_wqy12_chinese_grid(void)
+{
+    printf("\n=== Wqy12 Chinese Grid Test ===\n");
+
+    memset(img_buf, 0, sizeof(img_buf));
+
+    int margin_x = 12;
+    int margin_y = 12;
+    int cell_w = 18;
+    int cell_h = 20;
+    int glyph_stride = 2;
+
+    uint8_t encodings[256];
+    int n8 = discover_font_glyphs(&wqy12_font, encodings, 256);
+    printf("  8-bit glyphs: %d\n", n8);
+
+    int chars_per_row = 16;
+    int cur_y = margin_y;
+    int cur_x;
+    int count = 0;
+
+    for (int i = 0; i < n8; i++) {
+        int col = count % chars_per_row;
+        int row = count / chars_per_row;
+        cur_x = margin_x + col * cell_w;
+        cur_y = margin_y + row * cell_h;
+        render_glyph(cur_x, cur_y, encodings[i], glyph_stride);
+        count++;
+    }
+
+    uint16_t codes[256];
+    int nu = discover_unicode_glyphs(&wqy12_font, codes, 256);
+    printf("  Unicode glyphs: %d\n", nu);
+
+    int n8_rows = (n8 + chars_per_row - 1) / chars_per_row;
+    chars_per_row = 10;
+    count = 0;
+
+    for (int i = 0; i < nu; i++) {
+        int col = count % chars_per_row;
+        int row = count / chars_per_row;
+        cur_x = margin_x + col * cell_w;
+        cur_y = margin_y + n8_rows * cell_h + 8 + row * cell_h;
+        render_glyph(cur_x, cur_y, codes[i], glyph_stride);
+        count++;
+    }
+
+    printf("  Total: %d + %d = %d glyphs rendered\n", n8, nu, n8 + nu);
+    write_bmp("font_wqy12_chinese.bmp");
 }
 
 int main(void)
@@ -489,5 +564,8 @@ int main(void)
     }
     printf("PASS: profont10=%d chars + wqy12=%d chars = %d total, all rendered successfully\n",
            profont_count, char_count, profont_count + char_count);
+
+    test_wqy12_chinese_grid();
+
     return 0;
 }
