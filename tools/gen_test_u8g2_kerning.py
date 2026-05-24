@@ -23,31 +23,92 @@ glyphs = [
 ]
 advances = [8, 8, 6, 8]
 
+
+def encode_signed(value, num_bits):
+    """Encode signed value in u8g2 format: decode does v = raw - (1<<(cnt-1))
+    So raw = value + (1 << (num_bits-1))"""
+    center = 1 << (num_bits - 1)
+    return (value + center) & ((1 << num_bits) - 1)
+
+
 class BitWriter:
+    """LSB-first bit writer (matches u8g2 u8g2_font_decode_get_unsigned_bits)"""
+
     def __init__(self):
         self.bytes = bytearray()
         self.current_byte = 0
-        self.bit_pos = 7
+        self.bit_pos = 0
 
     def write_bits(self, value, num_bits):
-        for i in range(num_bits - 1, -1, -1):
-            bit = (value >> i) & 1
-            self.current_byte |= (bit << self.bit_pos)
-            self.bit_pos -= 1
-            if self.bit_pos < 0:
-                self.bytes.append(self.current_byte)
-                self.current_byte = 0
-                self.bit_pos = 7
+        """Write num_bits from value, LSB-first within each byte."""
+        mask = (1 << num_bits) - 1
+        value &= mask
+        self.current_byte |= (value << self.bit_pos)
+        self.bit_pos += num_bits
+        while self.bit_pos >= 8:
+            self.bytes.append(self.current_byte & 0xFF)
+            self.current_byte >>= 8
+            self.bit_pos -= 8
 
     def flush(self):
-        if self.bit_pos < 7:
-            self.bytes.append(self.current_byte)
+        if self.bit_pos > 0:
+            self.bytes.append(self.current_byte & 0xFF)
             self.current_byte = 0
-            self.bit_pos = 7
+            self.bit_pos = 0
 
     def get_data(self):
         self.flush()
         return bytes(self.bytes)
+
+
+def encode_glyph_u8g2(glyph_rows, width, height):
+    """Encode glyph using u8g2 paired-runs-with-continuation format."""
+    bp0 = BITS_PER_0
+    bp1 = BITS_PER_1
+    max_val_0 = (1 << bp0) - 1
+    max_val_1 = (1 << bp1) - 1
+
+    pixels = []
+    for row in glyph_rows:
+        for col in range(width):
+            pixels.append((row >> (7 - col)) & 1)
+
+    runs = []
+    current_color = 0
+    current_len = 0
+    for p in pixels:
+        if p == current_color:
+            current_len += 1
+        else:
+            if current_len > 0:
+                runs.append((current_len, current_color))
+            current_color = p
+            current_len = 1
+    if current_len > 0:
+        runs.append((current_len, current_color))
+
+    bw = BitWriter()
+    pos = 0
+
+    while pos < len(runs):
+        a = 0
+        if pos < len(runs) and runs[pos][1] == 0:
+            a = runs[pos][0]
+            pos += 1
+        a = min(a, max_val_0)
+
+        b = 0
+        if pos < len(runs) and runs[pos][1] == 1:
+            b = runs[pos][0]
+            pos += 1
+        b = min(b, max_val_1)
+
+        bw.write_bits(a, bp0)
+        bw.write_bits(b, bp1)
+        bw.write_bits(0, 1)
+
+    return bw.get_data()
+
 
 data = bytearray()
 
@@ -73,35 +134,27 @@ data += struct.pack('>H', 0)           # 17-18: start_pos_upper_A (BE)
 data += struct.pack('>H', 0)           # 19-20: start_pos_lower_a (BE)
 data += struct.pack('>H', 0)           # 21-22: start_pos_unicode (BE)
 
-MAX_RUN = (1 << BITS_PER_0) - 1
-max_run = MAX_RUN - 1
-
 for i, g in enumerate(glyphs):
     bw = BitWriter()
+
+    # Delta X is a signed value. If 0, mcw is used instead of the delta.
+    # For advance == mcw: encode 0 (use mcw).
+    # For advance != mcw: encode the advance as a signed delta.
+    if advances[i] == MAX_CHAR_W:
+        dx_signed = 0
+    else:
+        dx_signed = advances[i]
+
     bw.write_bits(MAX_CHAR_W, BITS_PER_CHAR_W)
     bw.write_bits(MAX_CHAR_H, BITS_PER_CHAR_H)
-    bw.write_bits(0, BITS_PER_CHAR_X)
-    bw.write_bits(0, BITS_PER_CHAR_Y)
-    bw.write_bits(advances[i], BITS_PER_DELTA_X)
+    bw.write_bits(encode_signed(0, BITS_PER_CHAR_X), BITS_PER_CHAR_X)
+    bw.write_bits(encode_signed(-1, BITS_PER_CHAR_Y), BITS_PER_CHAR_Y)
+    bw.write_bits(encode_signed(dx_signed, BITS_PER_DELTA_X), BITS_PER_DELTA_X)
 
-    run_type = 0
-    run_length = 0
-    for row in g:
-        for col in range(8):
-            bit = (row >> (7 - col)) & 1
-            if bit == run_type:
-                run_length += 1
-            else:
-                while run_length >= max_run:
-                    bw.write_bits(max_run, BITS_PER_0 if run_type == 0 else BITS_PER_1)
-                    run_length -= max_run
-                bw.write_bits(run_length, BITS_PER_0 if run_type == 0 else BITS_PER_1)
-                run_type = bit
-                run_length = 1
-    while run_length >= max_run:
-        bw.write_bits(max_run, BITS_PER_0 if run_type == 0 else BITS_PER_1)
-        run_length -= max_run
-    bw.write_bits(run_length, BITS_PER_0 if run_type == 0 else BITS_PER_1)
+    # Encode glyph pixels
+    pixel_bytes = encode_glyph_u8g2(g, MAX_CHAR_W, MAX_CHAR_H)
+    for b in pixel_bytes:
+        bw.write_bits(b, 8)
 
     packed = bw.get_data()
     total_size = 2 + len(packed)
@@ -118,13 +171,20 @@ for i, g in enumerate(glyphs):
 data.append(0)
 data.append(0)
 
+# Unicode encoding table (big-endian, matching get_be16 in C reader)
+# Format: for each block: 2 bytes block_offset, 2 bytes last_unicode
+# Followed by per-glyph entries: 2 bytes encoding, 1 byte glyph_index
 enc = bytearray()
-enc.append(1)
-enc += struct.pack('<H', 4)
-enc += struct.pack('<H', ord('T')) + bytes([0])
-enc += struct.pack('<H', ord('A')) + bytes([1])
-enc += struct.pack('<H', (ord('T') << 8) | ord('A')) + bytes([2])
-enc += struct.pack('<H', (ord('T') << 8) | ord('A')) + bytes([3])
+# Jump table: sequence of (block_off, last_unicode) pairs, terminated by last_unicode == 0xFFFF
+# block_off is cumulative bytes from jump_table start to the glyph entries for this block
+enc += struct.pack('>H', 8)              # block_offset = 2 blocks × 4 bytes = 8 (past jump table to glyphs)
+enc += struct.pack('>H', 0xFFFF)         # last_unicode for block (covers all, terminates loop)
+
+# Glyph entries in unicode encoding table (encoding, index)
+enc += struct.pack('>H', ord('T')) + bytes([0])
+enc += struct.pack('>H', ord('A')) + bytes([1])
+enc += struct.pack('>H', (ord('T') << 8) | ord('A')) + bytes([2])
+enc += struct.pack('>H', (ord('T') << 8) | ord('A')) + bytes([3])
 data += enc
 
 # Compute section offsets from byte 23

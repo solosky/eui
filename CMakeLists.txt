@@ -1,4 +1,18 @@
 cmake_minimum_required(VERSION 3.22)
+
+if(ESP_PLATFORM)
+    file(GLOB EUI_CORE_SRCS src/*.c)
+    file(GLOB EUI_WIDGET_SRCS src/widget/*.c)
+    file(GLOB EUI_DRIVER_SRCS src/driver/*.c)
+    list(REMOVE_ITEM EUI_DRIVER_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/src/driver/eui_drv_raylib.c")
+    idf_component_register(
+        SRCS ${EUI_CORE_SRCS} ${EUI_WIDGET_SRCS} ${EUI_DRIVER_SRCS}
+        INCLUDE_DIRS include third_party/motionc/include port/esp-idf/include
+        REQUIRES driver freertos tlsf motionc
+    )
+    return()
+endif()
+
 project(eui VERSION 1.1.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 99)
