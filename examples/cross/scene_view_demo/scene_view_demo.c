@@ -154,33 +154,36 @@ void eui_example_setup(const eui_example_config_t *cfg) {
 
     g_vd = eui_get_view_dispatcher();
 
-    eui_view_t main_view, red_view, blue_view, green_view;
+    eui_view_t *main_view = eui_malloc(sizeof(eui_view_t));
+    eui_view_t *red_view  = eui_malloc(sizeof(eui_view_t));
+    eui_view_t *blue_view = eui_malloc(sizeof(eui_view_t));
+    eui_view_t *green_view = eui_malloc(sizeof(eui_view_t));
 
-    eui_view_init(&main_view, main_view_handler, &main_view);
-    main_view.area = (eui_rect_t){ 0, 0, cfg->display_width, cfg->display_height };
+    eui_view_init(main_view, main_view_handler, main_view);
+    main_view->area = (eui_rect_t){ 0, 0, cfg->display_width, cfg->display_height };
 
-    eui_view_init(&red_view, detail_view_handler, &red_view);
-    red_view.area = (eui_rect_t){ 0, 0, cfg->display_width, cfg->display_height };
-    red_view.model = &g_red_data;
+    eui_view_init(red_view, detail_view_handler, red_view);
+    red_view->area = (eui_rect_t){ 0, 0, cfg->display_width, cfg->display_height };
+    red_view->model = &g_red_data;
 
-    eui_view_init(&blue_view, detail_view_handler, &blue_view);
-    blue_view.area = (eui_rect_t){ 0, 0, cfg->display_width, cfg->display_height };
-    blue_view.model = &g_blue_data;
+    eui_view_init(blue_view, detail_view_handler, blue_view);
+    blue_view->area = (eui_rect_t){ 0, 0, cfg->display_width, cfg->display_height };
+    blue_view->model = &g_blue_data;
 
-    eui_view_init(&green_view, detail_view_handler, &green_view);
-    green_view.area = (eui_rect_t){ 0, 0, cfg->display_width, cfg->display_height };
-    green_view.model = &g_green_data;
+    eui_view_init(green_view, detail_view_handler, green_view);
+    green_view->area = (eui_rect_t){ 0, 0, cfg->display_width, cfg->display_height };
+    green_view->model = &g_green_data;
 
-    eui_view_dispatcher_add(g_vd, SCENE_MAIN,  &main_view);
-    eui_view_dispatcher_add(g_vd, SCENE_RED,   &red_view);
-    eui_view_dispatcher_add(g_vd, SCENE_BLUE,  &blue_view);
-    eui_view_dispatcher_add(g_vd, SCENE_GREEN, &green_view);
+    eui_view_dispatcher_add(g_vd, SCENE_MAIN,  main_view);
+    eui_view_dispatcher_add(g_vd, SCENE_RED,   red_view);
+    eui_view_dispatcher_add(g_vd, SCENE_BLUE,  blue_view);
+    eui_view_dispatcher_add(g_vd, SCENE_GREEN, green_view);
 
     eui_scene_t scenes[4] = {
-        { SCENE_MAIN,  &main_view,  on_enter_main,  on_exit_main,  NULL },
-        { SCENE_RED,   &red_view,   on_enter_red,   on_exit_red,   NULL },
-        { SCENE_BLUE,  &blue_view,  on_enter_blue,  on_exit_blue,  NULL },
-        { SCENE_GREEN, &green_view, on_enter_green, on_exit_green, NULL },
+        { SCENE_MAIN,  main_view,  on_enter_main,  on_exit_main,  NULL },
+        { SCENE_RED,   red_view,   on_enter_red,   on_exit_red,   NULL },
+        { SCENE_BLUE,  blue_view,  on_enter_blue,  on_exit_blue,  NULL },
+        { SCENE_GREEN, green_view, on_enter_green, on_exit_green, NULL },
     };
     eui_scene_manager_register(&g_sm, scenes, 4);
 

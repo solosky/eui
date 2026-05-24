@@ -7,7 +7,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#ifdef __has_include
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#define AMIIBO_GET_TICK_MS() ((uint32_t)emscripten_get_now())
+#elif defined(__has_include)
 #if __has_include(<raylib.h>)
 #include <raylib.h>
 #define AMIIBO_GET_TICK_MS() ((uint32_t)(GetTime() * 1000.0))

@@ -33,13 +33,9 @@ set(EUI_FONT_ENABLE_U8G2 ON CACHE BOOL "Enable u8g2 font format support")
 set(EUI_FONT_ENABLE_KERNING ON CACHE BOOL "Enable font kerning support")
 set(EUI_FONT_ENABLE_MULTILINE ON CACHE BOOL "Enable multiline text support")
 
-configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/eui/eui_config.h.in
-    ${CMAKE_CURRENT_BINARY_DIR}/include/eui/eui_config.h
-)
-
-# Load config profile EARLY (before raylib check) so EUI_TARGET_PORT
-# is known when deciding whether to build raylib
+# Load config profile BEFORE configure_file() so that profile values
+# (EUI_COLOR_DEPTH, EUI_MEM_POOL_SIZE, EUI_FONT_ENABLE_*, etc.)
+# override the defaults when generating eui_config.h.
 if(DEFINED EUI_CONFIG_PROFILE)
     if(NOT EXISTS "${CMAKE_SOURCE_DIR}/${EUI_CONFIG_PROFILE}")
         message(FATAL_ERROR "Config profile not found: ${EUI_CONFIG_PROFILE}")
@@ -50,6 +46,11 @@ if(DEFINED EUI_CONFIG_PROFILE)
         set(EUI_TARGET_PORT "${EUI_TARGET_PORT}" CACHE STRING "Target port: raylib, esp-idf, nrf5, web")
     endif()
 endif()
+
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/eui/eui_config.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/include/eui/eui_config.h
+)
 
 # Build raylib when needed (must be before src for eui_drv_raylib)
 # - raylib/desktop examples

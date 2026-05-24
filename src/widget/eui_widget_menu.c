@@ -10,6 +10,8 @@ static void menu_draw(eui_widget_t *self, eui_canvas_t *canvas) {
     eui_menu_t *active = m->active_submenu ? m->active_submenu : m;
     uint8_t visible = self->area.h / ITEM_H;
     if (visible == 0) visible = 1;
+    bool need_scrollbar = (active->item_count > visible);
+    uint16_t highlight_w = need_scrollbar ? self->area.w - 4 : self->area.w;
 
     if (!canvas->font) {
         eui_canvas_set_font(canvas, &eui_font_builtin);
@@ -24,7 +26,7 @@ static void menu_draw(eui_widget_t *self, eui_canvas_t *canvas) {
         eui_menu_item_t *item = &active->items[idx];
 
         if (idx == active->selected_index) {
-            eui_canvas_invert_rect(canvas, self->area.x, y, self->area.w, ITEM_H);
+            eui_canvas_invert_rect(canvas, self->area.x, y, highlight_w, ITEM_H);
         }
         eui_canvas_set_color(canvas, idx == active->selected_index
                              ? EUI_COLOR_BLACK : EUI_COLOR_WHITE);
@@ -32,7 +34,7 @@ static void menu_draw(eui_widget_t *self, eui_canvas_t *canvas) {
 
         /* Draw submenu indicator */
         if (item->submenu) {
-            eui_canvas_draw_str(canvas, self->area.x + self->area.w - 10, y + 2, ">");
+            eui_canvas_draw_str(canvas, self->area.x + highlight_w - 8, y + 2, ">");
         }
     }
 
@@ -43,6 +45,26 @@ static void menu_draw(eui_widget_t *self, eui_canvas_t *canvas) {
     }
 
     eui_canvas_restore(canvas);
+
+    /* Scrollbar */
+    if (need_scrollbar) {
+        int16_t bar_x = self->area.x + self->area.w - 3;
+        int16_t bar_y = self->area.y;
+        int16_t bar_h = self->area.h;
+        int16_t thumb_h = (int16_t)((int32_t)bar_h * visible / active->item_count);
+        if (thumb_h < 3) thumb_h = 3;
+        uint8_t max_scroll = (uint8_t)(active->item_count - visible);
+        int16_t thumb_y = bar_y;
+        if (max_scroll > 0) {
+            thumb_y += (int16_t)((int32_t)(bar_h - thumb_h) * active->scroll_offset / max_scroll);
+            if (thumb_y + thumb_h > bar_y + bar_h)
+                thumb_y = bar_y + bar_h - thumb_h;
+        }
+
+        eui_canvas_set_color(canvas, EUI_COLOR_WHITE);
+        eui_canvas_draw_line(canvas, bar_x, bar_y, bar_x, bar_y + bar_h - 1);
+        eui_canvas_fill_rect(canvas, bar_x - 1, thumb_y, 3, thumb_h);
+    }
 }
 
 static bool menu_input(eui_widget_t *self, const eui_event_t *evt) {

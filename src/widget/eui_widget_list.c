@@ -12,6 +12,8 @@ static void list_draw(eui_widget_t *self, eui_canvas_t *canvas) {
     uint8_t visible = self->area.h / ITEM_H;
     if (visible == 0) visible = 1;
     bool animating = l->anim_rem > 0;
+    bool need_scrollbar = (l->item_count > visible);
+    uint16_t highlight_w = need_scrollbar ? self->area.w - 4 : self->area.w;
 
     if (!canvas->font) {
         eui_canvas_set_font(canvas, &eui_font_builtin);
@@ -34,7 +36,7 @@ static void list_draw(eui_widget_t *self, eui_canvas_t *canvas) {
             float f = MC_REAL_TO_FLOAT(eased);
             int16_t cur_y = old_y + (int16_t)((new_y - old_y) * f);
             eui_canvas_invert_rect(canvas, self->area.x, cur_y,
-                                   self->area.w, l->item_height);
+                                   highlight_w, l->item_height);
         }
     } else {
         /* Static highlight at selected index */
@@ -43,7 +45,7 @@ static void list_draw(eui_widget_t *self, eui_canvas_t *canvas) {
             int16_t y = self->area.y
                 + (l->selected_index - l->scroll_offset) * l->item_height;
             eui_canvas_invert_rect(canvas, self->area.x, y,
-                                   self->area.w, l->item_height);
+                                   highlight_w, l->item_height);
         }
     }
 
@@ -58,6 +60,26 @@ static void list_draw(eui_widget_t *self, eui_canvas_t *canvas) {
         eui_canvas_draw_str(canvas, self->area.x + 2, y + 2, eui_str_cstr(&l->items[idx].text));
     }
     eui_canvas_restore(canvas);
+
+    /* Scrollbar */
+    if (need_scrollbar) {
+        int16_t bar_x = self->area.x + self->area.w - 3;
+        int16_t bar_y = self->area.y;
+        int16_t bar_h = self->area.h;
+        int16_t thumb_h = (int16_t)((int32_t)bar_h * visible / l->item_count);
+        if (thumb_h < 3) thumb_h = 3;
+        uint8_t max_scroll = (uint8_t)(l->item_count - visible);
+        int16_t thumb_y = bar_y;
+        if (max_scroll > 0) {
+            thumb_y += (int16_t)((int32_t)(bar_h - thumb_h) * l->scroll_offset / max_scroll);
+            if (thumb_y + thumb_h > bar_y + bar_h)
+                thumb_y = bar_y + bar_h - thumb_h;
+        }
+
+        eui_canvas_set_color(canvas, EUI_COLOR_WHITE);
+        eui_canvas_draw_line(canvas, bar_x, bar_y, bar_x, bar_y + bar_h - 1);
+        eui_canvas_fill_rect(canvas, bar_x - 1, thumb_y, 3, thumb_h);
+    }
 }
 
 static void list_start_anim(eui_list_t *l, uint8_t old_sel) {
