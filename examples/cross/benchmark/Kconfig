@@ -1,0 +1,36 @@
+# examples/cross/benchmark/Kconfig
+menu "Display Configuration"
+    config EUI_EXAMPLE_DISPLAY_WIDTH
+        int "Display Width"
+        default 128
+
+    config EUI_EXAMPLE_DISPLAY_HEIGHT
+        int "Display Height"
+        default 64
+endmenu
+
+menu "I2C Configuration"
+    config EUI_EXAMPLE_I2C_PORT
+        int "I2C Port Number"
+        default 0
+
+    config EUI_EXAMPLE_I2C_SDA
+        int "SDA Pin"
+        default 21
+
+    config EUI_EXAMPLE_I2C_SCL
+        int "SCL Pin"
+        default 22
+
+    config EUI_EXAMPLE_I2C_FREQ
+        int "I2C Frequency (Hz)"
+        default 400000
+
+    config EUI_EXAMPLE_I2C_ADDR
+        hex "I2C Device Address"
+        default 0x3C
+
+    config EUI_EXAMPLE_I2C_TIMEOUT
+        int "I2C Timeout (ms)"
+        default 100
+endmenu
