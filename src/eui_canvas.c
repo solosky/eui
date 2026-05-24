@@ -749,6 +749,14 @@ void eui_canvas_invert_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t
             canvas->buffer[byte_idx] ^= (1u << bit_pos);
         }
     }
+#elif EUI_COLOR_DEPTH == 2
+    for (int16_t yi = y; yi < ey; yi++) {
+        for (int16_t xi = x; xi < ex; xi++) {
+            uint16_t byte_idx = (uint16_t)(yi * (int16_t)(screen_w / 4u) + (xi / 4u));
+            uint8_t shift = 6u - 2u * (uint8_t)(xi % 4u);
+            canvas->buffer[byte_idx] ^= (3u << shift);
+        }
+    }
 #elif EUI_COLOR_DEPTH == 8
     for (int16_t yi = y; yi < ey; yi++) {
         for (int16_t xi = x; xi < ex; xi++) {
