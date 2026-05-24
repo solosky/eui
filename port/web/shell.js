@@ -15,10 +15,37 @@
 
   document.addEventListener('keydown', function (e) {
     if (e.key in KEY_MAP) { e.preventDefault(); push(EVT_PRESS, KEY_MAP[e.key]); }
+    if (e.key === '=' || e.key === '+') { e.preventDefault(); zoomIn(); }
+    if (e.key === '-') { e.preventDefault(); zoomOut(); }
+    if (e.key === '0') { e.preventDefault(); zoomReset(); }
   });
   document.addEventListener('keyup', function (e) {
     if (e.key in KEY_MAP) { e.preventDefault(); push(EVT_RELEASE, KEY_MAP[e.key]); }
   });
+
+  /* ── Zoom ──────────────────────────────────────────────────────── */
+
+  var zoomLevel = 4;
+  var zoomMin = 1, zoomMax = 16;
+
+  function applyZoom() {
+    var el = document.getElementById('eui-canvas');
+    if (!el) return;
+    el.style.width  = (el.width  * zoomLevel) + 'px';
+    el.style.height = (el.height * zoomLevel) + 'px';
+    var span = document.querySelector('#zoom span');
+    if (span) span.textContent = zoomLevel + 'x';
+  }
+
+  function zoomIn()  { if (zoomLevel < zoomMax) { zoomLevel++; applyZoom(); } }
+  function zoomOut() { if (zoomLevel > zoomMin) { zoomLevel--; applyZoom(); } }
+  function zoomReset(){ zoomLevel = 4; applyZoom(); }
+
+  /* Apply initial zoom once the canvas element is ready */
+  var applyTimer = setInterval(function () {
+    var el = document.getElementById('eui-canvas');
+    if (el && el.width) { clearInterval(applyTimer); applyZoom(); }
+  }, 50);
 
   var DBTN = {
     'btn-up': 0, 'btn-down': 1, 'btn-left': 2,
