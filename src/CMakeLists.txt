@@ -51,3 +51,7 @@ if(UNIX)
     target_link_libraries(eui_drv_raylib PUBLIC m)
 endif()
 endif()
+
+if(EUI_TARGET_PORT STREQUAL "web")
+    target_sources(eui PRIVATE driver/eui_drv_web.c)
+endif()

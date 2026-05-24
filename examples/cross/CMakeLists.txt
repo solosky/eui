@@ -24,6 +24,10 @@ function(add_cross_example name)
 
     add_subdirectory(${name})
 
+    if(EUI_TARGET_PORT STREQUAL "web")
+        eui_web_add_html(${name} "${name}")
+    endif()
+
     # Ensure profile config header is generated before building any cross example
     if(TARGET gen_profile_config)
         add_dependencies(${name} gen_profile_config)

@@ -78,7 +78,7 @@ if(EUI_BUILD_CROSS_EXAMPLES)
         endif()
 
         # Generate eui_profile_config.h from profile variables
-        set(PROFILE_VARS "EUI_DISPLAY_DRIVER;EUI_DISPLAY_WIDTH;EUI_DISPLAY_HEIGHT;EUI_BUFFER_MODE;EUI_PIN_SPI_HOST;EUI_PIN_MOSI;EUI_PIN_SCLK;EUI_PIN_CS;EUI_PIN_DC;EUI_PIN_RST;EUI_PIN_BL;EUI_PIN_I2C_PORT;EUI_PIN_SDA;EUI_PIN_SCL;EUI_PIN_I2C_FREQ;EUI_PIN_I2C_ADDR;EUI_INPUT_DRIVER;EUI_PIN_BTN_UP;EUI_PIN_BTN_DOWN;EUI_PIN_BTN_OK;EUI_PIN_BTN_BACK")
+        set(PROFILE_VARS "EUI_DISPLAY_DRIVER;EUI_DISPLAY_WIDTH;EUI_DISPLAY_HEIGHT;EUI_BUFFER_MODE;EUI_CANVAS_SCALE;EUI_PIN_SPI_HOST;EUI_PIN_MOSI;EUI_PIN_SCLK;EUI_PIN_CS;EUI_PIN_DC;EUI_PIN_RST;EUI_PIN_BL;EUI_PIN_I2C_PORT;EUI_PIN_SDA;EUI_PIN_SCL;EUI_PIN_I2C_FREQ;EUI_PIN_I2C_ADDR;EUI_INPUT_DRIVER;EUI_PIN_BTN_UP;EUI_PIN_BTN_DOWN;EUI_PIN_BTN_OK;EUI_PIN_BTN_BACK")
         set(PROFILE_HEADER "${CMAKE_BINARY_DIR}/include/eui/eui_profile_config.h")
         # Build -DVAR=value args for each defined variable
         set(PROFILE_DEFINES "")
@@ -102,7 +102,7 @@ if(EUI_BUILD_CROSS_EXAMPLES)
     if(NOT DEFINED EUI_TARGET_PORT)
         set(EUI_TARGET_PORT "raylib" CACHE STRING "Target port: raylib, esp-idf, nrf5")
     endif()
-    set_property(CACHE EUI_TARGET_PORT PROPERTY STRINGS "raylib" "esp-idf" "nrf5")
+    set_property(CACHE EUI_TARGET_PORT PROPERTY STRINGS "raylib" "esp-idf" "nrf5" "web")
 
     if(EUI_TARGET_PORT STREQUAL "raylib")
         set(BOOTSTRAP_LIB eui_port_raylib)
@@ -113,9 +113,28 @@ if(EUI_BUILD_CROSS_EXAMPLES)
     elseif(EUI_TARGET_PORT STREQUAL "nrf5")
         set(BOOTSTRAP_LIB eui_port_nrf5)
         add_subdirectory(port/nrf5)
+    elseif(EUI_TARGET_PORT STREQUAL "web")
+        set(BOOTSTRAP_LIB eui_port_web)
+        add_subdirectory(port/web)
     else()
         message(FATAL_ERROR "Unknown EUI_TARGET_PORT: ${EUI_TARGET_PORT}")
     endif()
 
     add_subdirectory(examples/cross)
+
+    # Generate index.html for web port (scans built .html files at build time).
+    if(EUI_TARGET_PORT STREQUAL "web")
+        add_custom_target(web_index ALL
+            COMMAND ${CMAKE_COMMAND}
+                -DBUILD_DIR="${CMAKE_BINARY_DIR}"
+                -DOUTPUT="${CMAKE_BINARY_DIR}/port/web/index.html"
+                -P "${CMAKE_SOURCE_DIR}/port/web/gen_index.cmake"
+            COMMENT "Generating index.html"
+            VERBATIM
+        )
+        get_property(web_targets GLOBAL PROPERTY WEB_EXAMPLE_TARGETS)
+        if(web_targets)
+            add_dependencies(web_index ${web_targets})
+        endif()
+    endif()
 endif()

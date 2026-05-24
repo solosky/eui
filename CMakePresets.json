@@ -31,6 +31,20 @@
                 "EUI_BUILD_EXAMPLES": "OFF",
                 "EUI_BUILD_TESTS": "OFF"
             }
+        },
+        {
+            "name": "web-1bpp",
+            "displayName": "Web Canvas (128x64, 1bpp)",
+            "cacheVariables": {
+                "EUI_CONFIG_PROFILE": "configs/web/canvas_128x64_1bpp.cmake"
+            }
+        },
+        {
+            "name": "web-16bpp",
+            "displayName": "Web Canvas (240x240, 16bpp)",
+            "cacheVariables": {
+                "EUI_CONFIG_PROFILE": "configs/web/canvas_240x240_16bpp.cmake"
+            }
         }
     ]
 }
