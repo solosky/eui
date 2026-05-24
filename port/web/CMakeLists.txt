@@ -7,6 +7,10 @@ target_include_directories(eui_port_web PUBLIC
 )
 target_link_libraries(eui_port_web PUBLIC eui)
 
+if(TARGET gen_profile_config)
+    add_dependencies(eui_port_web gen_profile_config)
+endif()
+
 # Emscripten flags injected into every executable that links this lib
 target_link_options(eui_port_web INTERFACE
     -sWASM=1

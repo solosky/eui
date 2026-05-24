@@ -1,5 +1,6 @@
 #include "eui/eui.h"
 #include "eui/eui_port_bootstrap.h"
+#include "eui/eui_profile_config.h"
 #include "eui/driver/eui_drv_web.h"
 #include <emscripten.h>
 #include <stdio.h>
