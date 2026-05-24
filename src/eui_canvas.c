@@ -49,6 +49,10 @@ static void canvas_set_pixel(eui_canvas_t *c, int16_t x, int16_t y, eui_color_t 
     } else {
         c->buffer[byte_idx] &= ~(1u << bit_pos);
     }
+#elif EUI_COLOR_DEPTH == 2
+    uint16_t byte_idx = (uint16_t)(y * (int16_t)(screen_w / 4u)) + (uint16_t)(x / 4u);
+    uint8_t shift = 6u - 2u * (uint8_t)(x % 4u);
+    c->buffer[byte_idx] = (uint8_t)(c->buffer[byte_idx] & ~(3u << shift)) | ((color & 3u) << shift);
 #elif EUI_COLOR_DEPTH == 8
     c->buffer[y * screen_w + x] = color;
 #elif EUI_COLOR_DEPTH == 16
@@ -64,6 +68,8 @@ static size_t canvas_buf_size(eui_canvas_t *c)
     size_t pixels = (size_t)c->buf_width * c->buf_height;
 #if EUI_COLOR_DEPTH == 1
     return pixels / 8;
+#elif EUI_COLOR_DEPTH == 2
+    return pixels / 4u;
 #elif EUI_COLOR_DEPTH == 8
     return pixels;
 #elif EUI_COLOR_DEPTH == 16
