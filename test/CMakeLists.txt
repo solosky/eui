@@ -33,6 +33,11 @@ target_include_directories(test_font_kerning PRIVATE ${CMAKE_BINARY_DIR}/include
 target_link_libraries(test_font_kerning PRIVATE eui)
 add_test(NAME font_kerning COMMAND test_font_kerning)
 
+add_executable(test_wqy13_kerning test_wqy13_kerning.c)
+target_include_directories(test_wqy13_kerning PRIVATE ${CMAKE_BINARY_DIR}/include)
+target_link_libraries(test_wqy13_kerning PRIVATE eui)
+add_test(NAME font_wqy13_kerning COMMAND test_wqy13_kerning)
+
 add_executable(test_font_multiline test_font_multiline.c)
 target_include_directories(test_font_multiline PRIVATE ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(test_font_multiline PRIVATE eui)
@@ -43,13 +48,13 @@ target_include_directories(test_font_canvas PRIVATE ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(test_font_canvas PRIVATE eui)
 add_test(NAME font_canvas COMMAND test_font_canvas)
 
-add_executable(test_view test_view.c)
-target_include_directories(test_view PRIVATE ${CMAKE_BINARY_DIR}/include)
+add_executable(test_view view/test_view.c)
+target_include_directories(test_view PRIVATE ${CMAKE_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(test_view PRIVATE eui)
 add_test(NAME view COMMAND test_view)
 
-add_executable(test_widget test_widget.c)
-target_include_directories(test_widget PRIVATE ${CMAKE_BINARY_DIR}/include)
+add_executable(test_widget view/test_widget.c)
+target_include_directories(test_widget PRIVATE ${CMAKE_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(test_widget PRIVATE eui)
 add_test(NAME widget COMMAND test_widget)
 
@@ -78,13 +83,13 @@ target_include_directories(test_canvas_render PRIVATE ${CMAKE_BINARY_DIR}/includ
 target_link_libraries(test_canvas_render PRIVATE eui)
 add_test(NAME canvas_render COMMAND test_canvas_render)
 
-add_executable(test_view_transition test_view_transition.c)
-target_include_directories(test_view_transition PRIVATE ${CMAKE_BINARY_DIR}/include)
+add_executable(test_view_transition view/test_view_transition.c)
+target_include_directories(test_view_transition PRIVATE ${CMAKE_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(test_view_transition PRIVATE eui)
 add_test(NAME view_transition COMMAND test_view_transition)
 
-add_executable(test_view_transition_render test_view_transition_render.c)
-target_include_directories(test_view_transition_render PRIVATE ${CMAKE_BINARY_DIR}/include)
+add_executable(test_view_transition_render view/test_view_transition_render.c)
+target_include_directories(test_view_transition_render PRIVATE ${CMAKE_BINARY_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(test_view_transition_render PRIVATE eui_drv_raylib)
 add_test(NAME view_transition_render COMMAND test_view_transition_render)
 
@@ -119,6 +124,32 @@ if(EXISTS ${U8G2_DIR})
     )
     target_link_libraries(test_font_vs_u8g2 PRIVATE eui)
     add_test(NAME font_vs_u8g2 COMMAND test_font_vs_u8g2)
+
+    add_executable(test_wqy13_u8g2_kerning test_wqy13_u8g2_kerning.c)
+    target_sources(test_wqy13_u8g2_kerning PRIVATE
+        ${U8G2_DIR}/csrc/u8g2_setup.c
+        ${U8G2_DIR}/csrc/u8g2_font.c
+        ${U8G2_DIR}/csrc/u8g2_ll_hvline.c
+        ${U8G2_DIR}/csrc/u8g2_buffer.c
+        ${U8G2_DIR}/csrc/u8g2_kerning.c
+        ${U8G2_DIR}/csrc/u8g2_intersection.c
+        ${U8G2_DIR}/csrc/u8g2_hvline.c
+        ${U8G2_DIR}/csrc/u8x8_setup.c
+        ${U8G2_DIR}/csrc/u8x8_display.c
+        ${U8G2_DIR}/csrc/u8x8_capture.c
+        ${U8G2_DIR}/csrc/u8x8_gpio.c
+        ${U8G2_DIR}/csrc/u8x8_u16toa.c
+        ${U8G2_DIR}/csrc/u8x8_byte.c
+        ${U8G2_DIR}/csrc/u8x8_8x8.c
+        ${U8G2_DIR}/csrc/u8x8_cad.c
+    )
+    target_include_directories(test_wqy13_u8g2_kerning PRIVATE
+        ${CMAKE_BINARY_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${U8G2_DIR}/csrc
+    )
+    target_link_libraries(test_wqy13_u8g2_kerning PRIVATE eui)
+    add_test(NAME wqy13_u8g2_kerning COMMAND test_wqy13_u8g2_kerning)
 endif()
 
 add_executable(test_str test_str.c)

@@ -1,14 +1,9 @@
 #include "eui/eui.h"
-#include "eui/eui_view.h"
-#include "eui/eui_view_dispatcher.h"
-#include "eui/eui_canvas.h"
-#include "eui/eui_allocator.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#define POOL_SIZE 65536
-static uint8_t mem_pool[POOL_SIZE];
+#include "common/eui_test.h"
 
 #define TW 128
 #define TH 64
@@ -51,11 +46,6 @@ static eui_display_drv_t mock_display = {
     .init = NULL,
     .write_buffer = mock_write_buffer,
 };
-
-static int tests_run = 0, tests_passed = 0;
-#define TEST(n)  do { printf("  %s... ", n); tests_run++; } while(0)
-#define PASS()   do { printf("PASS\n"); tests_passed++; } while(0)
-#define FAIL(m)  do { printf("FAIL: %s\n", m); return; } while(0)
 
 static uint32_t g_tick_ms = 0;
 static uint32_t test_get_tick(void) { return g_tick_ms; }
@@ -398,7 +388,7 @@ static void test_raylib_1bpp_transition_conversion(void) {
 }
 
 int main(void) {
-    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
+    eui_test_init();
     printf("=== View Transition Uncovered-Pixel Tests ===\n");
 
     test_slide_left_gap();
@@ -411,6 +401,5 @@ int main(void) {
     test_raylib_1bpp_checkerboard();
     test_raylib_1bpp_transition_conversion();
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return eui_test_summary();
 }

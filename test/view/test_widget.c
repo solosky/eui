@@ -2,10 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static int tests_run = 0, tests_passed = 0;
-#define TEST(n) do { printf("  %s... ", n); tests_run++; } while(0)
-#define PASS() do { printf("PASS\n"); tests_passed++; } while(0)
-#define FAIL(m) do { printf("FAIL: %s\n", m); return; } while(0)
+#include "common/eui_test.h"
 
 static void stub_draw(eui_widget_t *w, eui_canvas_t *c) { (void)w; (void)c; }
 static bool stub_input(eui_widget_t *w, const eui_event_t *e) { (void)w; (void)e; return false; }
@@ -45,6 +42,5 @@ int main(void) {
     printf("=== Widget Tests ===\n");
     test_focus_chain();
     test_bridge();
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return eui_test_summary();
 }

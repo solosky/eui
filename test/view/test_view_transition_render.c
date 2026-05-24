@@ -1,15 +1,10 @@
 #include "eui/eui.h"
-#include "eui/eui_view.h"
-#include "eui/eui_view_dispatcher.h"
-#include "eui/eui_canvas.h"
-#include "eui/eui_allocator.h"
 #include "eui/driver/eui_drv_raylib.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#define POOL_SIZE 65536
-static uint8_t mem_pool[POOL_SIZE];
+#include "common/eui_test.h"
 
 #define TW 128
 #define TH 64
@@ -17,11 +12,6 @@ static uint8_t mem_pool[POOL_SIZE];
 /* ── tick mock: return controlled value ── */
 static uint32_t g_mock_tick = 1000;
 static uint32_t mock_get_tick(void) { return g_mock_tick; }
-
-static int tests_run = 0, tests_passed = 0;
-#define TEST(n)  do { printf("  %s... ", n); tests_run++; } while(0)
-#define PASS()   do { printf("PASS\n"); tests_passed++; } while(0)
-#define FAIL(m)  do { printf("FAIL: %s\n", m); return; } while(0)
 
 /* ── view handler: fill entire area with white ── */
 static bool cover_view_handler(eui_view_event_t *evt, void *context) {
@@ -200,10 +190,9 @@ static void test_no_edge_wrap_artifacts(void) {
 }
 
 int main(void) {
-    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
+    eui_test_init();
     printf("=== View Transition Render Integration Tests ===\n");
     test_all_transitions_zero_black();
     test_no_edge_wrap_artifacts();
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return eui_test_summary();
 }
