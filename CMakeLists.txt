@@ -38,6 +38,19 @@ configure_file(
     ${CMAKE_CURRENT_BINARY_DIR}/include/eui/eui_config.h
 )
 
+# Load config profile EARLY (before raylib check) so EUI_TARGET_PORT
+# is known when deciding whether to build raylib
+if(DEFINED EUI_CONFIG_PROFILE)
+    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/${EUI_CONFIG_PROFILE}")
+        message(FATAL_ERROR "Config profile not found: ${EUI_CONFIG_PROFILE}")
+    endif()
+    message(STATUS "Using config profile: ${EUI_CONFIG_PROFILE}")
+    include("${CMAKE_SOURCE_DIR}/${EUI_CONFIG_PROFILE}")
+    if(DEFINED EUI_TARGET_PORT)
+        set(EUI_TARGET_PORT "${EUI_TARGET_PORT}" CACHE STRING "Target port: raylib, esp-idf, nrf5, web")
+    endif()
+endif()
+
 # Build raylib when needed (must be before src for eui_drv_raylib)
 # - raylib/desktop examples
 # - cross-platform raylib port
@@ -63,20 +76,8 @@ endif()
 
 # Cross-platform examples
 if(EUI_BUILD_CROSS_EXAMPLES)
-    # Config profile support: if set, include() the profile which sets
-    # EUI_TARGET_PORT, EUI_COLOR_DEPTH, EUI_DISPLAY_DRIVER, etc.
+    # Config profile header generation (profile was already loaded above)
     if(DEFINED EUI_CONFIG_PROFILE)
-        if(NOT EXISTS "${CMAKE_SOURCE_DIR}/${EUI_CONFIG_PROFILE}")
-            message(FATAL_ERROR "Config profile not found: ${EUI_CONFIG_PROFILE}")
-        endif()
-        message(STATUS "Using config profile: ${EUI_CONFIG_PROFILE}")
-        include("${CMAKE_SOURCE_DIR}/${EUI_CONFIG_PROFILE}")
-
-        # Promote EUI_TARGET_PORT to a CACHE variable so set_property works
-        if(DEFINED EUI_TARGET_PORT)
-            set(EUI_TARGET_PORT "${EUI_TARGET_PORT}" CACHE STRING "Target port: raylib, esp-idf, nrf5")
-        endif()
-
         # Generate eui_profile_config.h from profile variables
         set(PROFILE_VARS "EUI_DISPLAY_DRIVER;EUI_DISPLAY_WIDTH;EUI_DISPLAY_HEIGHT;EUI_BUFFER_MODE;EUI_CANVAS_SCALE;EUI_PIN_SPI_HOST;EUI_PIN_MOSI;EUI_PIN_SCLK;EUI_PIN_CS;EUI_PIN_DC;EUI_PIN_RST;EUI_PIN_BL;EUI_PIN_I2C_PORT;EUI_PIN_SDA;EUI_PIN_SCL;EUI_PIN_I2C_FREQ;EUI_PIN_I2C_ADDR;EUI_INPUT_DRIVER;EUI_PIN_BTN_UP;EUI_PIN_BTN_DOWN;EUI_PIN_BTN_OK;EUI_PIN_BTN_BACK")
         set(PROFILE_HEADER "${CMAKE_BINARY_DIR}/include/eui/eui_profile_config.h")

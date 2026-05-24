@@ -29,7 +29,7 @@ function(eui_web_add_html target_name title)
     set(EXAMPLE_JS    "${target_name}.js")
     set(html_out      "${CMAKE_CURRENT_BINARY_DIR}/${target_name}.html")
     configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/shell.html.in"
+        "${CMAKE_SOURCE_DIR}/port/web/shell.html.in"
         "${html_out}"
         @ONLY
         NEWLINE_STYLE LF
