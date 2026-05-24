@@ -46,9 +46,8 @@ static void js_render_1bpp(const uint8_t *buf, int w, int h) {
         var d = img.data;
         var rb = (sw + 7) >> 3;
         for (var y = 0; y < sh; y++) {
-            var fy = sh - 1 - y;  /* EUI framebuffer origin is bottom-left */
             for (var x = 0; x < sw; x++) {
-                var bit = (HEAPU8[src + fy * rb + (x >> 3)] >> (x & 7)) & 1;
+                var bit = (HEAPU8[src + y * rb + (x >> 3)] >> (x & 7)) & 1;
                 var i = (y * sw + x) * 4;
                 d[i] = d[i+1] = d[i+2] = bit ? 0 : 255;
                 d[i+3] = 255;
@@ -70,9 +69,8 @@ static void js_render_16bpp(const uint8_t *buf, int w, int h) {
         var d = img.data;
         var s16 = src >> 1;
         for (var y = 0; y < sh; y++) {
-            var fy = sh - 1 - y;  /* EUI framebuffer origin is bottom-left */
             for (var x = 0; x < sw; x++) {
-                var c = HEAPU16[s16 + fy * sw + x];
+                var c = HEAPU16[s16 + y * sw + x];
                 var r = ((c >> 11) & 0x1F) << 3;
                 var g = ((c >> 5)  & 0x3F) << 2;
                 var b = (c & 0x1F) << 3;
