@@ -41,6 +41,10 @@
   function zoomOut() { if (zoomLevel > zoomMin) { zoomLevel--; applyZoom(); } }
   function zoomReset(){ zoomLevel = 4; applyZoom(); }
 
+  window.zoomIn = zoomIn;
+  window.zoomOut = zoomOut;
+  window.zoomReset = zoomReset;
+
   /* Apply initial zoom once the canvas element is ready */
   var applyTimer = setInterval(function () {
     var el = document.getElementById('eui-canvas');
