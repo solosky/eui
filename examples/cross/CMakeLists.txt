@@ -3,3 +3,4 @@
 add_subdirectory(basic_label)
 add_subdirectory(button_test)
 add_subdirectory(list_nav)
+add_subdirectory(menu_system)
