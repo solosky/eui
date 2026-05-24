@@ -31,15 +31,14 @@ function(eui_web_add_html target_name title)
     # Configure HTML from template
     set(EXAMPLE_TITLE "${title}")
     set(EXAMPLE_JS    "${target_name}.js")
-    set(html_out      "${CMAKE_CURRENT_BINARY_DIR}/${target_name}.html")
+    set(html_out      "${CMAKE_BINARY_DIR}/examples/cross/${target_name}/${target_name}.html.in")
     configure_file(
         "${CMAKE_SOURCE_DIR}/port/web/shell.html.in"
         "${html_out}"
         @ONLY
         NEWLINE_STYLE LF
     )
-    # Use a custom target (not POST_BUILD command) because the example
-    # target is created in a different directory scope via add_subdirectory
+    # Copy to executable's output dir (next to .js/.wasm)
     add_custom_target(html_${target_name} ALL
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${html_out}"

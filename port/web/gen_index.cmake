@@ -24,5 +24,7 @@ string(APPEND html "</style>\n</head>\n<body>\n")
 string(APPEND html "<h1>EUI Web Examples</h1>\n<ul>\n${items}</ul>\n")
 string(APPEND html "</body>\n</html>\n")
 
+get_filename_component(_out_dir "${OUTPUT}" DIRECTORY)
+file(MAKE_DIRECTORY "${_out_dir}")
 file(WRITE "${OUTPUT}" "${html}")
 message(STATUS "Generated index.html")
