@@ -2,16 +2,9 @@
 #include "eui/eui_types.h"
 #include "eui/eui_allocator.h"
 #include "eui/eui_config.h"
+#include "common/eui_test.h"
 #include <stdio.h>
 #include <string.h>
-
-#define POOL_SIZE 32768
-static uint8_t mem_pool[POOL_SIZE];
-
-static int tests_run = 0, tests_passed = 0;
-#define TEST(n) do { printf("  %s... ", n); tests_run++; } while(0)
-#define PASS() do { printf("PASS\n"); tests_passed++; } while(0)
-#define FAIL(m) do { printf("FAIL: %s\n", m); return; } while(0)
 
 #define MOCK_W 128
 #define MOCK_H 64
@@ -141,12 +134,11 @@ static void test_save_restore(void)
 
 int main(void)
 {
-    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
+    eui_test_init();
     printf("=== Canvas Tests ===\n");
     test_clear();
     test_fill_rect();
     test_clip();
     test_save_restore();
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return eui_test_summary();
 }

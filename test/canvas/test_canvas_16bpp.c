@@ -28,14 +28,11 @@
 #include "eui/eui_allocator.h"
 
 /* Internal header for lookup function */
-#include "eui_font_internal.h"
+#include "eui/eui_font_internal.h"
 
 /* Kerning font data */
-#include "test_font_kerning.h"
-
-/* ---- TLSF memory pool ---- */
-#define POOL_SIZE 393216
-static uint8_t mem_pool[POOL_SIZE];
+#include "data/test_font_kerning.h"
+#include "common/eui_test.h"
 
 /* ---- Mock display (16bpp) ---- */
 #define CANVAS_W 320
@@ -115,7 +112,7 @@ static int write_bmp(const char *fn)
 /* ================================================================== */
 int main(void)
 {
-    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
+    eui_test_init();
 
     printf("=== 16bpp Canvas Render Test (kerning via canvas API) ===\n");
     printf("Canvas: %dx%d  color_depth=16\n\n", CANVAS_W, CANVAS_H);

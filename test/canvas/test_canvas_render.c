@@ -4,12 +4,9 @@
 #include "eui/eui_types.h"
 #include "eui/eui_allocator.h"
 #include "eui/eui_config.h"
+#include "common/eui_test.h"
 #include <stdio.h>
 #include <string.h>
-#include <stdint.h>
-
-#define POOL_SIZE 65536
-static uint8_t mem_pool[POOL_SIZE];
 
 #define CANVAS_W 256
 #define CANVAS_H 750
@@ -53,11 +50,6 @@ static eui_display_drv_t mock_display = {
     .init = NULL,
     .write_buffer = mock_write_buffer,
 };
-
-static int tests_run = 0, tests_passed = 0;
-#define TEST(n) do { printf("  %-30s ... ", n); tests_run++; } while(0)
-#define PASS() do { printf("PASS\n"); tests_passed++; } while(0)
-#define FAIL(m) do { printf("FAIL: %s\n", m); return; } while(0)
 
 /* ---- helpers for non-overlapping layout ---- */
 /* built-in font: line_height=8, baseline=7.
@@ -449,7 +441,7 @@ static void render_all_methods(eui_canvas_t *c, const char *bmp_path)
 
 int main(void)
 {
-    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
+    eui_test_init();
     printf("=== eui_canvas Full API Render Test ===\n");
     printf("Canvas: %dx%d, color_depth=%d, font=builtin(8x8)\n\n",
            CANVAS_W, CANVAS_H, EUI_COLOR_DEPTH);
@@ -462,6 +454,5 @@ int main(void)
     render_all_methods(c, "test_canvas_render.bmp");
     eui_canvas_destroy(c);
 
-    printf("\n%d/%d tests passed\n", tests_passed, tests_run);
-    return tests_passed == tests_run ? 0 : 1;
+    return eui_test_summary();
 }
