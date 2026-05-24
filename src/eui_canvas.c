@@ -714,7 +714,10 @@ void eui_canvas_draw_bitmap(eui_canvas_t *canvas, int16_t x, int16_t y, const eu
                 pixel_raw = (pixel_raw << 8) | src[src_off + b];
             }
             eui_color_t color;
-            if (bytes_per_pixel == 1) {
+            if (depth == 2) {
+                uint8_t shift = 6u - 2u * (uint8_t)(col % 4u);
+                color = (eui_color_t)((pixel_raw >> shift) & 3u);
+            } else if (bytes_per_pixel == 1) {
                 color = (pixel_raw & 1) ? EUI_COLOR_WHITE : EUI_COLOR_BLACK;
             } else if (bytes_per_pixel == 2) {
                 color = (eui_color_t)(pixel_raw & 0xFFFF);
