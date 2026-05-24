@@ -34,6 +34,10 @@
 #include "data/test_font_kerning.h"
 #include "common/eui_test.h"
 
+/* ---- TLSF memory pool ---- */
+#define POOL_SIZE 393216
+static uint8_t mem_pool[POOL_SIZE];
+
 /* ---- Mock display (16bpp) ---- */
 #define CANVAS_W 320
 #define CANVAS_H 400
@@ -112,7 +116,7 @@ static int write_bmp(const char *fn)
 /* ================================================================== */
 int main(void)
 {
-    eui_test_init();
+    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
 
     printf("=== 16bpp Canvas Render Test (kerning via canvas API) ===\n");
     printf("Canvas: %dx%d  color_depth=16\n\n", CANVAS_W, CANVAS_H);

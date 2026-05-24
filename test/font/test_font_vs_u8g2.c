@@ -10,6 +10,7 @@
 #include "eui/eui_config.h"
 #include "eui/eui_types.h"
 #include "eui/eui_font_wqy13.h"
+#include "eui/eui_font_internal.h"
 #include "eui/eui_font_u8g2_internal.h"
 
 #include "data/test_u8g2_profont10_data.h"
