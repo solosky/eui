@@ -61,6 +61,9 @@ uint8_t eui_font_bdf_draw_char(const eui_font_t *font, char c,
             if (bit) {
                 if (color_depth == 1) {
                     buf[row * buf_stride + col / 8] |= (1u << (7 - (col % 8)));
+                } else if (color_depth == 2) {
+                    uint8_t shift = 6u - 2u * (col % 4u);
+                    buf[row * buf_stride + col / 4] |= (1u << shift);
                 }
             }
         }
