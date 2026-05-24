@@ -43,6 +43,9 @@ eui_color_t eui_color_from_rgb(uint8_t r, uint8_t g, uint8_t b)
 #if EUI_COLOR_DEPTH == 1
     uint16_t avg = ((uint16_t)r + (uint16_t)g + (uint16_t)b) / 3u;
     return (avg >= 128) ? EUI_COLOR_WHITE : EUI_COLOR_BLACK;
+#elif EUI_COLOR_DEPTH == 2
+    uint8_t gray = (uint8_t)(((uint16_t)r * 30u + (uint16_t)g * 59u + (uint16_t)b * 11u) / 100u);
+    return (eui_color_t)(gray * 3u / 255u);
 #elif EUI_COLOR_DEPTH == 4
     uint8_t gray = (uint8_t)(((uint16_t)r * 30u + (uint16_t)g * 59u + (uint16_t)b * 11u) / 100u);
     return (eui_color_t)(gray * 15u / 255u);
@@ -51,7 +54,7 @@ eui_color_t eui_color_from_rgb(uint8_t r, uint8_t g, uint8_t b)
 #elif EUI_COLOR_DEPTH == 16
     return (eui_color_t)(((uint16_t)(r >> 3) << 11) | ((uint16_t)(g >> 2) << 5) | (uint16_t)(b >> 3));
 #else
-    #error "EUI_COLOR_DEPTH must be 1, 4, 8, or 16"
+    #error "EUI_COLOR_DEPTH must be 1, 2, 4, 8, or 16"
 #endif
 }
 
@@ -59,6 +62,8 @@ eui_color_t eui_color_from_gray(uint8_t gray)
 {
 #if EUI_COLOR_DEPTH == 1
     return (gray >= 128) ? EUI_COLOR_WHITE : EUI_COLOR_BLACK;
+#elif EUI_COLOR_DEPTH == 2
+    return (eui_color_t)(gray * 3u / 255u);
 #elif EUI_COLOR_DEPTH == 4
     return (eui_color_t)(gray * 15u / 255u);
 #elif EUI_COLOR_DEPTH == 8
@@ -66,6 +71,6 @@ eui_color_t eui_color_from_gray(uint8_t gray)
 #elif EUI_COLOR_DEPTH == 16
     return (eui_color_t)(((uint16_t)(gray >> 3) << 11) | ((uint16_t)(gray >> 2) << 5) | (uint16_t)(gray >> 3));
 #else
-    #error "EUI_COLOR_DEPTH must be 1, 4, 8, or 16"
+    #error "EUI_COLOR_DEPTH must be 1, 2, 4, 8, or 16"
 #endif
 }

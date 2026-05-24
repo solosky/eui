@@ -26,6 +26,8 @@ typedef struct {
  */
 #if EUI_COLOR_DEPTH == 1
 typedef uint8_t  eui_color_t;
+#elif EUI_COLOR_DEPTH == 2
+typedef uint8_t  eui_color_t;
 #elif EUI_COLOR_DEPTH == 4
 typedef uint8_t  eui_color_t;
 #elif EUI_COLOR_DEPTH == 8
@@ -33,7 +35,7 @@ typedef uint8_t  eui_color_t;
 #elif EUI_COLOR_DEPTH == 16
 typedef uint16_t eui_color_t;
 #else
-#error "EUI_COLOR_DEPTH must be 1, 4, 8, or 16"
+#error "EUI_COLOR_DEPTH must be 1, 2, 4, 8, or 16"
 #endif
 
 /**
@@ -43,6 +45,8 @@ typedef enum {
     EUI_COLOR_BLACK = 0,
 #if EUI_COLOR_DEPTH == 16
     EUI_COLOR_WHITE = 0xFFFF,
+#elif EUI_COLOR_DEPTH == 2
+    EUI_COLOR_WHITE = 3,
 #else
     EUI_COLOR_WHITE = 1,
 #endif
