@@ -57,6 +57,31 @@ static void js_render_1bpp(const uint8_t *buf, int w, int h) {
     }, buf, w, h);
 }
 
+static void js_render_2bpp(const uint8_t *buf, int w, int h) {
+    EM_ASM({
+        var src = $0;
+        var sw = $1;
+        var sh = $2;
+        var el = document.getElementById('eui-canvas');
+        if (!el) return;
+        var ctx = el.getContext('2d');
+        var img = ctx.createImageData(sw, sh);
+        var d = img.data;
+        var rb = sw >> 2;
+        for (var y = 0; y < sh; y++) {
+            for (var x = 0; x < sw; x++) {
+                var shift = 6 - 2 * (x & 3);
+                var pixel = (HEAPU8[src + y * rb + (x >> 2)] >> shift) & 3;
+                var i = (y * sw + x) * 4;
+                var v = pixel * 85;
+                d[i] = d[i+1] = d[i+2] = v;
+                d[i+3] = 255;
+            }
+        }
+        ctx.putImageData(img, 0, 0);
+    }, buf, w, h);
+}
+
 static void js_render_16bpp(const uint8_t *buf, int w, int h) {
     EM_ASM({
         var src = $0;
@@ -106,6 +131,8 @@ static void disp_write_buffer(const uint8_t *buf, const eui_rect_t *rect,
     (void)rect;
     if (d->color_depth == 1)
         js_render_1bpp(buf, d->width, d->height);
+    else if (d->color_depth == 2)
+        js_render_2bpp(buf, d->width, d->height);
     else
         js_render_16bpp(buf, d->width, d->height);
 }
