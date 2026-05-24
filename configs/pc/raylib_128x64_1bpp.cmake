@@ -1,0 +1,9 @@
+# configs/pc/raylib_128x64_1bpp.cmake
+set(EUI_TARGET_PORT      "raylib")
+set(EUI_COLOR_DEPTH      1)
+set(EUI_DISPLAY_DRIVER   "raylib")
+set(EUI_DISPLAY_WIDTH    128)
+set(EUI_DISPLAY_HEIGHT   64)
+set(EUI_BUFFER_MODE      "full")
+set(EUI_MEM_POOL_SIZE    32768)
+set(EUI_INPUT_DRIVER     "raylib")
