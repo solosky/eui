@@ -36,12 +36,15 @@ typedef struct {
 
 static void js_render_1bpp(const uint8_t *buf, int w, int h) {
     EM_ASM({
-        var src = $0, sw = $1, sh = $2;
+        var src = $0;
+        var sw = $1;
+        var sh = $2;
         var el = document.getElementById('eui-canvas');
         if (!el) return;
         var ctx = el.getContext('2d');
         var img = ctx.createImageData(sw, sh);
-        var d = img.data, rb = (sw + 7) >> 3;
+        var d = img.data;
+        var rb = (sw + 7) >> 3;
         for (var y = 0; y < sh; y++) {
             var fy = sh - 1 - y;  /* EUI framebuffer origin is bottom-left */
             for (var x = 0; x < sw; x++) {
@@ -57,7 +60,9 @@ static void js_render_1bpp(const uint8_t *buf, int w, int h) {
 
 static void js_render_16bpp(const uint8_t *buf, int w, int h) {
     EM_ASM({
-        var src = $0, sw = $1, sh = $2;
+        var src = $0;
+        var sw = $1;
+        var sh = $2;
         var el = document.getElementById('eui-canvas');
         if (!el) return;
         var ctx = el.getContext('2d');
