@@ -70,6 +70,42 @@ endif()
 
 # Cross-platform examples
 if(EUI_BUILD_CROSS_EXAMPLES)
+    # Config profile support: if set, include() the profile which sets
+    # EUI_TARGET_PORT, EUI_COLOR_DEPTH, EUI_DISPLAY_DRIVER, etc.
+    if(DEFINED EUI_CONFIG_PROFILE)
+        if(NOT EXISTS "${CMAKE_SOURCE_DIR}/${EUI_CONFIG_PROFILE}")
+            message(FATAL_ERROR "Config profile not found: ${EUI_CONFIG_PROFILE}")
+        endif()
+        message(STATUS "Using config profile: ${EUI_CONFIG_PROFILE}")
+        include("${CMAKE_SOURCE_DIR}/${EUI_CONFIG_PROFILE}")
+
+        # Promote EUI_TARGET_PORT to a CACHE variable so set_property works
+        if(DEFINED EUI_TARGET_PORT)
+            set(EUI_TARGET_PORT "${EUI_TARGET_PORT}" CACHE STRING "Target port: raylib, esp-idf, nrf5")
+        endif()
+
+        # Generate eui_profile_config.h from profile variables
+        set(PROFILE_VARS "EUI_DISPLAY_DRIVER;EUI_DISPLAY_WIDTH;EUI_DISPLAY_HEIGHT;EUI_BUFFER_MODE;EUI_PIN_SPI_HOST;EUI_PIN_MOSI;EUI_PIN_SCLK;EUI_PIN_CS;EUI_PIN_DC;EUI_PIN_RST;EUI_PIN_BL;EUI_PIN_I2C_PORT;EUI_PIN_SDA;EUI_PIN_SCL;EUI_PIN_I2C_FREQ;EUI_PIN_I2C_ADDR;EUI_INPUT_DRIVER;EUI_PIN_BTN_UP;EUI_PIN_BTN_DOWN;EUI_PIN_BTN_OK;EUI_PIN_BTN_BACK")
+        set(PROFILE_HEADER "${CMAKE_BINARY_DIR}/include/eui/eui_profile_config.h")
+        # Build -DVAR=value args for each defined variable
+        set(PROFILE_DEFINES "")
+        foreach(var_name ${PROFILE_VARS})
+            if(DEFINED ${var_name})
+                list(APPEND PROFILE_DEFINES "-D${var_name}=${${var_name}}")
+            endif()
+        endforeach()
+        add_custom_command(
+            OUTPUT ${PROFILE_HEADER}
+            COMMAND ${CMAKE_COMMAND}
+                ${PROFILE_DEFINES}
+                -DCONFIG_VARS="${PROFILE_VARS}"
+                -DOUTPUT_HEADER=${PROFILE_HEADER}
+                -P ${CMAKE_SOURCE_DIR}/tools/config_to_header.cmake
+            COMMENT "Generating eui_profile_config.h from config profile"
+        )
+        add_custom_target(gen_profile_config DEPENDS ${PROFILE_HEADER})
+    endif()
+
     if(NOT DEFINED EUI_TARGET_PORT)
         set(EUI_TARGET_PORT "raylib" CACHE STRING "Target port: raylib, esp-idf, nrf5")
     endif()
