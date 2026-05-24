@@ -48,3 +48,12 @@ function(eui_web_add_html target_name title)
         VERBATIM
     )
 endfunction()
+
+# Copy shell.js to examples/cross/ so HTML pages can reference it as ../shell.js
+add_custom_target(copy_shell_js ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/port/web/shell.js"
+        "${CMAKE_BINARY_DIR}/examples/cross/shell.js"
+    COMMENT "Copying shell.js to output"
+    VERBATIM
+)

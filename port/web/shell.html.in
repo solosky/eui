@@ -38,6 +38,6 @@
   <button id="btn-back"  class="dpad-btn">&#9664; BACK</button>
 </div>
 <script src="@EXAMPLE_JS@"></script>
-<script src="shell.js"></script>
+<script src="../shell.js"></script>
 </body>
 </html>

@@ -1,0 +1,18 @@
+#ifndef EUI_CONFIG_H
+#define EUI_CONFIG_H
+
+#define EUI_COLOR_DEPTH       1
+#define EUI_MEM_POOL_SIZE     8192
+#define EUI_MAX_VIEWS         8
+#define EUI_MAX_ANIMATIONS    8
+#define EUI_MAX_WIDGETS       32
+#define EUI_EVENT_QUEUE_SIZE  8
+#define EUI_MAX_OVERLAYS      4
+#define EUI_MAX_WIDGET_CHILDREN  8
+#define EUI_CANVAS_STATE_STACK   4
+
+#define EUI_FONT_ENABLE_U8G2     1
+#define EUI_FONT_ENABLE_KERNING  1
+#define EUI_FONT_ENABLE_MULTILINE 1
+
+#endif /* EUI_CONFIG_H */

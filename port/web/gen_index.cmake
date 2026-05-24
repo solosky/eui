@@ -8,7 +8,7 @@ list(SORT html_files)
 set(items "")
 foreach(f ${html_files})
     get_filename_component(name "${f}" NAME_WE)
-    string(APPEND items "<li><a href=\"../examples/cross/${name}/${name}.html\">${name}</a></li>\n")
+    string(APPEND items "<li><a href=\"examples/cross/${name}/${name}.html\">${name}</a></li>\n")
 endforeach()
 
 set(html "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n")

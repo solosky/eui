@@ -128,7 +128,7 @@ if(EUI_BUILD_CROSS_EXAMPLES)
         add_custom_target(web_index ALL
             COMMAND ${CMAKE_COMMAND}
                 -DBUILD_DIR="${CMAKE_BINARY_DIR}"
-                -DOUTPUT="${CMAKE_BINARY_DIR}/port/web/index.html"
+                -DOUTPUT="${CMAKE_BINARY_DIR}/index.html"
                 -P "${CMAKE_SOURCE_DIR}/port/web/gen_index.cmake"
             COMMENT "Generating index.html"
             VERBATIM
