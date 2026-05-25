@@ -1,24 +1,28 @@
 /* examples/cross/desktop_launcher/desktop_launcher.c
  * 400x300 2bpp Desktop Launcher Demo
- * Standalone - own main(), direct raylib link
+ * Supports raylib (desktop) and Emscripten (web)
  */
 #include "eui/eui.h"
 #include "eui/eui_font_builtin.h"
-#include "eui/driver/eui_drv_raylib.h"
-#include <raylib.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
 #include <stdlib.h>
 
+#if defined(__EMSCRIPTEN__)
+#include <emscripten.h>
+#include "eui/driver/eui_drv_web.h"
+static uint32_t get_tick_ms(void) { return (uint32_t)emscripten_get_now(); }
+#else
+#include <raylib.h>
+#include "eui/driver/eui_drv_raylib.h"
+static uint32_t get_tick_ms(void) { return (uint32_t)(GetTime() * 1000.0f); }
+#endif
+
 #define W 400
 #define H 300
 #define POOL_SIZE (400 * 300 * 2 / 8 + 32768)
 static uint8_t mem_pool[POOL_SIZE];
-
-static uint32_t get_tick_ms(void) {
-    return (uint32_t)(GetTime() * 1000.0f);
-}
 
 static bool desktop_view_handler(eui_view_event_t *evt, void *context);
 static bool app_view_handler(eui_view_event_t *evt, void *context);
@@ -598,17 +602,10 @@ static uint32_t launcher_tick(void) {
     return now;
 }
 
-/* ─── Main ─── */
-int main(void) {
-    eui_allocator_init_tlsf(mem_pool, sizeof(mem_pool));
-
-    eui_display_drv_t *display = eui_drv_raylib_create_display(W, H, EUI_COLOR_DEPTH);
-    if (!display) { fprintf(stderr, "create display failed\n"); return 1; }
-    eui_input_drv_t *input = eui_drv_raylib_create_input();
-    if (!input) { eui_drv_raylib_destroy_display(display); return 1; }
-
+/* ─── Setup (shared between platforms) ─── */
+static int setup_app(eui_display_drv_t *display, eui_input_drv_t *input) {
     eui_config_t cfg = { .display = display, .input = input };
-    if (eui_init(&cfg) != 0) { eui_drv_raylib_destroy_input(input); eui_drv_raylib_destroy_display(display); return 1; }
+    if (eui_init(&cfg) != 0) return -1;
 
     eui_set_tick_callback(launcher_tick);
     display->init(display->user_data);
@@ -628,15 +625,36 @@ int main(void) {
 
     eui_anim_init();
     eui_view_dispatcher_switch_to(g_vd, 1, EUI_ANIM_NONE);
+    return 0;
+}
+
+/* ─── Platform main ─── */
+#if defined(__EMSCRIPTEN__)
+static void emu_main_loop(void) { eui_tick(); }
+int main(void) {
+    eui_allocator_init_tlsf(mem_pool, sizeof(mem_pool));
+    eui_display_drv_t *d = eui_drv_web_create_display(W, H, EUI_COLOR_DEPTH);
+    eui_input_drv_t   *i = eui_drv_web_create_input();
+    if (!d || !i || setup_app(d, i) != 0) return 1;
+    emscripten_set_main_loop(emu_main_loop, 0, 1);
+    return 0;
+}
+#else
+int main(void) {
+    eui_allocator_init_tlsf(mem_pool, sizeof(mem_pool));
+    eui_display_drv_t *d = eui_drv_raylib_create_display(W, H, EUI_COLOR_DEPTH);
+    eui_input_drv_t   *i = eui_drv_raylib_create_input();
+    if (!d || !i || setup_app(d, i) != 0) return 1;
 
     while (!eui_drv_raylib_window_should_close()) {
         eui_tick();
         eui_drv_raylib_refresh();
     }
 
-    display->deinit(display->user_data);
+    d->deinit(d->user_data);
     eui_deinit();
-    eui_drv_raylib_destroy_input(input);
-    eui_drv_raylib_destroy_display(display);
+    eui_drv_raylib_destroy_input(i);
+    eui_drv_raylib_destroy_display(d);
     return 0;
 }
+#endif
