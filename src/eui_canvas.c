@@ -53,6 +53,13 @@ static void canvas_set_pixel(eui_canvas_t *c, int16_t x, int16_t y, eui_color_t 
     uint16_t byte_idx = (uint16_t)(y * (int16_t)(screen_w / 4u)) + (uint16_t)(x / 4u);
     uint8_t shift = 6u - 2u * (uint8_t)(x % 4u);
     c->buffer[byte_idx] = (uint8_t)(c->buffer[byte_idx] & ~(3u << shift)) | ((color & 3u) << shift);
+#elif EUI_COLOR_DEPTH == 4
+    uint16_t byte_idx = (uint16_t)(y * (int16_t)(screen_w / 2u)) + (uint16_t)(x / 2u);
+    if (x & 1) {
+        c->buffer[byte_idx] = (uint8_t)(c->buffer[byte_idx] & 0xF0u) | (color & 0x0Fu);
+    } else {
+        c->buffer[byte_idx] = (uint8_t)(c->buffer[byte_idx] & 0x0Fu) | ((uint8_t)(color & 0x0Fu) << 4);
+    }
 #elif EUI_COLOR_DEPTH == 8
     c->buffer[y * screen_w + x] = color;
 #elif EUI_COLOR_DEPTH == 16
@@ -70,6 +77,8 @@ static size_t canvas_buf_size(eui_canvas_t *c)
     return pixels / 8;
 #elif EUI_COLOR_DEPTH == 2
     return pixels / 4u;
+#elif EUI_COLOR_DEPTH == 4
+    return pixels / 2u;
 #elif EUI_COLOR_DEPTH == 8
     return pixels;
 #elif EUI_COLOR_DEPTH == 16
@@ -220,8 +229,12 @@ void eui_canvas_clear(eui_canvas_t *canvas)
     uint8_t fill = (uint8_t)(canvas->bg_color & 3u);
     fill = (uint8_t)(fill | (fill << 2) | (fill << 4) | (fill << 6));
     memset(canvas->buffer, fill, size);
+#elif EUI_COLOR_DEPTH == 4
+    uint8_t fill = (uint8_t)(canvas->bg_color & 0x0Fu);
+    fill = (uint8_t)(fill | (fill << 4));
+    memset(canvas->buffer, fill, size);
 #else
-    /* For 4bpp/8bpp/16bpp, fill with bg_color */
+    /* For 8bpp/16bpp, fill with bg_color */
     if (canvas->bg_color == 0) {
         memset(canvas->buffer, 0, size);
 #if EUI_COLOR_DEPTH == 16
@@ -714,7 +727,9 @@ void eui_canvas_draw_bitmap(eui_canvas_t *canvas, int16_t x, int16_t y, const eu
                 pixel_raw = (pixel_raw << 8) | src[src_off + b];
             }
             eui_color_t color;
-            if (depth == 2) {
+            if (depth == 4) {
+                color = (eui_color_t)(pixel_raw & 0x0Fu);
+            } else if (depth == 2) {
                 color = (eui_color_t)(pixel_raw & 3u);
             } else if (bytes_per_pixel == 1) {
                 color = (pixel_raw & 1) ? EUI_COLOR_WHITE : EUI_COLOR_BLACK;
@@ -757,6 +772,17 @@ void eui_canvas_invert_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t
             uint16_t byte_idx = (uint16_t)(yi * (int16_t)(screen_w / 4u) + (xi / 4u));
             uint8_t shift = 6u - 2u * (uint8_t)(xi % 4u);
             canvas->buffer[byte_idx] ^= (3u << shift);
+        }
+    }
+#elif EUI_COLOR_DEPTH == 4
+    for (int16_t yi = y; yi < ey; yi++) {
+        for (int16_t xi = x; xi < ex; xi++) {
+            uint16_t byte_idx = (uint16_t)(yi * (int16_t)(screen_w / 2u) + (xi / 2u));
+            if (xi & 1) {
+                canvas->buffer[byte_idx] ^= 0x0Fu;
+            } else {
+                canvas->buffer[byte_idx] ^= 0xF0u;
+            }
         }
     }
 #elif EUI_COLOR_DEPTH == 8
@@ -834,6 +860,10 @@ bool eui_canvas_begin_page(eui_canvas_t *canvas)
         uint8_t fill = (uint8_t)(canvas->bg_color & 3u);
         fill = (uint8_t)(fill | (fill << 2) | (fill << 4) | (fill << 6));
         memset(canvas->buffer, fill, canvas_buf_size(canvas));
+#elif EUI_COLOR_DEPTH == 4
+        uint8_t fill = (uint8_t)(canvas->bg_color & 0x0Fu);
+        fill = (uint8_t)(fill | (fill << 4));
+        memset(canvas->buffer, fill, canvas_buf_size(canvas));
 #elif EUI_COLOR_DEPTH == 16
         uint16_t *buf16 = (uint16_t *)canvas->buffer;
         size_t pixels = (size_t)canvas->buf_width * canvas->buf_height;
@@ -873,6 +903,10 @@ bool eui_canvas_next_page(eui_canvas_t *canvas)
 #elif EUI_COLOR_DEPTH == 2
         uint8_t fill = (uint8_t)(canvas->bg_color & 3u);
         fill = (uint8_t)(fill | (fill << 2) | (fill << 4) | (fill << 6));
+        memset(canvas->buffer, fill, canvas_buf_size(canvas));
+#elif EUI_COLOR_DEPTH == 4
+        uint8_t fill = (uint8_t)(canvas->bg_color & 0x0Fu);
+        fill = (uint8_t)(fill | (fill << 4));
         memset(canvas->buffer, fill, canvas_buf_size(canvas));
 #elif EUI_COLOR_DEPTH == 16
         uint16_t *buf16 = (uint16_t *)canvas->buffer;
