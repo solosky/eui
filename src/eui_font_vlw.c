@@ -128,7 +128,7 @@ uint8_t eui_font_vlw_draw_char(const eui_font_t *font, char c,
                     buf[row * buf_stride + col / 8] |= (1u << (7 - (col % 8)));
                 } else if (color_depth == 2) {
                     uint8_t shift = 6u - 2u * (uint8_t)(col % 4u);
-                    buf[row * buf_stride + col / 4] |= (1u << shift);
+                    buf[row * buf_stride + col / 4] |= (3u << shift);
                 } else {
                     buf[row * buf_stride + col] = 0xFF;
                 }
