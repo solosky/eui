@@ -18,8 +18,12 @@ eui_add_test(test_str           str/test_str.c)
 
 # ---- Canvas ----
 eui_add_test(test_canvas        canvas/test_canvas.c)
-eui_add_test(test_canvas_16bpp  canvas/test_canvas_16bpp.c)
-eui_add_test(test_canvas_2bpp   canvas/test_canvas_2bpp.c)
+if(EUI_COLOR_DEPTH EQUAL 16)
+    eui_add_test(test_canvas_16bpp  canvas/test_canvas_16bpp.c)
+endif()
+if(EUI_COLOR_DEPTH EQUAL 2)
+    eui_add_test(test_canvas_2bpp   canvas/test_canvas_2bpp.c)
+endif()
 eui_add_test(test_canvas_render canvas/test_canvas_render.c)
 
 # ---- Font ----
