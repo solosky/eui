@@ -83,6 +83,19 @@ static void disp_write_buffer(const uint8_t *buffer, const eui_rect_t *rect, voi
                 dst[0] = v; dst[1] = v; dst[2] = v; dst[3] = 255;
             }
         }
+    } else if (d->color_depth == 4) {
+        int bytes_per_row = (int)d->width / 2;
+        for (int y = 0; y < (int)d->height; y++) {
+            int flipped_y = (int)d->height - 1 - y;
+            for (int x = 0; x < (int)d->width; x++) {
+                int byte_idx = y * bytes_per_row + (x / 2);
+                int shift = (x & 1) ? 0 : 4;
+                uint8_t pixel = (buffer[byte_idx] >> shift) & 0x0F;
+                uint8_t *dst = d->rgba_buffer + (size_t)(flipped_y * d->width + x) * 4;
+                uint8_t v = (uint8_t)(pixel * 17);
+                dst[0] = v; dst[1] = v; dst[2] = v; dst[3] = 255;
+            }
+        }
     } else if (d->color_depth == 16) {
         const uint16_t *src16 = (const uint16_t*)buffer;
         for (int y = 0; y < (int)d->height; y++) {
