@@ -28,6 +28,7 @@ add_library(eui STATIC
     driver/eui_drv_sh1106.c
     driver/eui_drv_st7735.c
     driver/eui_drv_ili9341.c
+    driver/eui_drv_st7306.c
     driver/eui_drv_buttons.c
     driver/eui_drv_encoder.c
     driver/eui_drv_xpt2046.c
