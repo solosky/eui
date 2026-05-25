@@ -3,7 +3,7 @@
  * Supports raylib (desktop) and Emscripten (web)
  */
 #include "eui/eui.h"
-#include "eui/eui_font_builtin.h"
+#include "eui/eui_font_wqy13.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -185,12 +185,12 @@ static void draw_status_bar(eui_canvas_t *c) {
 
     /* Time */
     eui_canvas_set_color(c, 3);
-    eui_canvas_set_font(c, &eui_font_builtin);
+    eui_canvas_set_font(c, &eui_font_wqy13);
     uint32_t hour = g_status_minutes / 60;
     uint32_t min  = g_status_minutes % 60;
     char buf[16];
     snprintf(buf, sizeof(buf), "%02lu:%02lu", (unsigned long)hour, (unsigned long)min);
-    eui_canvas_draw_str(c, 8, 7, buf);
+    eui_canvas_draw_str(c, 8, 20, buf);
 
     /* Battery icon */
     int16_t bx = W - 26;
@@ -215,7 +215,7 @@ static void draw_reader(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_
     (void)w;
     eui_canvas_set_color(c, 0);
     eui_canvas_fill_rect(c, x, y, w, h);
-    eui_canvas_set_font(c, &eui_font_builtin);
+    eui_canvas_set_font(c, &eui_font_wqy13);
     const char *lines[] = {
         "第1章  开始",
         "夜色降临，小镇上的",
@@ -228,11 +228,11 @@ static void draw_reader(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_
         "要前往省城的大学",
         "开始全新的生活。",
     };
-    int16_t ly = y + 8;
+    int16_t ly = y + 20;
     for (size_t i = 0; i < sizeof(lines)/sizeof(lines[0]); i++) {
         eui_canvas_set_color(c, (i == 0) ? 3 : 2);
         eui_canvas_draw_str(c, x + 8, ly, lines[i]);
-        ly += 14;
+        ly += 19;
     }
     /* Scrollbar track */
     eui_canvas_set_color(c, 1);
@@ -251,8 +251,8 @@ static void draw_gb_emu(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_
     eui_canvas_fill_rect(c, x + 40, y + 8, 120, 100);
     eui_canvas_set_color(c, 3);
     eui_canvas_draw_rect(c, x + 40, y + 8, 120, 100);
-    eui_canvas_set_font(c, &eui_font_builtin);
-    eui_canvas_draw_str(c, x + 60, y + 18, "GAME BOY");
+    eui_canvas_set_font(c, &eui_font_wqy13);
+    eui_canvas_draw_str(c, x + 60, y + 24, "GAME BOY");
     /* Mock characters */
     eui_canvas_set_color(c, 1);
     eui_canvas_fill_rect(c, x + 64, y + 50, 8, 8);
@@ -262,20 +262,20 @@ static void draw_gb_emu(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_
     eui_canvas_fill_rect(c, x + 104, y + 56, 10, 10);
     /* Controls label */
     eui_canvas_set_color(c, 2);
-    eui_canvas_draw_str(c, x + 60, y + 120, "A  B");
-    eui_canvas_draw_str(c, x + 44, y + 136, "START");
-    eui_canvas_draw_str(c, x + 100, y + 136, "SELECT");
+    eui_canvas_draw_str(c, x + 60, y + 130, "A  B");
+    eui_canvas_draw_str(c, x + 44, y + 148, "START");
+    eui_canvas_draw_str(c, x + 100, y + 148, "SELECT");
 }
 
 static void draw_nfc(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_t h) {
     (void)w;
     eui_canvas_set_color(c, 0);
     eui_canvas_fill_rect(c, x, y, w, h);
-    eui_canvas_set_font(c, &eui_font_builtin);
+    eui_canvas_set_font(c, &eui_font_wqy13);
     eui_canvas_set_color(c, 3);
-    eui_canvas_draw_str(c, x + 20, y + 16, "NFC 读写器");
+    eui_canvas_draw_str(c, x + 20, y + 22, "NFC 读写器");
     eui_canvas_set_color(c, 2);
-    eui_canvas_draw_str(c, x + 20, y + 40, "正在扫描...");
+    eui_canvas_draw_str(c, x + 20, y + 46, "正在扫描...");
     /* Tag card */
     eui_canvas_set_color(c, 1);
     eui_canvas_fill_round_rect(c, x + 40, y + 64, 80, 60, 8);
@@ -284,15 +284,15 @@ static void draw_nfc(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_t h
     eui_canvas_set_color(c, 2);
     eui_canvas_draw_str(c, x + 60, y + 88, "NFC TAG");
     eui_canvas_set_color(c, 1);
-    eui_canvas_draw_str(c, x + 36, y + 140, "请将卡片放置在");
-    eui_canvas_draw_str(c, x + 36, y + 156, "读卡区域");
+    eui_canvas_draw_str(c, x + 36, y + 150, "请将卡片放置在");
+    eui_canvas_draw_str(c, x + 36, y + 170, "读卡区域");
 }
 
 static void draw_music(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_t h) {
     (void)w;
     eui_canvas_set_color(c, 0);
     eui_canvas_fill_rect(c, x, y, w, h);
-    eui_canvas_set_font(c, &eui_font_builtin);
+    eui_canvas_set_font(c, &eui_font_wqy13);
     /* Now playing bar at bottom */
     int16_t bar_y = y + h - 30;
     eui_canvas_set_color(c, 1);
@@ -310,13 +310,13 @@ static void draw_music(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_t
     eui_canvas_fill_rect(c, x + 110, bar_y + 6, 72, 16);
     /* Playlist */
     eui_canvas_set_color(c, 3);
-    eui_canvas_draw_str(c, x + 8, y + 10, "播放列表");
+    eui_canvas_draw_str(c, x + 8, y + 22, "播放列表");
     const char *songs[] = {"月半小夜曲", "致爱丽丝", "四季·春", "卡农"};
-    int16_t sy = y + 30;
+    int16_t sy = y + 46;
     for (size_t i = 0; i < sizeof(songs)/sizeof(songs[0]); i++) {
         eui_canvas_set_color(c, i == 0 ? 3 : 2);
         eui_canvas_draw_str(c, x + 16, sy, songs[i]);
-        sy += 20;
+        sy += 22;
     }
 }
 
@@ -328,8 +328,8 @@ static void draw_calc(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_t 
     eui_canvas_set_color(c, 1);
     eui_canvas_fill_rect(c, x + 20, y + 8, w - 40, 28);
     eui_canvas_set_color(c, 3);
-    eui_canvas_set_font(c, &eui_font_builtin);
-    eui_canvas_draw_str(c, x + w - 44, y + 14, "42");
+    eui_canvas_set_font(c, &eui_font_wqy13);
+    eui_canvas_draw_str(c, x + w - 44, y + 18, "42");
     /* Buttons */
     const char *btns[] = {
         "7","8","9","+",
@@ -355,9 +355,9 @@ static void draw_filemgr(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16
     (void)w;
     eui_canvas_set_color(c, 0);
     eui_canvas_fill_rect(c, x, y, w, h);
-    eui_canvas_set_font(c, &eui_font_builtin);
+    eui_canvas_set_font(c, &eui_font_wqy13);
     eui_canvas_set_color(c, 3);
-    eui_canvas_draw_str(c, x + 8, y + 8, "文件管理器");
+    eui_canvas_draw_str(c, x + 8, y + 20, "文件管理器");
     const char *items[] = {
         " | SD卡   内置存储",
         " | 下载   下载文件",
@@ -368,11 +368,11 @@ static void draw_filemgr(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16
         " | 应用   已安装",
         " | 数据   应用数据",
     };
-    int16_t sy = y + 30;
+    int16_t sy = y + 42;
     for (size_t i = 0; i < sizeof(items)/sizeof(items[0]); i++) {
         eui_canvas_set_color(c, i == 0 ? 3 : 2);
         eui_canvas_draw_str(c, x + 16, sy, items[i]);
-        sy += 16;
+        sy += 20;
     }
 }
 
@@ -380,9 +380,9 @@ static void draw_calendar(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int1
     (void)w;
     eui_canvas_set_color(c, 0);
     eui_canvas_fill_rect(c, x, y, w, h);
-    eui_canvas_set_font(c, &eui_font_builtin);
+    eui_canvas_set_font(c, &eui_font_wqy13);
     eui_canvas_set_color(c, 3);
-    eui_canvas_draw_str(c, x + 20, y + 8, "2026年5月");
+    eui_canvas_draw_str(c, x + 20, y + 20, "2026年5月");
     const char *wd[] = {"日","一","二","三","四","五","六"};
     int16_t gx = x + 12, gy = y + 30;
     int cw = 24, ch = 20;
@@ -414,9 +414,9 @@ static void draw_amiibo(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_
     (void)w; (void)h;
     eui_canvas_set_color(c, 0);
     eui_canvas_fill_rect(c, x, y, w, h);
-    eui_canvas_set_font(c, &eui_font_builtin);
+    eui_canvas_set_font(c, &eui_font_wqy13);
     eui_canvas_set_color(c, 3);
-    eui_canvas_draw_str(c, x + 8, y + 8, "amiibo 列表");
+    eui_canvas_draw_str(c, x + 8, y + 20, "amiibo 列表");
     const char *chars[] = {
         " Mario    马力欧",
         " Link     林克",
@@ -427,11 +427,11 @@ static void draw_amiibo(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_
         " Yoshi    耀西",
         " DK       森喜刚",
     };
-    int16_t ay = y + 30;
+    int16_t ay = y + 42;
     for (size_t i = 0; i < sizeof(chars)/sizeof(chars[0]); i++) {
         eui_canvas_set_color(c, i == 0 ? 3 : 2);
         eui_canvas_draw_str(c, x + 16, ay, chars[i]);
-        ay += 16;
+        ay += 20;
     }
 }
 
@@ -439,9 +439,9 @@ static void draw_settings(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int1
     (void)w;
     eui_canvas_set_color(c, 0);
     eui_canvas_fill_rect(c, x, y, w, h);
-    eui_canvas_set_font(c, &eui_font_builtin);
+    eui_canvas_set_font(c, &eui_font_wqy13);
     eui_canvas_set_color(c, 3);
-    eui_canvas_draw_str(c, x + 8, y + 8, "设置");
+    eui_canvas_draw_str(c, x + 8, y + 20, "设置");
     const char *items[] = {
         "WiFi           [开启]",
         "蓝牙           [关闭]",
@@ -451,11 +451,11 @@ static void draw_settings(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int1
         "存储   78% 已用",
         "关于本机",
     };
-    int16_t sy = y + 32;
+    int16_t sy = y + 44;
     for (size_t i = 0; i < sizeof(items)/sizeof(items[0]); i++) {
         eui_canvas_set_color(c, i == 0 ? 3 : 2);
         eui_canvas_draw_str(c, x + 16, sy, items[i]);
-        sy += 18;
+        sy += 22;
     }
 }
 
@@ -475,7 +475,7 @@ static bool desktop_view_handler(eui_view_event_t *evt, void *context) {
         eui_canvas_set_color(c, 0);
         eui_canvas_fill_rect(c, view->area.x, view->area.y, view->area.w, view->area.h);
         draw_status_bar(c);
-        eui_canvas_set_font(c, &eui_font_builtin);
+        eui_canvas_set_font(c, &eui_font_wqy13);
 
         /* Grid cells */
         for (int i = 0; i < APP_COUNT; i++) {
@@ -485,10 +485,10 @@ static bool desktop_view_handler(eui_view_event_t *evt, void *context) {
             eui_canvas_fill_round_rect(c, cx, cy, CELL_W, CELL_H, 4);
             eui_canvas_set_color(c, 3);
             int16_t ix = cx + (CELL_W - 24) / 2;
-            int16_t iy = cy + 8;
+            int16_t iy = cy + 4;
             eui_canvas_draw_xbm(c, ix, iy, 24, 24, g_apps[i].icon);
             uint16_t tw = eui_canvas_str_width(c, g_apps[i].name);
-            eui_canvas_draw_str(c, cx + (CELL_W - (int16_t)tw) / 2, iy + 24 + 6, g_apps[i].name);
+            eui_canvas_draw_str(c, cx + (CELL_W - (int16_t)tw) / 2, cy + 8 + 24 + 12, g_apps[i].name);
         }
 
         /* Animated highlight */
@@ -549,8 +549,8 @@ static bool app_view_handler(eui_view_event_t *evt, void *context) {
         fn(c, view->area.x, view->area.y, view->area.w, view->area.h);
         /* Back hint */
         eui_canvas_set_color(c, 1);
-        eui_canvas_set_font(c, &eui_font_builtin);
-        eui_canvas_draw_str(c, 4, H - 8, "BACK: 返回桌面");
+        eui_canvas_set_font(c, &eui_font_wqy13);
+        eui_canvas_draw_str(c, 4, H - 6, "BACK: 返回桌面");
         return true;
     }
     case EUI_VIEW_EVT_INPUT: {
