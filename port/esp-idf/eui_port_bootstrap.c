@@ -13,7 +13,11 @@
 #include "eui/eui_profile_config.h"
 #endif
 
+#ifdef EUI_DRV_ST7306
+#define POOL_SIZE 65536
+#else
 #define POOL_SIZE 8192
+#endif
 static uint8_t mem_pool[POOL_SIZE];
 
 /* Default pin config — override via Kconfig menuconfig */
