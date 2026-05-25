@@ -189,6 +189,12 @@ static void rle_decode(bit_reader_t *br, uint8_t width, uint8_t height,
                             uint8_t shift = 6u - 2u * ((lx + i) % 4u);
                             buf[bi] |= (3u << shift);
                         }
+                    } else if (color_depth == 4) {
+                        for (uint8_t i = 0; i < cur; i++) {
+                            uint16_t bi = ly * buf_stride + (lx + i) / 2;
+                            uint8_t shift = (uint8_t)(4u * (1u - ((lx + i) & 1u)));
+                            buf[bi] |= (0x0Fu << shift);
+                        }
                     }
                     if (cnt < rem) { x = lx + cur; break; }
                     cnt -= rem;
@@ -313,6 +319,9 @@ uint8_t eui_font_u8g2_draw_glyph(const eui_font_t *font, uint16_t encoding,
                 } else if (color_depth == 2) {
                     uint8_t shift = 6u - 2u * (uint8_t)(px % 4u);
                     buf[(uint16_t)buf_row * buf_stride + px / 4] |= (3u << shift);
+                } else if (color_depth == 4) {
+                    uint8_t shift = (uint8_t)(4u * (1u - (px & 1u)));
+                    buf[(uint16_t)buf_row * buf_stride + px / 2] |= (0x0Fu << shift);
                 }
             }
         }
