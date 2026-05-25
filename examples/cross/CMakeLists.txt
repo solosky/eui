@@ -46,3 +46,6 @@ add_cross_example(benchmark)
 add_cross_example(scene_view_demo)
 add_cross_example(color_demo)
 add_cross_example(amiibo_demo)
+
+# Standalone 400x300 desktop launcher (own main, direct raylib link)
+add_subdirectory(desktop_launcher)
