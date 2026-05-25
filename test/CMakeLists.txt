@@ -24,6 +24,9 @@ endif()
 if(EUI_COLOR_DEPTH EQUAL 2)
     eui_add_test(test_canvas_2bpp   canvas/test_canvas_2bpp.c)
 endif()
+if(EUI_COLOR_DEPTH EQUAL 4)
+    eui_add_test(test_canvas_4bpp   canvas/test_canvas_4bpp.c)
+endif()
 eui_add_test(test_canvas_render canvas/test_canvas_render.c)
 
 # ---- Font ----
