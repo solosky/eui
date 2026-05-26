@@ -84,6 +84,71 @@ cmake --build build_esp
 | `CONFIG_EUI_EXAMPLE_DISPLAY_WIDTH` | 128 | 显示宽度 (像素) |
 | `CONFIG_EUI_EXAMPLE_DISPLAY_HEIGHT` | 64 | 显示高度 (像素) |
 
+## 构建跨平台示例
+
+### 作为 ESP-IDF 组件
+
+跨平台示例通过 ESP-IDF 的构建系统编译。确保 `IDF_PATH` 已设置且
+示例已添加到 `examples/cross/` 目录中：
+
+```bash
+. $IDF_PATH/export.sh
+
+# SSD1306 OLED 128x64, 1bpp
+idf.py -B build_esp \
+       -DEUI_BUILD_CROSS_EXAMPLES=ON \
+       -DEUI_CONFIG_PROFILE="configs/esp32/ssd1306_i2c_128x64_1bpp.cmake" \
+       build
+```
+
+### 使用 CMake 预设
+
+```bash
+. $IDF_PATH/export.sh
+
+# 使用预设（需要 IDF_PATH 已设置）
+cmake --preset esp32 -B build_esp \
+      -DEUI_CONFIG_PROFILE="configs/esp32/ssd1306_i2c_128x64_1bpp.cmake"
+cmake --build build_esp
+```
+
+### 使用配置 profile
+
+配置 profile 文件位于 `configs/esp32/`，预设了显示驱动、引脚和色深：
+
+```bash
+. $IDF_PATH/export.sh
+
+# SSD1306 OLED 128x64, 1bpp
+cmake -B build_esp \
+      -DEUI_BUILD_CROSS_EXAMPLES=ON \
+      -DEUI_CONFIG_PROFILE="configs/esp32/ssd1306_i2c_128x64_1bpp.cmake"
+cmake --build build_esp
+
+# ST7735 TFT 240x240, 16bpp
+cmake -B build_esp \
+      -DEUI_BUILD_CROSS_EXAMPLES=ON \
+      -DEUI_CONFIG_PROFILE="configs/esp32/st7735_spi_240x240_16bpp.cmake"
+cmake --build build_esp
+```
+
+### 可用 profile
+
+| Profile | 显示 | 尺寸 | 色深 |
+|---------|------|------|------|
+| `configs/esp32/ssd1306_i2c_128x64_1bpp.cmake` | SSD1306 (I2C) | 128×64 | 1bpp |
+| `configs/esp32/st7735_spi_240x240_16bpp.cmake` | ST7735 (SPI) | 240×240 | 16bpp |
+| `configs/esp32/ili9341_spi_320x240_16bpp.cmake` | ILI9341 (SPI) | 320×240 | 16bpp |
+| `configs/esp32/st7306_spi_300x400_2bpp.cmake` | ST7306 (SPI) | 300×400 | 2bpp |
+
+> 注意：使用 ESP-IDF 预设时，需通过 `-DEUI_CONFIG_PROFILE=` 指定配置
+> profile，因为预设本身不包含 profile 设置。
+
+### 可用示例
+
+与 raylib 和 nrf5 端口共享完全相同的示例代码。示例要求（色深、尺寸）
+通过 `requirements.cmake` 自动检查，不满足条件的示例会被跳过。
+
 ## 运行架构
 
 ```

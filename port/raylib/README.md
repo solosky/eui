@@ -97,17 +97,69 @@ main()
 | Backspace / Esc | `EUI_INPUT_BACK` |
 | Tab | `EUI_INPUT_NEXT` |
 
-## 跨平台示例
+## 构建跨平台示例
 
-以下示例可在所有三个端口 (raylib / esp-idf / nrf5) 上使用相同代码运行：
+### 使用 CMake 预设（推荐）
 
-| 示例 | 目录 |
-|------|------|
-| basic_label | `examples/cross/basic_label/` |
-| button_test | `examples/cross/button_test/` |
-| list_nav | `examples/cross/list_nav/` |
+```bash
+# 构建所有跨平台示例（默认 128x64, 1bpp）
+cmake --preset pc -B build_pc
+cmake --build build_pc
 
-通过修改 `EUI_TARGET_PORT` 选择目标平台，无需修改示例代码。
+# 构建特定分辨率示例（如 desktop_launcher 需要 400x300, 2bpp）
+cmake --preset pc -B build_pc \
+      -DEUI_COLOR_DEPTH=2 \
+      -DEUI_MEM_POOL_SIZE=65536 \
+      -DEUI_MAX_VIEWS=16
+cmake --build build_pc
+```
+
+### 使用配置 profile
+
+配置 profile 文件位于 `configs/pc/`，预设了显示尺寸、色深等参数：
+
+```bash
+# 标准 128x64, 1bpp
+cmake -B build_pc \
+      -DEUI_BUILD_CROSS_EXAMPLES=ON \
+      -DEUI_CONFIG_PROFILE="configs/pc/raylib_128x64_1bpp.cmake"
+cmake --build build_pc
+
+# 桌面启动器 400x300, 2bpp
+cmake -B build_pc \
+      -DEUI_BUILD_CROSS_EXAMPLES=ON \
+      -DEUI_CONFIG_PROFILE="configs/pc/raylib_400x300_2bpp.cmake"
+cmake --build build_pc
+```
+
+### 完整 profile 列表
+
+| Profile | 尺寸 | 色深 | 用途 |
+|---------|------|------|------|
+| `configs/pc/raylib_128x64_1bpp.cmake` | 128×64 | 1bpp | 通用 OLED 模拟 |
+| `configs/pc/raylib_400x300_2bpp.cmake` | 400×300 | 2bpp | 桌面启动器 |
+| `configs/pc/raylib_240x240_16bpp.cmake` | 240×240 | 16bpp | 彩色 TFT 模拟 |
+
+### 可用示例
+
+| 示例 | 要求 | 说明 |
+|------|------|------|
+| `basic_label` | — | 最小 widget 示例 |
+| `button_test` | — | 按钮交互 |
+| `list_nav` | — | 列表导航 |
+| `menu_system` | — | 菜单系统（含子菜单） |
+| `dialog_overlay` | — | 对话框覆盖层 |
+| `animation_demo` | — | 框架动画 API |
+| `custom_widget` | — | 自定义 widget |
+| `benchmark` | — | 性能测试 |
+| `page_buffer` | — | 分页缓冲模式 |
+| `scene_view_demo` | — | 场景管理器 |
+| `color_demo` | ≥16bpp | 彩色渲染 |
+| `amiibo_demo` | ≥16bpp | Amiibo 轮播 |
+| `desktop_launcher` | ≥2bpp, 400×300 | 桌面启动器（弹簧动画） |
+
+所有示例代码完全跨平台，通过修改 `EUI_CONFIG_PROFILE` 或 `EUI_TARGET_PORT`
+选择目标，无需修改源文件。
 
 ## 与其他端口对比
 

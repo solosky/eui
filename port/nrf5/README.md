@@ -112,6 +112,53 @@ cmake --build build_nrf5
 | `CONFIG_EUI_EXAMPLE_DISPLAY_WIDTH` | 128 | 显示宽度 (像素) |
 | `CONFIG_EUI_EXAMPLE_DISPLAY_HEIGHT` | 64 | 显示高度 (像素) |
 
+## 构建跨平台示例
+
+### 使用 CMake 预设（推荐）
+
+```bash
+export NRF5_SDK_ROOT=/path/to/nRF5_SDK_17.1.0_ddde560
+
+# 构建所有跨平台示例
+cmake --preset nrf52 -B build_nrf5
+cmake --build build_nrf5
+```
+
+### 使用配置 profile
+
+配置 profile 文件位于 `configs/nrf52/`，预设了显示驱动和引脚配置：
+
+```bash
+export NRF5_SDK_ROOT=/path/to/nRF5_SDK_17.1.0_ddde560
+
+# SSD1306 OLED 128x64, 1bpp
+cmake -B build_nrf5 \
+      -DCMAKE_TOOLCHAIN_FILE=port/nrf5/toolchain.cmake \
+      -DEUI_BUILD_CROSS_EXAMPLES=ON \
+      -DEUI_CONFIG_PROFILE="configs/nrf52/ssd1306_i2c_128x64_1bpp.cmake"
+cmake --build build_nrf5
+
+# ST7735 TFT 240x240, 16bpp
+cmake -B build_nrf5 \
+      -DCMAKE_TOOLCHAIN_FILE=port/nrf5/toolchain.cmake \
+      -DEUI_BUILD_CROSS_EXAMPLES=ON \
+      -DEUI_CONFIG_PROFILE="configs/nrf52/st7735_spi_240x240_16bpp.cmake"
+cmake --build build_nrf5
+```
+
+### 可用 profile
+
+| Profile | 显示 | 尺寸 | 色深 |
+|---------|------|------|------|
+| `configs/nrf52/ssd1306_i2c_128x64_1bpp.cmake` | SSD1306 (I2C) | 128×64 | 1bpp |
+| `configs/nrf52/st7735_spi_240x240_16bpp.cmake` | ST7735 (SPI) | 240×240 | 16bpp |
+
+### 可用示例
+
+与 raylib 和 esp-idf 端口共享完全相同的示例代码。只需修改
+`EUI_CONFIG_PROFILE` 即可切换目标显示硬件。示例要求（色深、尺寸）
+通过 `requirements.cmake` 自动检查，不满足条件的示例会被跳过。
+
 ## 运行架构
 
 ```
