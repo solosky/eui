@@ -1,5 +1,4 @@
-build/**
-build_*/*
+build*/**
 Testing/*
 CMakeFiles/*
 */__pycache__/*
