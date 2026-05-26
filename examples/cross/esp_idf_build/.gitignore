@@ -1,0 +1,4 @@
+build/
+build_*/
+build_output/
+sdkconfig*

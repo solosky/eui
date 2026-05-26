@@ -2,6 +2,15 @@
 
 EUI 硬件抽象层 (HAL) 移植到 Espressif ESP32 系列芯片，使用 ESP-IDF 框架。
 
+## 支持的芯片
+
+| 芯片 | 架构 | 状态 |
+|------|------|------|
+| ESP32 | Xtensa LX6 | 已支持 |
+| ESP32-S2 | Xtensa LX7 | 已支持 |
+| ESP32-S3 | Xtensa LX7 | 已验证 |
+| ESP32-C3 | RISC-V | 理论支持 |
+
 ## 实现的 HAL
 
 | HAL | 实现 | 驱动 |
@@ -14,140 +23,139 @@ EUI 硬件抽象层 (HAL) 移植到 Espressif ESP32 系列芯片，使用 ESP-ID
 
 | 依赖 | 说明 |
 |------|------|
-| **ESP-IDF** | Espressif IoT Development Framework (v4.0+) |
+| **ESP-IDF** | Espressif IoT Development Framework (v5.0+) |
 | **FreeRTOS** | ESP-IDF 内置，提供任务延时 |
 | **Xtensa / RISC-V GCC** | ESP-IDF 工具链 |
 
 ## 快速开始
 
-### 作为 ESP-IDF 组件使用
-
-1. 将 `port/esp-idf/` 目录添加到项目的 `EXTRA_COMPONENT_DIRS`
-2. 使用 `menuconfig` 配置引脚和显示参数
-3. 标准 ESP-IDF 构建流程：
+### 环境准备
 
 ```bash
-# 设置 IDF 环境
+# 1. 安装 ESP-IDF
+git clone -b v5.2.3 --recursive https://github.com/espressif/esp-idf.git
+cd esp-idf && ./install.sh esp32s3
+
+# 2. 设置环境变量
+. /path/to/esp-idf/export.sh
+```
+
+### 构建单个示例
+
+EUI 的 IDE 构建项目位于 `examples/cross/esp_idf_build/`，使用此目录作为 IDF 项目根目录：
+
+```bash
+# 设置环境
 . $IDF_PATH/export.sh
-# 或 . /path/to/esp-idf/export.sh
 
-# 配置
-idf.py menuconfig
-# 在 EUI Example 子菜单中设置 I2C 引脚、地址、显示尺寸
+# 进入 IDF 项目目录
+cd examples/cross/esp_idf_build
 
-# 编译
-idf.py build
+# 选择芯片 (esp32s3, esp32, esp32s2)
+idf.py set-target esp32s3
+
+# 构建指定示例
+idf.py -DEUI_EXAMPLE=basic_label build
 ```
 
-### 作为独立 CMake 库编译
+`-DEUI_EXAMPLE` 可选值为：
 
-当 `IDF_PATH` 未设置时，端口的 CMakeLists.txt 会自动切换到独立编译模式，仅依赖 EUI 核心库：
+| 示例 | 说明 | 最低要求 |
+|------|------|----------|
+| `basic_label` | 基础文本标签 | 无 |
+| `button_test` | 按钮交互测试 | 无 |
+| `list_nav` | 列表导航 | 无 |
+| `menu_system` | 菜单系统 | 无 |
+| `dialog_overlay` | 对话框覆盖层 | 无 |
+| `animation_demo` | 动画效果演示 | 无 |
+| `custom_widget` | 自定义控件 | 无 |
+| `page_buffer` | 页缓冲模式 | 无 |
+| `benchmark` | 性能基准测试 | 无 |
+| `scene_view_demo` | 场景视图演示 | 无 |
+| `amiibo_demo` | Amiibo 风格 UI | 16bpp + 240x240 |
+| `color_demo` | 色彩演示 | 16bpp + 240x240 |
+| `desktop_launcher` | 桌面启动器 | 2bpp + 400x300 |
 
-```bash
-cmake -DEUI_BUILD_CROSS_EXAMPLES=ON \
-      -DEUI_TARGET_PORT=esp-idf \
-      -DCMAKE_TOOLCHAIN_FILE=$IDF_PATH/tools/cmake/toolchain-esp32.cmake \
-      -B build_esp
-cmake --build build_esp
-```
-
-## CMake 变量
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `IDF_PATH` | (环境变量) | ESP-IDF 根目录 |
-
-端口 CMakeLists.txt 支持双模式：
-
-- **IDF 模式** (`IDF_PATH` 已设置): 使用 `idf_component_register()` 注册为 ESP-IDF 组件
-- **Standalone 模式** (`IDF_PATH` 未设置): 使用 `add_library()` 构建静态库
-
-## 配置 (Kconfig)
-
-通过 ESP-IDF 的 `menuconfig` 系统配置（在 `EUI Example` 子菜单中）：
-
-### I2C 配置
-
-| 配置 | 默认值 | 说明 |
-|------|--------|------|
-| `CONFIG_EUI_EXAMPLE_I2C_PORT` | 0 | I2C 端口号 |
-| `CONFIG_EUI_EXAMPLE_I2C_SDA` | 21 | SDA 引脚 |
-| `CONFIG_EUI_EXAMPLE_I2C_SCL` | 22 | SCL 引脚 |
-| `CONFIG_EUI_EXAMPLE_I2C_FREQ` | 400000 | I2C 频率 (Hz) |
-| `CONFIG_EUI_EXAMPLE_I2C_ADDR` | 0x3C | I2C 设备地址 |
-| `CONFIG_EUI_EXAMPLE_I2C_TIMEOUT` | 100 | 超时 (ms) |
-
-### 显示配置
-
-| 配置 | 默认值 | 说明 |
-|------|--------|------|
-| `CONFIG_EUI_EXAMPLE_DISPLAY_WIDTH` | 128 | 显示宽度 (像素) |
-| `CONFIG_EUI_EXAMPLE_DISPLAY_HEIGHT` | 64 | 显示高度 (像素) |
-
-## 构建跨平台示例
-
-### 作为 ESP-IDF 组件
-
-跨平台示例通过 ESP-IDF 的构建系统编译。确保 `IDF_PATH` 已设置且
-示例已添加到 `examples/cross/` 目录中：
+### 批量构建所有示例
 
 ```bash
 . $IDF_PATH/export.sh
-
-# SSD1306 OLED 128x64, 1bpp
-idf.py -B build_esp \
-       -DEUI_BUILD_CROSS_EXAMPLES=ON \
-       -DEUI_CONFIG_PROFILE="configs/esp32/ssd1306_i2c_128x64_1bpp.cmake" \
-       build
+cd examples/cross/esp_idf_build
+./build_all.sh esp32s3
 ```
 
-### 使用 CMake 预设
+构建完成后，二进制文件输出到 `build_output/` 目录：
+```
+build_output/
+  ├── basic_label_esp32s3.bin
+  ├── button_test_esp32s3.bin
+  ├── list_nav_esp32s3.bin
+  └── ...
+```
+
+### 烧录
 
 ```bash
-. $IDF_PATH/export.sh
+# 构建完成后烧录
+idf.py -DEUI_EXAMPLE=basic_label build flash monitor
 
-# 使用预设（需要 IDF_PATH 已设置）
-cmake --preset esp32 -B build_esp \
-      -DEUI_CONFIG_PROFILE="configs/esp32/ssd1306_i2c_128x64_1bpp.cmake"
-cmake --build build_esp
+# 或指定端口
+idf.py -p /dev/ttyUSB0 flash
 ```
 
-### 使用配置 profile
+## 项目结构
 
-配置 profile 文件位于 `configs/esp32/`，预设了显示驱动、引脚和色深：
-
-```bash
-. $IDF_PATH/export.sh
-
-# SSD1306 OLED 128x64, 1bpp
-cmake -B build_esp \
-      -DEUI_BUILD_CROSS_EXAMPLES=ON \
-      -DEUI_CONFIG_PROFILE="configs/esp32/ssd1306_i2c_128x64_1bpp.cmake"
-cmake --build build_esp
-
-# ST7735 TFT 240x240, 16bpp
-cmake -B build_esp \
-      -DEUI_BUILD_CROSS_EXAMPLES=ON \
-      -DEUI_CONFIG_PROFILE="configs/esp32/st7735_spi_240x240_16bpp.cmake"
-cmake --build build_esp
+```
+examples/cross/esp_idf_build/  # IDF 项目根目录
+  ├── CMakeLists.txt           # 顶层 CMake，注册 EUI 组件
+  ├── build_all.sh             # 批量构建脚本
+  ├── main/
+  │   └── CMakeLists.txt       # 主组件，根据 EUI_EXAMPLE 选择示例源码
+  └── build_output/            # 构建产物输出目录
 ```
 
-### 可用 profile
+## 组件架构
 
-| Profile | 显示 | 尺寸 | 色深 |
-|---------|------|------|------|
-| `configs/esp32/ssd1306_i2c_128x64_1bpp.cmake` | SSD1306 (I2C) | 128×64 | 1bpp |
-| `configs/esp32/st7735_spi_240x240_16bpp.cmake` | ST7735 (SPI) | 240×240 | 16bpp |
-| `configs/esp32/ili9341_spi_320x240_16bpp.cmake` | ILI9341 (SPI) | 320×240 | 16bpp |
-| `configs/esp32/st7306_spi_300x400_2bpp.cmake` | ST7306 (SPI) | 300×400 | 2bpp |
+EUI 作为 IDF 项目中的三个独立组件：
 
-> 注意：使用 ESP-IDF 预设时，需通过 `-DEUI_CONFIG_PROFILE=` 指定配置
-> profile，因为预设本身不包含 profile 设置。
+| 组件 | 路径 | 说明 |
+|------|------|------|
+| `eui` | 项目根目录 | EUI 框架核心（canvas, font, widget, driver） |
+| `eui_port` | `port/esp-idf/eui_port` | I2C/SPI/GPIO HAL 实现 |
+| `tlsf` | `third_party/tlsf` | TLSF 内存分配器 |
+| `motionc` | `third_party/motionc` | MotionC 动画引擎 |
 
-### 可用示例
+示例源码通过 `main/` 组件的 `EUI_EXAMPLE` CMake 变量选择，与 `eui_port_bootstrap.c`（app_main 入口）编译链接。
 
-与 raylib 和 nrf5 端口共享完全相同的示例代码。示例要求（色深、尺寸）
-通过 `requirements.cmake` 自动检查，不满足条件的示例会被跳过。
+## 自定义配置
+
+### I2C 引脚配置
+
+编辑 `port/esp-idf/eui_port_bootstrap.c` 中的默认引脚定义：
+
+```c
+// SSD1306 I2C 默认引脚 (ESP32-S3)
+#define CONFIG_EUI_EXAMPLE_I2C_PORT   0
+#define CONFIG_EUI_EXAMPLE_I2C_SDA    21
+#define CONFIG_EUI_EXAMPLE_I2C_SCL    22
+#define CONFIG_EUI_EXAMPLE_I2C_FREQ   400000
+#define CONFIG_EUI_EXAMPLE_I2C_ADDR   0x3C
+```
+
+### SPI 引脚配置
+
+ST7306 等 SPI 设备需要启用 `EUI_DRV_ST7306` 编译宏并配置引脚。
+
+### 显示尺寸
+
+```c
+#define CONFIG_EUI_EXAMPLE_DISPLAY_WIDTH  128
+#define CONFIG_EUI_EXAMPLE_DISPLAY_HEIGHT 64
+```
+
+### 内存池大小
+
+默认 8KB，ST7306 等大尺寸显示自动调整为 64KB。在 `port/esp-idf/eui_port_bootstrap.c` 中通过 `POOL_SIZE` 宏配置。
 
 ## 运行架构
 
@@ -175,7 +183,7 @@ SPI 配置为 MODE 0 (CPOL=0, CPHA=0)，DMA 禁用。最大传输大小 4092 字
 
 | 特性 | ESP-IDF | nRF5 | Raylib |
 |------|---------|------|--------|
-| 目标 | ESP32 | nRF52832 | PC |
+| 目标 | ESP32/S2/S3 | nRF52832 | PC |
 | RTOS | FreeRTOS | Bare-metal | 无 |
 | 入口点 | `app_main()` | `main()` | `main()` |
 | Tick 来源 | `esp_timer_get_time()` | `app_timer` RTC | `GetTime()` |
