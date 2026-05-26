@@ -1,12 +1,13 @@
 /* port/raylib/eui_port_bootstrap.c */
 #include "eui/eui.h"
+#include "eui/eui_profile_config.h"
 #include "eui/driver/eui_drv_raylib.h"
 #include "eui/eui_port_bootstrap.h"
 #include <raylib.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#define POOL_SIZE (128 * 64 * 2 + 8192)
+#define POOL_SIZE EUI_MEM_POOL_SIZE
 static uint8_t mem_pool[POOL_SIZE];
 
 static uint32_t get_tick_ms(void) {
@@ -17,8 +18,8 @@ int main(void) {
     eui_allocator_init_tlsf(mem_pool, sizeof(mem_pool));
 
     eui_example_config_t cfg = {
-        .display_width  = 128,
-        .display_height = 64,
+        .display_width  = EUI_DISPLAY_WIDTH,
+        .display_height = EUI_DISPLAY_HEIGHT,
     };
 
     eui_display_drv_t *display = eui_drv_raylib_create_display(

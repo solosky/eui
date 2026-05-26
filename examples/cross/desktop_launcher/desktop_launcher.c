@@ -1,9 +1,9 @@
 /* examples/cross/desktop_launcher/desktop_launcher.c
  * 400x300 2bpp Desktop Launcher Demo
- * Supports raylib (desktop) and Emscripten (web)
  */
 #include "eui/eui.h"
 #include "eui/eui_font_wqy13.h"
+#include "eui/eui_port_bootstrap.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -11,18 +11,20 @@
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten.h>
-#include "eui/driver/eui_drv_web.h"
-static uint32_t get_tick_ms(void) { return (uint32_t)emscripten_get_now(); }
-#else
+#define LAUNCHER_GET_TICK_MS() ((uint32_t)emscripten_get_now())
+#elif defined(__has_include)
+#if __has_include(<raylib.h>)
 #include <raylib.h>
-#include "eui/driver/eui_drv_raylib.h"
-static uint32_t get_tick_ms(void) { return (uint32_t)(GetTime() * 1000.0f); }
+#define LAUNCHER_GET_TICK_MS() ((uint32_t)(GetTime() * 1000.0f))
+#else
+#define LAUNCHER_GET_TICK_MS() 0
+#endif
+#else
+#define LAUNCHER_GET_TICK_MS() 0
 #endif
 
 #define W 400
 #define H 300
-#define POOL_SIZE (400 * 300 * 2 / 8 + 32768)
-static uint8_t mem_pool[POOL_SIZE];
 
 static bool desktop_view_handler(eui_view_event_t *evt, void *context);
 static bool app_view_handler(eui_view_event_t *evt, void *context);
@@ -177,13 +179,11 @@ static eui_view_t *g_desktop_view = NULL;
 
 /* ─── Status bar ─── */
 static void draw_status_bar(eui_canvas_t *c) {
-    /* Background */
     eui_canvas_set_color(c, 1);
     eui_canvas_fill_rect(c, 0, 0, W, STATUSBAR_H);
     eui_canvas_set_color(c, 2);
     eui_canvas_draw_line(c, 0, STATUSBAR_H - 1, W - 1, STATUSBAR_H - 1);
 
-    /* Time */
     eui_canvas_set_color(c, 3);
     eui_canvas_set_font(c, &eui_font_wqy13);
     uint32_t hour = g_status_minutes / 60;
@@ -192,7 +192,6 @@ static void draw_status_bar(eui_canvas_t *c) {
     snprintf(buf, sizeof(buf), "%02lu:%02lu", (unsigned long)hour, (unsigned long)min);
     eui_canvas_draw_str(c, 8, 20, buf);
 
-    /* Battery icon */
     int16_t bx = W - 26;
     eui_canvas_set_color(c, 3);
     eui_canvas_draw_rect(c, bx, 7, 14, 10);
@@ -200,7 +199,6 @@ static void draw_status_bar(eui_canvas_t *c) {
     eui_canvas_set_color(c, 2);
     eui_canvas_fill_rect(c, bx + 3, 9, 6, 6);
 
-    /* WiFi indicator */
     int16_t wx = W - 46;
     eui_canvas_set_color(c, 3);
     eui_canvas_fill_circle(c, wx, 16, 2);
@@ -234,10 +232,8 @@ static void draw_reader(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_
         eui_canvas_draw_str(c, x + 8, ly, lines[i]);
         ly += 19;
     }
-    /* Scrollbar track */
     eui_canvas_set_color(c, 1);
     eui_canvas_fill_rect(c, x + w - 6, y, 6, h);
-    /* Scrollbar thumb */
     eui_canvas_set_color(c, 2);
     eui_canvas_fill_rect(c, x + w - 5, y + 8, 4, 40);
 }
@@ -246,21 +242,18 @@ static void draw_gb_emu(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_
     (void)w;
     eui_canvas_set_color(c, 0);
     eui_canvas_fill_rect(c, x, y, w, h);
-    /* Screen */
     eui_canvas_set_color(c, 2);
     eui_canvas_fill_rect(c, x + 40, y + 8, 120, 100);
     eui_canvas_set_color(c, 3);
     eui_canvas_draw_rect(c, x + 40, y + 8, 120, 100);
     eui_canvas_set_font(c, &eui_font_wqy13);
     eui_canvas_draw_str(c, x + 60, y + 24, "GAME BOY");
-    /* Mock characters */
     eui_canvas_set_color(c, 1);
     eui_canvas_fill_rect(c, x + 64, y + 50, 8, 8);
     eui_canvas_fill_rect(c, x + 76, y + 58, 8, 8);
     eui_canvas_fill_rect(c, x + 88, y + 50, 8, 8);
     eui_canvas_set_color(c, 3);
     eui_canvas_fill_rect(c, x + 104, y + 56, 10, 10);
-    /* Controls label */
     eui_canvas_set_color(c, 2);
     eui_canvas_draw_str(c, x + 60, y + 130, "A  B");
     eui_canvas_draw_str(c, x + 44, y + 148, "START");
@@ -276,7 +269,6 @@ static void draw_nfc(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_t h
     eui_canvas_draw_str(c, x + 20, y + 22, "NFC 读写器");
     eui_canvas_set_color(c, 2);
     eui_canvas_draw_str(c, x + 20, y + 46, "正在扫描...");
-    /* Tag card */
     eui_canvas_set_color(c, 1);
     eui_canvas_fill_round_rect(c, x + 40, y + 64, 80, 60, 8);
     eui_canvas_set_color(c, 3);
@@ -293,7 +285,6 @@ static void draw_music(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_t
     eui_canvas_set_color(c, 0);
     eui_canvas_fill_rect(c, x, y, w, h);
     eui_canvas_set_font(c, &eui_font_wqy13);
-    /* Now playing bar at bottom */
     int16_t bar_y = y + h - 30;
     eui_canvas_set_color(c, 1);
     eui_canvas_fill_rect(c, x, bar_y, w, 30);
@@ -303,12 +294,10 @@ static void draw_music(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_t
     eui_canvas_draw_str(c, x + 8, bar_y + 8, "Classic Piano");
     eui_canvas_set_color(c, 2);
     eui_canvas_draw_str(c, x + 8, bar_y + 20, "03:42 - 05:18");
-    /* Progress bar */
     eui_canvas_set_color(c, 1);
     eui_canvas_fill_rect(c, x + 110, bar_y + 6, 120, 16);
     eui_canvas_set_color(c, 3);
     eui_canvas_fill_rect(c, x + 110, bar_y + 6, 72, 16);
-    /* Playlist */
     eui_canvas_set_color(c, 3);
     eui_canvas_draw_str(c, x + 8, y + 22, "播放列表");
     const char *songs[] = {"月半小夜曲", "致爱丽丝", "四季·春", "卡农"};
@@ -324,13 +313,11 @@ static void draw_calc(eui_canvas_t *c, int16_t x, int16_t y, int16_t w, int16_t 
     (void)w;
     eui_canvas_set_color(c, 0);
     eui_canvas_fill_rect(c, x, y, w, h);
-    /* Display */
     eui_canvas_set_color(c, 1);
     eui_canvas_fill_rect(c, x + 20, y + 8, w - 40, 28);
     eui_canvas_set_color(c, 3);
     eui_canvas_set_font(c, &eui_font_wqy13);
     eui_canvas_draw_str(c, x + w - 44, y + 18, "42");
-    /* Buttons */
     const char *btns[] = {
         "7","8","9","+",
         "4","5","6","-",
@@ -477,7 +464,6 @@ static bool desktop_view_handler(eui_view_event_t *evt, void *context) {
         draw_status_bar(c);
         eui_canvas_set_font(c, &eui_font_wqy13);
 
-        /* Grid cells */
         for (int i = 0; i < APP_COUNT; i++) {
             int16_t cx = cell_x((int8_t)i);
             int16_t cy = cell_y((int8_t)i);
@@ -491,7 +477,6 @@ static bool desktop_view_handler(eui_view_event_t *evt, void *context) {
             eui_canvas_draw_str(c, cx + (CELL_W - (int16_t)tw) / 2, cy + 8 + 24 + 12, g_apps[i].name);
         }
 
-        /* Animated highlight */
         int16_t hx = (int16_t)MC_REAL_TO_INT(g_hl_x);
         int16_t hy = (int16_t)MC_REAL_TO_INT(g_hl_y);
         eui_canvas_set_color(c, 3);
@@ -547,7 +532,6 @@ static bool app_view_handler(eui_view_event_t *evt, void *context) {
         eui_canvas_t *c = evt->event.draw.canvas;
         app_draw_fn fn = g_app_draw[g_selected];
         fn(c, view->area.x, view->area.y, view->area.w, view->area.h);
-        /* Back hint */
         eui_canvas_set_color(c, 1);
         eui_canvas_set_font(c, &eui_font_wqy13);
         eui_canvas_draw_str(c, 4, H - 6, "BACK: 返回桌面");
@@ -566,22 +550,21 @@ static bool app_view_handler(eui_view_event_t *evt, void *context) {
     }
 }
 
-/* ─── Per-frame tick ─── */
+/* ─── Per-frame animation tick ─── */
 static uint32_t g_last_tick = 0;
+
 static uint32_t launcher_tick(void) {
-    uint32_t now = get_tick_ms();
+    uint32_t now = LAUNCHER_GET_TICK_MS();
     if (g_last_tick == 0) { g_last_tick = now; return now; }
     uint32_t dt = now - g_last_tick;
     g_last_tick = now;
 
     if (dt > 100) dt = 100;
 
-    /* Spring animation */
     mc_real_t dt_s = MC_FP_C((float)dt / 1000.0f);
     mc_spring_step(&g_hl_x, &g_hl_spring_x, &g_hl_params, g_hl_target_x, dt_s);
     mc_spring_step(&g_hl_y, &g_hl_spring_y, &g_hl_params, g_hl_target_y, dt_s);
 
-    /* Status bar: ~2s per minute */
     g_status_sub_tick += dt;
     if (g_status_sub_tick >= 2000) {
         g_status_sub_tick = 0;
@@ -590,7 +573,6 @@ static uint32_t launcher_tick(void) {
         if (g_desktop_view) eui_view_mark_dirty(g_desktop_view);
     }
 
-    /* Mark dirty while spring is active */
     float vx = MC_REAL_TO_FLOAT(g_hl_spring_x.velocity);
     float vy = MC_REAL_TO_FLOAT(g_hl_spring_y.velocity);
     float ex = MC_REAL_TO_FLOAT(g_hl_x - g_hl_target_x);
@@ -602,13 +584,9 @@ static uint32_t launcher_tick(void) {
     return now;
 }
 
-/* ─── Setup (shared between platforms) ─── */
-static int setup_app(eui_display_drv_t *display, eui_input_drv_t *input) {
-    eui_config_t cfg = { .display = display, .input = input };
-    if (eui_init(&cfg) != 0) return -1;
-
-    eui_set_tick_callback(launcher_tick);
-    display->init(display->user_data);
+/* ─── Setup ─── */
+void eui_example_setup(const eui_example_config_t *cfg) {
+    (void)cfg;
 
     g_vd = eui_get_view_dispatcher();
 
@@ -623,38 +601,8 @@ static int setup_app(eui_display_drv_t *display, eui_input_drv_t *input) {
     av->area = (eui_rect_t){ 0, 0, W, H };
     eui_view_dispatcher_add(g_vd, 2, av);
 
+    eui_set_tick_callback(launcher_tick);
+
     eui_anim_init();
     eui_view_dispatcher_switch_to(g_vd, 1, EUI_ANIM_NONE);
-    return 0;
 }
-
-/* ─── Platform main ─── */
-#if defined(__EMSCRIPTEN__)
-static void emu_main_loop(void) { eui_tick(); }
-int main(void) {
-    eui_allocator_init_tlsf(mem_pool, sizeof(mem_pool));
-    eui_display_drv_t *d = eui_drv_web_create_display(W, H, EUI_COLOR_DEPTH);
-    eui_input_drv_t   *i = eui_drv_web_create_input();
-    if (!d || !i || setup_app(d, i) != 0) return 1;
-    emscripten_set_main_loop(emu_main_loop, 0, 1);
-    return 0;
-}
-#else
-int main(void) {
-    eui_allocator_init_tlsf(mem_pool, sizeof(mem_pool));
-    eui_display_drv_t *d = eui_drv_raylib_create_display(W, H, EUI_COLOR_DEPTH);
-    eui_input_drv_t   *i = eui_drv_raylib_create_input();
-    if (!d || !i || setup_app(d, i) != 0) return 1;
-
-    while (!eui_drv_raylib_window_should_close()) {
-        eui_tick();
-        eui_drv_raylib_refresh();
-    }
-
-    d->deinit(d->user_data);
-    eui_deinit();
-    eui_drv_raylib_destroy_input(i);
-    eui_drv_raylib_destroy_display(d);
-    return 0;
-}
-#endif
