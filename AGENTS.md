@@ -74,7 +74,7 @@ eui/
 │   └── hal/              # Platform-specific HAL implementations
 ├── test/                 # Unit tests (26 .c files, CTest)
 ├── examples/             # Raylib desktop demos (16 .c files)
-├── docs/                 # Framework design, API reference, porting guide
+├── docs/                 # Framework design, API reference, porting guide, example guidelines
 ├── tools/                # Font data generation scripts (Python)
 ├── third_party/
 │   ├── tlsf/             # TLSF memory allocator (git submodule)
@@ -150,6 +150,16 @@ eui_input_hal_t hal = { .poll = my_poll };
 - **MotionC** (submodule): Q16.16 fixed-point animation engine, 30 easing functions, spring physics.
 - **Raylib** (submodule, optional): Desktop simulation only. Not used on target hardware.
 - **U8g2** (optional, external): Reference comparison test only. Path set via `U8G2_DIR` CMake variable.
+
+## Cross-Platform Examples
+
+See `docs/example_guidelines.md` for the standard example pattern (source
+skeleton, CMakeLists.txt, requirements.cmake) and accepted variations.
+
+### Key rules
+- Include `eui/eui_port_bootstrap.h`, define `eui_example_setup()`.
+- No `main()`, no platform `#ifdef`, no driver creation.
+- CMakeLists.txt links `${BOOTSTRAP_LIB}` — the build system selects the right port.
 
 ## Test Commands
 
