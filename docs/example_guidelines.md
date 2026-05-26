@@ -1,22 +1,21 @@
-# Cross-Platform Example Guidelines
+# 跨平台示例编写规范
 
-All cross-platform examples live in `examples/cross/<name>/` and share a
-consistent structure that works across raylib (desktop) and Emscripten (web)
-via the port bootstrap system.
+所有跨平台示例位于 `examples/cross/<name>/` 目录下，通过端口引导
+（port bootstrap）系统在 raylib（桌面）和 Emscripten（Web）之间共享
+一致的结构。
 
-## File structure
+## 文件结构
 
 ```
 examples/cross/<name>/
-├── CMakeLists.txt        # Build target definition
-├── requirements.cmake    # (optional) Display/color constraints
-└── <name>.c              # Single source file
+├── CMakeLists.txt        # 构建目标定义
+├── requirements.cmake    #（可选）显示/颜色深度约束
+└── <name>.c              # 单一源文件
 ```
 
-## Source file skeleton
+## 源文件骨架
 
-Every example must include `eui/eui_port_bootstrap.h` and define
-`eui_example_setup()`:
+每个示例必须包含 `eui/eui_port_bootstrap.h` 并定义 `eui_example_setup()`：
 
 ```c
 /* examples/cross/<name>/<name>.c */
@@ -27,17 +26,17 @@ void eui_example_setup(const eui_example_config_t *cfg) {
     (void)cfg;
     eui_view_dispatcher_t *vd = eui_get_view_dispatcher();
 
-    // Build your UI here — views, widgets, etc.
+    // 在此构建 UI —— views、widgets 等
     eui_view_dispatcher_add(vd, 1, &widget->view);
     eui_view_dispatcher_switch_to(vd, 1, EUI_ANIM_NONE);
 }
 ```
 
-**Rules:**
-- No `main()` function — the port bootstrap provides it.
-- No platform-specific `#ifdef` blocks — the bootstrap handles raylib vs web.
-- No `eui_allocator_init_tlsf()` or memory pool — the bootstrap owns them.
-- No direct driver creation (`eui_drv_raylib_create_display`, etc.).
+**规则：**
+- 不能定义 `main()` 函数 —— 端口引导提供了 `main()`。
+- 不能使用平台相关的 `#ifdef` 块 —— 引导层处理 raylib 与 web 的差异。
+- 不能调用 `eui_allocator_init_tlsf()` 或定义内存池 —— 引导层管理内存池。
+- 不能直接创建驱动（如 `eui_drv_raylib_create_display()` 等）。
 
 ## CMakeLists.txt
 
@@ -48,14 +47,13 @@ target_include_directories(<name> PRIVATE ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(<name> PRIVATE eui ${BOOTSTRAP_LIB})
 ```
 
-`${BOOTSTRAP_LIB}` is set by the build system to `eui_port_raylib`,
-`eui_port_web`, or `eui_port_esp_idf` depending on `EUI_TARGET_PORT`.
+`${BOOTSTRAP_LIB}` 由构建系统根据 `EUI_TARGET_PORT` 设置为
+`eui_port_raylib`、`eui_port_web` 或 `eui_port_esp_idf`。
 
-## requirements.cmake (optional)
+## requirements.cmake（可选）
 
-Declare minimum display and color-depth requirements. Examples that need a
-specific display size or bpp are skipped automatically when the active config
-profile does not meet them.
+声明最低显示尺寸和颜色深度要求。当活跃配置不满足需求时，需要特定
+显示尺寸或 bpp 的示例会被自动跳过。
 
 ```cmake
 # examples/cross/<name>/requirements.cmake
@@ -64,19 +62,19 @@ set(EXAMPLE_REQUIRES_WIDTH_MIN       400)
 set(EXAMPLE_REQUIRES_HEIGHT_MIN      300)
 ```
 
-Supported variables:
+支持的变量：
 
-| Variable | Description |
+| 变量 | 说明 |
 |---|---|
-| `EXAMPLE_REQUIRES_COLOR_DEPTH_MIN` | Minimum color depth (1, 2, 4, 8, 16) |
-| `EXAMPLE_REQUIRES_WIDTH_MIN` | Minimum display width in pixels |
-| `EXAMPLE_REQUIRES_HEIGHT_MIN` | Minimum display height in pixels |
+| `EXAMPLE_REQUIRES_COLOR_DEPTH_MIN` | 最低颜色深度（1、2、4、8、16） |
+| `EXAMPLE_REQUIRES_WIDTH_MIN` | 最低显示宽度（像素） |
+| `EXAMPLE_REQUIRES_HEIGHT_MIN` | 最低显示高度（像素） |
 
-## Variations
+## 变体
 
-### Simple — widget-only
+### 简单 —— 仅使用 widget
 
-Minimal example using pre-built widgets:
+使用预构建 widget 的最小示例：
 
 ```c
 void eui_example_setup(const eui_example_config_t *cfg) {
@@ -88,9 +86,9 @@ void eui_example_setup(const eui_example_config_t *cfg) {
 }
 ```
 
-### Custom draw — raw canvas
+### 自定义绘制 —— 原始 canvas
 
-Use when you need full control over rendering:
+当需要完全控制渲染时使用：
 
 ```c
 static void my_draw(eui_widget_t *w, eui_canvas_t *c) {
@@ -114,9 +112,9 @@ void eui_example_setup(const eui_example_config_t *cfg) {
 }
 ```
 
-### Custom view handlers
+### 自定义视图处理器
 
-For complex navigation (multiple views, overlays):
+用于复杂导航（多视图、覆盖层）：
 
 ```c
 static bool my_view_handler(eui_view_event_t *evt, void *context) {
@@ -138,9 +136,9 @@ void eui_example_setup(const eui_example_config_t *cfg) {
 }
 ```
 
-### Animation — framework animation API
+### 动画 —— 框架动画 API
 
-Use `eui_anim_start()` for built-in tweens:
+使用 `eui_anim_start()` 实现内置缓动：
 
 ```c
 void eui_example_setup(const eui_example_config_t *cfg) {
@@ -155,10 +153,10 @@ void eui_example_setup(const eui_example_config_t *cfg) {
 }
 ```
 
-### Custom tick — MotionC spring animation
+### 自定义 tick —— MotionC 弹簧动画
 
-Override the tick callback for per-frame physics (e.g. spring animations).
-Must still return the current timestamp in ms.
+覆写 tick 回调以实现逐帧物理模拟（如弹簧动画），仍须返回当前
+时间戳（毫秒）。
 
 ```c
 #include <math.h>
@@ -184,29 +182,28 @@ static uint32_t my_tick(void) {
     uint32_t dt = now - g_last_tick;
     g_last_tick = now;
     if (dt > 100) dt = 100;
-    // Update spring animation, mark dirty if active
+    // 更新弹簧动画，动画活跃时标记 dirty
     return now;
 }
 
 void eui_example_setup(const eui_example_config_t *cfg) {
-    // ... setup views ...
+    // ... 设置 views ...
     eui_set_tick_callback(my_tick);
     eui_anim_init();
     eui_view_dispatcher_switch_to(vd, 1, EUI_ANIM_NONE);
 }
 ```
 
-The platform-specific `GET_TICK_MS()` macros are the **only** acceptable
-`#ifdef` in an example source file.
+平台相关的 `GET_TICK_MS()` 宏是示例源文件中 **唯一** 允许的 `#ifdef`。
 
-## Anti-patterns
+## 反模式
 
-| What not to do | Why |
+| 不要这样做 | 原因 |
 |---|---|
-| Define `main()` | Bootstrap provides it; duplicate will cause link error. |
-| `#include <raylib.h>` directly | Use `eui/eui_port_bootstrap.h` instead; raylib is a bootstrap detail. |
-| `#include "eui/driver/eui_drv_raylib.h"` | Driver creation belongs in the bootstrap, not the example. |
-| `eui_allocator_init_tlsf()` | Bootstrap allocates the memory pool. |
-| Hardcoded display size with `#define W 128`, `#define H 64` | Either use `cfg->display_width/height` or keep it as a fixed constant with a comment; the profile system ensures the display matches. |
-| Calling `eui_init()` | Bootstrap handles framework initialization. |
-| `#if defined(__EMSCRIPTEN__)` for anything other than `GET_TICK_MS()` | All platform abstraction goes through the bootstrap. |
+| 定义 `main()` | 引导层已提供；重复定义会导致链接错误。 |
+| 直接 `#include <raylib.h>` | 应使用 `eui/eui_port_bootstrap.h`；raylib 是引导层细节。 |
+| `#include "eui/driver/eui_drv_raylib.h"` | 驱动创建属于引导层，不属于示例。 |
+| 调用 `eui_allocator_init_tlsf()` | 引导层分配内存池。 |
+| 用 `#define W 128`、`#define H 64` 硬编码显示尺寸 | 使用 `cfg->display_width/height` 或加注释保留为固定常量；配置系统确保显示匹配。 |
+| 调用 `eui_init()` | 引导层处理框架初始化。 |
+| 在 `GET_TICK_MS()` 之外使用 `#if defined(__EMSCRIPTEN__)` | 所有平台抽象都应通过引导层。 |
