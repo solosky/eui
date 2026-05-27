@@ -60,21 +60,43 @@ idf.py -DEUI_EXAMPLE=basic_label build
 
 `-DEUI_EXAMPLE` 可选值为：
 
-| 示例 | 说明 | 最低要求 |
-|------|------|----------|
-| `basic_label` | 基础文本标签 | 无 |
-| `button_test` | 按钮交互测试 | 无 |
-| `list_nav` | 列表导航 | 无 |
-| `menu_system` | 菜单系统 | 无 |
-| `dialog_overlay` | 对话框覆盖层 | 无 |
-| `animation_demo` | 动画效果演示 | 无 |
-| `custom_widget` | 自定义控件 | 无 |
-| `page_buffer` | 页缓冲模式 | 无 |
-| `benchmark` | 性能基准测试 | 无 |
-| `scene_view_demo` | 场景视图演示 | 无 |
-| `amiibo_demo` | Amiibo 风格 UI | 16bpp + 240x240 |
-| `color_demo` | 色彩演示 | 16bpp + 240x240 |
-| `desktop_launcher` | 桌面启动器 | 2bpp + 400x300 |
+| 示例 | 说明 | 最低要求 | Profile |
+|------|------|----------|---------|
+| `basic_label` | 基础文本标签 | 无 | default |
+| `button_test` | 按钮交互测试 | 无 | default |
+| `list_nav` | 列表导航 | 无 | default |
+| `menu_system` | 菜单系统 | 无 | default |
+| `dialog_overlay` | 对话框覆盖层 | 无 | default |
+| `animation_demo` | 动画效果演示 | 无 | default |
+| `custom_widget` | 自定义控件 | 无 | default |
+| `page_buffer` | 页缓冲模式 | 无 | default |
+| `benchmark` | 性能基准测试 | 无 | default |
+| `scene_view_demo` | 场景视图演示 | 无 | default |
+| `desktop_launcher` | 桌面启动器 | 2bpp + 400×300 | `st7306_400x300` |
+| `amiibo_demo` | Amiibo 风格 UI | 16bpp + 240×240 | tft (待添加) |
+| `color_demo` | 色彩演示 | 16bpp + 240×240 | tft (待添加) |
+
+### 使用 Display Profile
+
+高规格示例需要指定 `-DEUI_PROFILE=<name>` 参数选择对应的显示驱动配置：
+
+```bash
+. $IDF_PATH/export.sh
+cd examples/cross/esp_idf_build
+
+# desktop_launcher 需要 400×300 + 2bpp，使用 ST7306 SPI 屏
+idf.py set-target esp32s3
+idf.py -DEUI_EXAMPLE=desktop_launcher -DEUI_PROFILE=st7306_400x300 build
+```
+
+可用 profile：
+
+| Profile | 驱动 | 尺寸 | 色深 | 接口 |
+|---------|------|------|------|------|
+| `default` (或不指定) | SSD1306 | 128×64 | 1bpp | I2C |
+| `st7306_400x300` | ST7306 | 400×300 | 2bpp | SPI |
+
+对应的 CMake 配置 profile 位于 `configs/esp32/` 目录，可用于 `EUI_BUILD_CROSS_EXAMPLES` 独立构建流程。
 
 ### 批量构建所有示例
 

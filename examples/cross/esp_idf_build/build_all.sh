@@ -8,18 +8,24 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$SCRIPT_DIR"
-BUILD_DIR="$PROJECT_DIR/build"
 OUTPUT_DIR="$PROJECT_DIR/build_output"
 CHIP="${1:-esp32s3}"
 
-# Examples requiring higher specs (skipped for 128x64 1bpp SSD1306)
-SKIP_EXAMPLES=("amiibo_demo" "color_demo" "desktop_launcher")
+# ============================================================
+# Example sets by profile
+# ============================================================
 
-EXAMPLES=(
+# Default profile: SSD1306 I2C, 128x64, 1bpp
+EXAMPLES_DEFAULT=(
     "animation_demo"  "basic_label"    "benchmark"
     "button_test"     "custom_widget"  "dialog_overlay"
     "list_nav"        "menu_system"    "page_buffer"
     "scene_view_demo"
+)
+
+# ST7306 profile: SPI, 400x300, 2bpp (landscape)
+EXAMPLES_ST7306=(
+    "desktop_launcher"
 )
 
 if [ -z "$IDF_PATH" ]; then
@@ -32,71 +38,75 @@ cd "$PROJECT_DIR"
 mkdir -p "$OUTPUT_DIR"
 
 echo "Chip target: $CHIP"
-echo "Project dir: $PROJECT_DIR"
-echo "Build dir:   $BUILD_DIR"
 echo "Output dir:  $OUTPUT_DIR"
 echo ""
 
-# ============================================================
-# Step 1: Initial configure (sets target and IDF build env)
-# ============================================================
-rm -rf "$BUILD_DIR"
-idf.py -B "$BUILD_DIR" -DEUI_EXAMPLE=basic_label set-target "$CHIP" 2>&1 | tail -1
-
-echo "Initial configure done. Building examples..."
-
 FAILED=()
 SUCCESS=()
-SKIPPED=()
+GLOBAL_FAILED=0
 
-build_example() {
-    local example="$1"
+# ============================================================
+# Build pass: single profile, list of examples
+# ============================================================
+build_pass() {
+    local profile="$1"
+    local build_dir="$2"
+    shift 2
+    local examples=("$@")
 
-    # Skip incompatible examples
-    for skip in "${SKIP_EXAMPLES[@]}"; do
-        if [ "$example" = "$skip" ]; then
-            return 2
-        fi
-    done
+    rm -rf "$build_dir"
 
-    echo "  Building: $example ..."
-
-    # Reconfigure cmake with new example name
-    cd "$BUILD_DIR"
-    cmake -DEUI_EXAMPLE="$example" "$PROJECT_DIR" > /dev/null 2>&1
-
-    # Build (only recompiles changed main component, all IDF libs cached)
-    if cmake --build . -- -j"$(nproc)" 2>&1 | tail -3; then
-        # Copy output
-        if [ -f "eui_example.bin" ]; then
-            cp "eui_example.bin" "$OUTPUT_DIR/${example}_${CHIP}.bin"
-            echo "    -> $OUTPUT_DIR/${example}_${CHIP}.bin"
-        fi
-        if [ -f "eui_example.elf" ]; then
-            cp "eui_example.elf" "$OUTPUT_DIR/${example}_${CHIP}.elf"
-        fi
-        cd "$PROJECT_DIR"
-        return 0
-    else
-        cd "$PROJECT_DIR"
-        return 1
+    local profile_cmake_arg=""
+    local profile_desc="default (SSD1306 128x64 1bpp)"
+    if [ "$profile" != "default" ]; then
+        profile_cmake_arg="-DEUI_PROFILE=$profile"
+        profile_desc="$profile"
     fi
+
+    echo "============================================"
+    echo " Profile: $profile_desc"
+    echo "============================================"
+
+    # Initial configure with first example
+    idf.py -B "$build_dir" -DEUI_EXAMPLE="${examples[0]}" $profile_cmake_arg set-target "$CHIP" > /dev/null 2>&1
+
+    for example in "${examples[@]}"; do
+        echo "  Building: $example ..."
+
+        cd "$build_dir"
+        cmake -DEUI_EXAMPLE="$example" "$PROJECT_DIR" > /dev/null 2>&1
+
+        if cmake --build . -- -j"$(nproc)" > /dev/null 2>&1; then
+            if [ -f "eui_example.bin" ]; then
+                cp "eui_example.bin" "$OUTPUT_DIR/${example}_${CHIP}.bin"
+                echo "    -> $OUTPUT_DIR/${example}_${CHIP}.bin"
+            fi
+            if [ -f "eui_example.elf" ]; then
+                cp "eui_example.elf" "$OUTPUT_DIR/${example}_${CHIP}.elf"
+            fi
+            SUCCESS+=("$example")
+        else
+            FAILED+=("$example")
+            echo "  FAILED: $example"
+            GLOBAL_FAILED=1
+        fi
+        cd "$PROJECT_DIR"
+    done
 }
 
-for example in "${EXAMPLES[@]}"; do
-    build_example "$example"
-    rc=$?
-    if [ $rc -eq 0 ]; then
-        SUCCESS+=("$example")
-    elif [ $rc -eq 2 ]; then
-        SKIPPED+=("$example")
-        echo "  Skip: $example (incompatible with default profile)"
-    else
-        FAILED+=("$example")
-        echo "  FAILED: $example"
-    fi
-done
+# ============================================================
+# Pass 1: Default profile (SSD1306 I2C)
+# ============================================================
+build_pass "default" "$PROJECT_DIR/build_default" "${EXAMPLES_DEFAULT[@]}"
 
+# ============================================================
+# Pass 2: ST7306 SPI landscape (400x300 2bpp)
+# ============================================================
+build_pass "st7306_400x300" "$PROJECT_DIR/build_st7306" "${EXAMPLES_ST7306[@]}"
+
+# ============================================================
+# Summary
+# ============================================================
 echo ""
 echo "============================================"
 echo " Build Summary for $CHIP"
@@ -107,13 +117,8 @@ if [ ${#FAILED[@]} -gt 0 ]; then
     echo "Failed: ${#FAILED[@]}"
     for e in "${FAILED[@]}"; do echo "  - $e"; done
 fi
-echo "Skipped: ${#SKIPPED[@]}"
-for e in "${SKIPPED[@]}"; do echo "  * $e"; done
 echo ""
 echo "Output: $OUTPUT_DIR/"
 ls -lh "$OUTPUT_DIR"/*.bin 2>/dev/null || echo "  (no binaries)"
 
-if [ ${#FAILED[@]} -gt 0 ]; then
-    exit 1
-fi
-echo "All compatible examples built successfully."
+exit $GLOBAL_FAILED
