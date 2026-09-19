@@ -271,17 +271,24 @@ static int input_poll(eui_event_t *evt, void *ud) {
     int keys[EUI_KEY_COUNT] = {
         KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_ENTER, KEY_BACKSPACE
     };
+    int pressed[EUI_KEY_COUNT];
+
+    for (int k = 0; k < EUI_KEY_COUNT; k++)
+        pressed[k] = IsKeyDown(keys[k]);
+
+    /* Mouse: left = OK, right = BACK (parallel with keyboard) */
+    pressed[EUI_KEY_OK]   |= IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+    pressed[EUI_KEY_BACK] |= IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
 
     for (int k = 0; k < EUI_KEY_COUNT; k++) {
-        int pressed = IsKeyDown(keys[k]);
-        if (pressed && !prev_states[k]) {
+        if (pressed[k] && !prev_states[k]) {
             evt->type = EUI_EVT_KEY_PRESS;
             evt->data.key = (eui_key_t)k;
             evt->timestamp = (uint32_t)(GetTime() * 1000);
             prev_states[k] = 1;
             return 1;
         }
-        if (!pressed && prev_states[k]) {
+        if (!pressed[k] && prev_states[k]) {
             evt->type = EUI_EVT_KEY_RELEASE;
             evt->data.key = (eui_key_t)k;
             evt->timestamp = (uint32_t)(GetTime() * 1000);
