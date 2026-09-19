@@ -25,6 +25,7 @@ static int disp_init(void *ud) {
     int sh = d->height * d->scale;
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(sw, sh, "EUI - raylib");
+    SetExitKey(KEY_NULL); /* Esc must reach input_poll as BACK, not close the window */
     d->fb = LoadRenderTexture(d->width, d->height);
     if (d->fb.texture.id > 0)
         SetTextureWrap(d->fb.texture, TEXTURE_WRAP_CLAMP);
