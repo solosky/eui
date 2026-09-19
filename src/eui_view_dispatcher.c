@@ -8,6 +8,7 @@ void eui_view_dispatcher_init(eui_view_dispatcher_t *vd, eui_canvas_t *canvas, u
     vd->canvas = canvas;
     vd->get_tick_ms = get_tick_ms;
     vd->running = false;
+    vd->current_view_idx = 0xFF; /* no active view until the first switch_to */
 }
 
 int eui_view_dispatcher_add(eui_view_dispatcher_t *vd, uint32_t view_id, eui_view_t *view) {
