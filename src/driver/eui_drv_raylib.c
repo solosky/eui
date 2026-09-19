@@ -279,6 +279,7 @@ static int input_poll(eui_event_t *evt, void *ud) {
     /* Mouse: left = OK, right = BACK (parallel with keyboard) */
     pressed[EUI_KEY_OK]   |= IsMouseButtonDown(MOUSE_BUTTON_LEFT);
     pressed[EUI_KEY_BACK] |= IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
+    pressed[EUI_KEY_BACK] |= IsKeyDown(KEY_ESCAPE);
 
     for (int k = 0; k < EUI_KEY_COUNT; k++) {
         if (pressed[k] && !prev_states[k]) {
