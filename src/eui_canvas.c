@@ -1,6 +1,7 @@
 #include "eui/eui_canvas.h"
 #include "eui/eui_allocator.h"
 #include "eui/eui_font.h"
+#include "eui/eui_font_internal.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -69,6 +70,39 @@ static void canvas_set_pixel(eui_canvas_t *c, int16_t x, int16_t y, eui_color_t 
     (void)c; (void)x; (void)y; (void)color;
 #endif
 }
+
+static eui_color_t canvas_get_pixel(eui_canvas_t *c, int16_t x, int16_t y)
+{
+#if EUI_COLOR_DEPTH != 16
+    /* pixel readback is only needed for 16bpp alpha blending */
+    (void)c; (void)x; (void)y;
+    return 0;
+#else
+    if (x < c->clip.x || x >= c->clip.x + (int16_t)c->clip.w ||
+        y < c->clip.y || y >= c->clip.y + (int16_t)c->clip.h) {
+        return 0;
+    }
+
+    uint16_t screen_h = eui_canvas_height(c);
+    uint16_t screen_w = eui_canvas_width(c);
+
+    if (x < 0 || x >= (int16_t)screen_w || y < 0 || y >= (int16_t)screen_h) return 0;
+
+    uint16_t *buf16 = (uint16_t*)c->buffer;
+    return buf16[y * screen_w + x];
+#endif
+}
+
+#if EUI_COLOR_DEPTH == 16
+/* Alpha-blend fg over dst in native RGB565 space (a: 0..255 ink coverage). */
+static eui_color_t vlw_blend_pixel(eui_color_t dst, eui_color_t fg, uint8_t a)
+{
+    uint16_t r = (uint16_t)((((fg >> 11) & 0x1Fu) * a + ((dst >> 11) & 0x1Fu) * (255u - a) + 127u) / 255u);
+    uint16_t g = (uint16_t)((((fg >> 5) & 0x3Fu) * a + ((dst >> 5) & 0x3Fu) * (255u - a) + 127u) / 255u);
+    uint16_t b = (uint16_t)((((fg) & 0x1Fu) * a + ((dst) & 0x1Fu) * (255u - a) + 127u) / 255u);
+    return (eui_color_t)((r << 11) | (g << 5) | b);
+}
+#endif
 
 static size_t canvas_buf_size(eui_canvas_t *c)
 {
@@ -600,12 +634,52 @@ static void draw_bdf_glyph(eui_canvas_t *canvas, const eui_font_t *font,
     if (adv_out) *adv_out = x_adv;
 }
 
+static void draw_vlw_glyph(eui_canvas_t *canvas, const eui_font_t *font,
+                           uint16_t cp, int16_t x, int16_t y, uint8_t *adv_out)
+{
+    eui_vlw_glyph_t g;
+    if (!eui_font_vlw_find_glyph(font, cp, &g) ||
+        g.width <= 0 || g.height <= 0) {
+        if (adv_out) *adv_out = 0;
+        return;
+    }
+
+    /* bitmap top sits (baseline - dy) rows below the line cell top */
+    int16_t gy = (int16_t)(y + (int16_t)font->baseline - (int16_t)g.dy);
+    int16_t gx = (int16_t)(x + (int16_t)g.dx);
+
+    for (int32_t row = 0; row < g.height; row++) {
+        for (int32_t col = 0; col < g.width; col++) {
+            uint8_t a = g.bitmap[row * g.width + col];
+            if (a == 0) continue;
+            int16_t px = (int16_t)(gx + col);
+            int16_t py = (int16_t)(gy + row);
+#if EUI_COLOR_DEPTH == 16
+            if (a >= 250) {
+                canvas_set_pixel(canvas, px, py, canvas->fg_color);
+            } else {
+                eui_color_t dst = canvas_get_pixel(canvas, px, py);
+                canvas_set_pixel(canvas, px, py,
+                                 vlw_blend_pixel(dst, canvas->fg_color, a));
+            }
+#else
+            if (a >= 128)
+                canvas_set_pixel(canvas, px, py, canvas->fg_color);
+#endif
+        }
+    }
+
+    if (adv_out) *adv_out = (uint8_t)g.x_advance;
+}
+
 static void draw_glyph(eui_canvas_t *canvas, const eui_font_t *font,
                        char c, uint16_t prev, int16_t x, int16_t y, uint8_t *adv_out)
 {
     if (!font || !font->data) { if (adv_out) *adv_out = 0; return; }
     if (font->format == EUI_FONT_FORMAT_BDF) {
         draw_bdf_glyph(canvas, font, c, x, y, adv_out);
+    } else if (font->format == EUI_FONT_FORMAT_VLW) {
+        draw_vlw_glyph(canvas, font, (uint16_t)(uint8_t)c, x, y, adv_out);
 #if EUI_FONT_ENABLE_U8G2
     } else if (font->format == EUI_FONT_FORMAT_U8G2) {
         draw_u8g2_glyph(canvas, font, (uint16_t)(uint8_t)c, (uint16_t)(uint8_t)prev, x, y, adv_out);
@@ -629,11 +703,17 @@ uint16_t eui_canvas_draw_str(eui_canvas_t *canvas, int16_t x, int16_t y, const c
 #if EUI_FONT_ENABLE_U8G2
         if (canvas->font->format == EUI_FONT_FORMAT_U8G2 && canvas->font->lookup_glyph && cp > 0xFF) {
             draw_u8g2_glyph(canvas, canvas->font, (uint16_t)cp, 0, cur_x, y, &adv);
+        } else if (canvas->font->format == EUI_FONT_FORMAT_VLW) {
+            draw_vlw_glyph(canvas, canvas->font, (uint16_t)cp, cur_x, y, &adv);
         } else {
             draw_glyph(canvas, canvas->font, (char)(encoding & 0xFF), prev, cur_x, y, &adv);
         }
 #else
-        draw_glyph(canvas, canvas->font, (char)(encoding & 0xFF), prev, cur_x, y, &adv);
+        if (canvas->font->format == EUI_FONT_FORMAT_VLW) {
+            draw_vlw_glyph(canvas, canvas->font, (uint16_t)cp, cur_x, y, &adv);
+        } else {
+            draw_glyph(canvas, canvas->font, (char)(encoding & 0xFF), prev, cur_x, y, &adv);
+        }
 #endif
         cur_x += adv;
         prev = encoding;

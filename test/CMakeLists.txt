@@ -36,6 +36,7 @@ eui_add_test(test_font_canvas           font/test_font_canvas.c)
 eui_add_test(test_font_multiline        font/test_font_multiline.c)
 eui_add_test(test_font_wqy13_render     font/test_font_wqy13_render.c)
 eui_add_test(test_font_real_u8g2_render font/test_font_real_u8g2_render.c)
+eui_add_test(test_font_vlw_render     font/test_font_vlw_render.c)
 
 # ---- View ----
 eui_add_test(test_view              view/test_view.c)

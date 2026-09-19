@@ -67,4 +67,17 @@ uint8_t eui_font_draw_char(const eui_font_t *font, char c,
                             uint8_t *buf, uint16_t buf_stride,
                             uint8_t color_depth);
 
+/**
+ * @brief Initialize a font descriptor from raw VLW data.
+ *
+ * Parses the VLW file header and derives the line metrics the same way
+ * LovyanGFX does: the baseline is refined to the deepest glyph ascent
+ * (maxAscent) and the line height to maxAscent + maxDescent. Sets
+ * format, flags, data, baseline and line_height on @p font.
+ *
+ * @param font Pointer to the font descriptor to fill in.
+ * @param data Raw VLW file data (must outlive the font descriptor).
+ */
+void eui_font_vlw_init(eui_font_t *font, const uint8_t *data);
+
 #endif /* EUI_FONT_H */

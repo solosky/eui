@@ -9,8 +9,9 @@ def be32(v):
     return struct.pack('>i', v)
 
 def bdf_row_to_8bpp(byte, width=8):
-    """Convert 1bpp BDF row byte to 8 8bpp bytes. 1=ink(0), 0=bg(255)"""
-    return bytes(0 if (byte >> (7-i)) & 1 else 255 for i in range(width))
+    """Convert 1bpp BDF row byte to 8 8bpp bytes (alpha: 255=opaque ink, 0=bg,
+    matching real Processing/TFT_eSPI .vlw files)."""
+    return bytes(255 if (byte >> (7-i)) & 1 else 0 for i in range(width))
 
 # BDF glyph bitmaps (8x8) for chars A-H, matching eui_font_builtin.c
 bdf_glyphs = {
