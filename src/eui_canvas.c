@@ -105,8 +105,9 @@ eui_color_t eui_canvas_px_get(eui_canvas_t *c, int16_t x, int16_t y)
 }
 
 #if EUI_COLOR_DEPTH == 16
-/* Alpha-blend fg over dst in native RGB565 space (a: 0..255 ink coverage). */
-static eui_color_t vlw_blend_pixel(eui_color_t dst, eui_color_t fg, uint8_t a)
+/* Alpha-blend fg over dst in native RGB565 space (a: 0..255 ink coverage).
+ * Non-static: eui_canvas_px_blend reuses the same formula at 16bpp. */
+eui_color_t blend_565(eui_color_t dst, eui_color_t fg, uint8_t a)
 {
     uint16_t r = (uint16_t)((((fg >> 11) & 0x1Fu) * a + ((dst >> 11) & 0x1Fu) * (255u - a) + 127u) / 255u);
     uint16_t g = (uint16_t)((((fg >> 5) & 0x3Fu) * a + ((dst >> 5) & 0x3Fu) * (255u - a) + 127u) / 255u);
@@ -114,6 +115,69 @@ static eui_color_t vlw_blend_pixel(eui_color_t dst, eui_color_t fg, uint8_t a)
     return (eui_color_t)((r << 11) | (g << 5) | b);
 }
 #endif
+
+#if EUI_COLOR_DEPTH == 1 || EUI_COLOR_DEPTH == 2
+/* 4x4 Bayer 有序抖动阈值表（与 VAMeter startup_view 的既有先例同表） */
+static const uint8_t canvas_bayer4[4][4] = {
+    {  0,  8,  2, 10 },
+    { 12,  4, 14,  6 },
+    {  3, 11,  1,  9 },
+    { 15,  7, 13,  5 },
+};
+#endif
+
+#if EUI_COLOR_DEPTH != 16
+/* 色深级别 ↔ 0..255 灰度：eui_color_from_gray 的量化就是这套网格 */
+static uint8_t canvas_gray_of(eui_color_t v)
+{
+#if EUI_COLOR_DEPTH == 1
+    return (uint8_t)(v ? 255u : 0u);
+#elif EUI_COLOR_DEPTH == 2
+    return (uint8_t)(v * 85u);
+#elif EUI_COLOR_DEPTH == 4
+    return (uint8_t)(v * 17u);
+#else
+    return (uint8_t)v;                     /* 8bpp */
+#endif
+}
+
+/* 把 0..255 的精确灰度量化到本色深。L ∈ {2,4} 用 4x4 Bayer 抖动合成中间灰，
+ * L ∈ {16,256} 直接四舍五入：rem == 0（颜色已在级网格上）时恒等，实心内部零噪点。 */
+static eui_color_t canvas_quantize(eui_canvas_t *c, uint8_t g, int16_t x, int16_t y)
+{
+#if EUI_COLOR_DEPTH == 8
+    (void)c; (void)x; (void)y;
+    return (eui_color_t)g;
+#elif EUI_COLOR_DEPTH == 4
+    (void)c; (void)x; (void)y;
+    return (eui_color_t)(((uint16_t)g * 15u + 127u) / 255u);
+#else
+    uint16_t y_abs = (uint16_t)((uint16_t)y + c->page_y_offset);
+    uint8_t  t     = canvas_bayer4[y_abs & 3u][(uint16_t)x & 3u];
+    uint16_t step  = (EUI_COLOR_DEPTH == 1) ? 255u : 85u;
+    uint8_t  q     = (uint8_t)(g / step);
+    uint8_t  rem   = (uint8_t)(g - q * step);
+    return (eui_color_t)((rem * 16u >= (uint16_t)(t + 1u) * step) ? (uint8_t)(q + 1u) : q);
+#endif
+}
+#endif /* != 16bpp */
+
+void eui_canvas_px_blend(eui_canvas_t *c, int16_t x, int16_t y, eui_color_t fg, uint8_t cov)
+{
+    if (!c || cov == 0) return;
+    if (cov == 255) {
+        eui_canvas_px_set(c, x, y, fg);
+        return;
+    }
+#if EUI_COLOR_DEPTH == 16
+    eui_canvas_px_set(c, x, y, blend_565(eui_canvas_px_get(c, x, y), fg, cov));
+#else
+    uint16_t g = ((uint16_t)canvas_gray_of(fg) * cov
+                + (uint16_t)canvas_gray_of(eui_canvas_px_get(c, x, y)) * (255u - cov)
+                + 127u) / 255u;
+    eui_canvas_px_set(c, x, y, canvas_quantize(c, (uint8_t)g, x, y));
+#endif
+}
 
 static size_t canvas_buf_size(eui_canvas_t *c)
 {
@@ -669,9 +733,7 @@ static void draw_vlw_glyph(eui_canvas_t *canvas, const eui_font_t *font,
             if (a >= 250) {
                 eui_canvas_px_set(canvas, px, py, canvas->fg_color);
             } else {
-                eui_color_t dst = eui_canvas_px_get(canvas, px, py);
-                eui_canvas_px_set(canvas, px, py,
-                                 vlw_blend_pixel(dst, canvas->fg_color, a));
+                eui_canvas_px_blend(canvas, px, py, canvas->fg_color, a);
             }
 #else
             if (a >= 128)
