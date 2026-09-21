@@ -36,10 +36,12 @@ static const eui_font_t wqy12_font = {
 #define IMG_W 800
 #define IMG_H 400
 
-#if EUI_COLOR_DEPTH == 1
+#if EUI_COLOR_DEPTH == 1 || EUI_COLOR_DEPTH == 2 || EUI_COLOR_DEPTH == 4
 #define BUF_SIZE (IMG_W * IMG_H / 8)
-#else
+#elif EUI_COLOR_DEPTH == 8
 #define BUF_SIZE (IMG_W * IMG_H)
+#else
+#define BUF_SIZE (IMG_W * IMG_H * 2)
 #endif
 
 static uint8_t img_buf[BUF_SIZE];
@@ -117,9 +119,13 @@ static void write_bmp(const char *filename)
             int bit = (img_buf[idx] >> (7 - (x % 8))) & 1;
 #elif EUI_COLOR_DEPTH == 8
             int bit = img_buf[y * IMG_W + x] > 128 ? 1 : 0;
-#else
+#elif EUI_COLOR_DEPTH == 16
             uint16_t *p16 = (uint16_t *)img_buf;
             int bit = p16[y * IMG_W + x] > 0 ? 1 : 0;
+#else
+            /* 2/4bpp：img_buf 是位打包布局，与 1bpp 同读法 */
+            int idx = y * (IMG_W / 8) + x / 8;
+            int bit = (img_buf[idx] >> (7 - (x % 8))) & 1;
 #endif
             if (bit) row[x / 8] |= (1 << (7 - (x % 8)));
         }

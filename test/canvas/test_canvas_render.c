@@ -21,6 +21,11 @@
 
 static uint8_t mock_buf[BUF_SIZE];
 
+/* Self-owned TLSF pool: the shared eui_test_init() pool is 64 KB, too small for
+ * a 256x750 full-buffer canvas at 4/8/16bpp (384 KB at 16bpp). */
+#define POOL_SIZE 524288
+static uint8_t mem_pool[POOL_SIZE];
+
 static void mock_write_buffer(const uint8_t *b, const eui_rect_t *r, void *ud)
 {
     (void)ud;
@@ -441,7 +446,7 @@ static void render_all_methods(eui_canvas_t *c, const char *bmp_path)
 
 int main(void)
 {
-    eui_test_init();
+    eui_allocator_init_tlsf(mem_pool, POOL_SIZE);
     printf("=== eui_canvas Full API Render Test ===\n");
     printf("Canvas: %dx%d, color_depth=%d, font=builtin(8x8)\n\n",
            CANVAS_W, CANVAS_H, EUI_COLOR_DEPTH);
