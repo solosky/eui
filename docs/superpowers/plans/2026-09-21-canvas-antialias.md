@@ -351,7 +351,11 @@ static const uint8_t aa_bayer_expected[4][4] = {
     { 15,  7, 13,  5 },
 };
 
-/* 在 (ox,oy) 起 4x4 区域用 cov 混合白色到黑底，数取"高级"的格数 */
+/* 在 (ox,oy) 起 4x4 区域用 cov 混合白色到黑底，数取到 high_level 及以上的格数。
+ * 谓词必须是 >= 而不是 ==：随覆盖度增长，"相邻两级"这一对本身会变
+ * （2bpp 下 cov=255 时量化结果是级 3 而非级 2），等值计数永远到不了 16。
+ * 本测试验证"抖动密度随覆盖度单调不减"；Bayer 相位的精确性由
+ * test_dither_phase_matches_bayer 负责。 */
 static int dither_high_count(int ox, int oy, uint8_t cov, int high_level)
 {
     int n = 0;
@@ -359,7 +363,7 @@ static int dither_high_count(int ox, int oy, uint8_t cov, int high_level)
         for (int dx = 0; dx < 4; dx++) {
             eui_canvas_px_set(aa_cur, ox + dx, oy + dy, 0);
             eui_canvas_px_blend(aa_cur, ox + dx, oy + dy, EUI_COLOR_WHITE, cov);
-            if ((int)aa_get(ox + dx, oy + dy) == high_level) n++;
+            if ((int)aa_get(ox + dx, oy + dy) >= high_level) n++;
         }
     return n;
 }
@@ -556,13 +560,16 @@ void        eui_canvas_px_blend(eui_canvas_t *c, int16_t x, int16_t y,
 在 `src/eui_canvas.c` 中，把原 `vlw_blend_pixel`（16bpp 段）改名为 `blend_565` 并去掉 `static`（同文件内使用），在其后追加：
 
 ```c
-/* 4x4 Bayer 有序抖动阈值表（与 VAMeter startup_view 的既有先例同表） */
+#if EUI_COLOR_DEPTH == 1 || EUI_COLOR_DEPTH == 2
+/* 4x4 Bayer 有序抖动阈值表（与 VAMeter startup_view 的既有先例同表）。
+ * 必须带色深守卫：只有 1/2bpp 用它，否则 4/8/16bpp 会多出 unused-const 警告。 */
 static const uint8_t canvas_bayer4[4][4] = {
     {  0,  8,  2, 10 },
     { 12,  4, 14,  6 },
     {  3, 11,  1,  9 },
     { 15,  7, 13,  5 },
 };
+#endif
 
 #if EUI_COLOR_DEPTH != 16
 /* 色深级别 ↔ 0..255 灰度：eui_color_from_gray 的量化就是这套网格 */
