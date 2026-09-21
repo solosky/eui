@@ -1309,6 +1309,13 @@ Expected: `C1` 通过旧实现也成立（直边本来就对），但 `corner_ma
 ```
 （`eui_canvas_aa.c` 顶部已有 `eui_canvas_internal.h`，其中已 include 公开头，无需重复。）
 
+**勘误（交付后修正，以 `src/eui_canvas_aa.c` 的实际实现为准）**：下面两家圆角矩形的四个角盘**不能**复用直边端点变量当圆心。`ri = x+w-r-1`、`b = y+h-r-1` 是"直边最后一列/行"，比真正的角心 `(x+w-r, y+r)` / `(x+w-r, y+h-r)` / `(x+r, y+h-r)` 小 1；照原稿写会让右、下两侧的四段角弧整体内缩 1 px，后果是：
+
+1. `fill_round_rect`：轮廓在"直边与角弧相切"的那一行/列出现 **1 px 台阶**（VAMeter 模拟器截图中圆角上的"折角"，见 spec C16）；
+2. `draw_round_rect`：角弧接不到直边那一列，轮廓出现 **1 px 断口**。
+
+旧中点光栅器把"含边界点的像素"整格涂满，恰好掩盖了这 1 px，所以实施期的 C1/C5 两个测试都没抓到（C5 只比对左/上角心，恰好是取对的那两个）。角心对齐还有额外好处：`2r == w`（或 `2r == h`）的胶囊形退化配置里两盘圆心重合、分界轴落在像素边界上，原先 1-2 px 的双重混合接缝随之消失。正确写法是 `eui_canvas_aa_arc(canvas, ri + 1, t, …)` / `(ri + 1, b + 1)` / `(l, b + 1)`。
+
 ```c
 void eui_canvas_fill_circle(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t r)
 {
