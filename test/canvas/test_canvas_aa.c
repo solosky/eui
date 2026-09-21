@@ -7,8 +7,10 @@
 #include <stdio.h>
 #include <string.h>
 
-/* C15 参考一致性测试要放 2*120+4 的画布；16bpp 下约 135KB，因此自建池 */
-#define AA_POOL_SIZE 262144
+/* C15 参考一致性测试要放 2*120+4 的画布；16bpp 下约 135KB，因此自建池。
+ * 池要能同时容下**两个** 16bpp 画布：FAIL() 是 longjmp 出测试函数的，失败的那条
+ * 测试走不到末尾的 eui_canvas_destroy，于是它的 135KB 画布会留在池里。 */
+#define AA_POOL_SIZE 393216
 static uint8_t aa_pool[AA_POOL_SIZE];
 
 #define AA_W 260
@@ -285,6 +287,358 @@ static void test_16bpp_blend_matches_legacy(void)
 }
 #endif
 
+/* 参考光栅器：64 子样本独立判定"像素中心落在圆内"的面积占比（0..256）。
+ * 与实现完全独立，是 C15 的判别性基准。 */
+static uint32_t aa_ref_disc_cov(int px, int py, int cx, int cy, int r)
+{
+    int hit = 0;
+    for (int sy = 0; sy < 8; sy++)
+        for (int sx = 0; sx < 8; sx++) {
+            /* 用整数比较避免浮点：以 1/16 px 为单位 */
+            int32_t x = ((px * 16) + 2 * sx + 1) - cx * 16;
+            int32_t y = ((py * 16) + 2 * sy + 1) - cy * 16;
+            if (x * x + y * y <= r * 16 * r * 16) hit++;
+        }
+    return (uint32_t)((hit * 256 + 32) / 64);
+}
+
+/* 参考方向向量：从 1° 旋转矩阵递推，Q30 精度、不用 libm、与实现的 Q14 表无关。
+ * （360 步累积的舍入误差约 3e-7，远小于 1/16 px 的容差） */
+#define REF_COS1 1073578288LL   /* round(cos 1° * 2^30) —— 实测值，勿手改 */
+#define REF_SIN1   18739379LL   /* round(sin 1° * 2^30) —— 实测值，勿手改 */
+static void aa_ref_dir(int deg, int64_t *ux, int64_t *uy)
+{
+    int64_t cx = 1LL << 30, cy = 0;                 /* 0° = (1, 0) */
+    int d = deg % 360;
+    if (d < 0) d += 360;
+    for (int i = 0; i < d; i++) {
+        int64_t nx = (cx * REF_COS1 - cy * REF_SIN1) >> 30;
+        int64_t ny = (cx * REF_SIN1 + cy * REF_COS1) >> 30;
+        cx = nx; cy = ny;
+    }
+    *ux = cx; *uy = cy;
+}
+
+/* 扇区参考：圆盘参考 + 角度区间判定。角度判定用"半平面交（sweep<=180）/
+ * 补扇形交的补（sweep>180）"两种数学形式，与实现的两条公式同源但独立实现；
+ * 被验证的是覆盖度与光栅化管线，而非三角恒等式。 */
+static uint32_t aa_ref_sector_cov(int px, int py, int cx, int cy,
+                                  int r_in, int r_out, int a0, int a1)
+{
+    int sweep = a1 - a0;
+    int has_caps = !(sweep >= 360 || sweep <= -360);
+    int complement = has_caps && sweep > 180;
+    int64_t ux0 = 1LL << 30, uy0 = 0, ux1 = 1LL << 30, uy1 = 0;
+    if (has_caps) {
+        if (complement) { aa_ref_dir(a1, &ux0, &uy0); aa_ref_dir(a0, &ux1, &uy1); }
+        else            { aa_ref_dir(a0, &ux0, &uy0); aa_ref_dir(a1, &ux1, &uy1); }
+    }
+    int hit = 0;
+    for (int sy = 0; sy < 8; sy++)
+        for (int sx = 0; sx < 8; sx++) {
+            int32_t dx = ((px * 16) + 2 * sx + 1) - cx * 16;
+            int32_t dy = ((py * 16) + 2 * sy + 1) - cy * 16;
+            int64_t d2 = (int64_t)dx * dx + (int64_t)dy * dy;
+            if (d2 < (int64_t)(r_in * 16) * (r_in * 16)) continue;
+            if (d2 > (int64_t)(r_out * 16) * (r_out * 16)) continue;
+            if (has_caps) {
+                if (complement) {
+                    /* 在补扇形内则排除 */
+                    if ((ux0 * dy - uy0 * dx) >= 0 && (ux1 * dy - uy1 * dx) <= 0) continue;
+                } else {
+                    if ((ux0 * dy - uy0 * dx) < 0) continue;   /* 起点帽内侧 ⟺ cross >= 0 */
+                    if ((ux1 * dy - uy1 * dx) > 0) continue;   /* 终点帽内侧 ⟺ cross <= 0 */
+                }
+            }
+            hit++;
+        }
+    return (uint32_t)((hit * 256 + 32) / 64);
+}
+
+#if EUI_COLOR_DEPTH == 8
+static void test_reference_agreement_sector(void)   /* C8/C9 的一般化验证 */
+{
+    TEST("C15（扇区）：与 64 子样本参考一致，含跨 180° 与整圆（8bpp，容差 24/256）");
+    /* 跨 180° 的两种路径与补扇形公式都在这组 sweep 里被逐像素比对；
+     * 若实现把大弧拆成两段绘制，接缝处会叠加成 ~0.25·dst+0.75·fg，
+     * 偏差约 63/256，必然超出容差。 */
+    static const int sweeps[] = { 1, 45, 120, 179, 180, 181, 270, 359, 360 };
+    const int r = 40, cx = 130, cy = 130;
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+    for (unsigned i = 0; i < sizeof(sweeps) / sizeof(sweeps[0]); i++) {
+        int sw = sweeps[i];
+        eui_canvas_set_bg_color(c, EUI_COLOR_BLACK);
+        eui_canvas_clear(c);
+        eui_canvas_set_color(c, eui_color_from_gray(255));
+        eui_canvas_aa_arc(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, 0, 30, (int16_t)(30 + sw));
+        for (int y = cy - r - 2; y <= cy + r + 2; y++)
+            for (int x = cx - r - 2; x <= cx + r + 2; x++) {
+                uint32_t want = aa_ref_sector_cov(x, y, cx, cy, 0, r, 30, 30 + sw);
+                uint32_t got  = aa_get(x, y);
+                uint32_t diff = (got > want) ? (got - want) : (want - got);
+                if (diff > 24) {
+                    printf("\n  sweep=%d (%d,%d) got=%u want=%u\n",
+                           sw, x - cx, y - cy, got, want);
+                    FAIL("扇区与参考偏差超容差（可能是接缝双重混合或覆盖度模型错误）");
+                }
+            }
+    }
+    /* 圆环（内孔）也要过参考 */
+    {
+        eui_canvas_clear(c);
+        eui_canvas_aa_arc(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, 25, 0, 360);
+        for (int y = cy - r - 2; y <= cy + r + 2; y++)
+            for (int x = cx - r - 2; x <= cx + r + 2; x++) {
+                uint32_t want = aa_ref_sector_cov(x, y, cx, cy, 25, r, 0, 360);
+                uint32_t got  = aa_get(x, y);
+                uint32_t diff = (got > want) ? (got - want) : (want - got);
+                if (diff > 24) {
+                    printf("\n  ring (%d,%d) got=%u want=%u\n", x - cx, y - cy, got, want);
+                    FAIL("圆环与参考偏差超容差");
+                }
+            }
+    }
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+#endif
+
+#if EUI_COLOR_DEPTH == 8
+static void test_reference_agreement_disc(void)   /* C15 @8bpp */
+{
+    TEST("C15：与 64 子样本参考一致（8bpp，容差 24/256）");
+    static const int radii[] = { 3, 4, 8, 20, 60, 120 };
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+    for (unsigned i = 0; i < sizeof(radii) / sizeof(radii[0]); i++) {
+        int r = radii[i];
+        /* 两种圆心相位：落在像素中心 / 落在像素角 */
+        for (int ph = 0; ph < 2; ph++) {
+            int cx = 130 + ph, cy = 130;
+            eui_canvas_set_bg_color(c, EUI_COLOR_BLACK);
+            eui_canvas_clear(c);
+            eui_canvas_set_color(c, eui_color_from_gray(255));   /* 8bpp 下 EUI_COLOR_WHITE 是 1，不是 255 */
+            eui_canvas_aa_arc(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, 0, 0, 360);
+            for (int y = cy - r - 2; y <= cy + r + 2; y++)
+                for (int x = cx - r - 2; x <= cx + r + 2; x++) {
+                    uint32_t want = aa_ref_disc_cov(x, y, cx, cy, r);
+                    uint32_t got  = aa_get(x, y);            /* 8bpp: 像素值即覆盖度 */
+                    uint32_t d    = (got > want) ? (got - want) : (want - got);
+                    if (d > 24) {
+                        printf("\n  r=%d phase=%d (%d,%d) got=%u want=%u\n",
+                               r, ph, x - cx, y - cy, got, want);
+                        FAIL("与参考偏差超容差");
+                    }
+                }
+        }
+    }
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+#endif
+
+#if EUI_COLOR_DEPTH == 16
+static void test_reference_agreement_disc_16(void)  /* C15 @16bpp：比绿通道 */
+{
+    TEST("C15：与 64 子样本参考一致（16bpp 绿通道，容差 2 级）");
+    static const int radii[] = { 3, 8, 20, 60, 120 };
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+    for (unsigned i = 0; i < sizeof(radii) / sizeof(radii[0]); i++) {
+        int r = radii[i];
+        int cx = 130, cy = 131;
+        eui_canvas_clear(c);
+        eui_canvas_set_color(c, eui_color_from_gray(255));
+        eui_canvas_aa_arc(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, 0, 0, 360);
+        for (int y = cy - r - 2; y <= cy + r + 2; y++)
+            for (int x = cx - r - 2; x <= cx + r + 2; x++) {
+                uint32_t ref = aa_ref_disc_cov(x, y, cx, cy, r);
+                int want = (int)((ref * 63u + 127u) / 255u);
+                int got  = (int)(((uint32_t)aa_get(x, y) >> 5) & 0x3Fu);
+                int d    = got - want;
+                if (d < -2 || d > 2) {
+                    printf("\n  r=%d (%d,%d) got=%d want=%d ref=%u\n", r, x - cx, y - cy, got, want, ref);
+                    FAIL("16bpp 与参考偏差超容差");
+                }
+            }
+    }
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+#endif
+
+#if EUI_COLOR_DEPTH == 8
+static void test_contracts_c2_c3_c4_c6_c7(void)
+{
+    TEST("C2/C3/C4/C6/C7（8bpp 覆盖度可观测）");
+    const int r = 60, cx = 130, cy = 130;
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+    /* C2：非黑底上全覆盖像素必须精确等于 fg（证明未二次混合、未读 dst） */
+    eui_canvas_set_bg_color(c, (eui_color_t)128);
+    eui_canvas_clear(c);
+    eui_canvas_set_color(c, (eui_color_t)255);
+    eui_canvas_aa_arc(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, 0, 0, 360);
+    for (int y = cy - r; y <= cy + r; y++)
+        for (int x = cx - r; x <= cx + r; x++) {
+            int dx = x - cx, dy = y - cy;
+            /* 像素 (x,y) 覆盖相对圆心的 [dx, dx+1] × [dy, dy+1]，不是一个点：
+             * C2 的"明确在内部"要看像素的**最远点**、C3 的"明确在外"要看**最近点**
+             * （负偏移侧在 +1 方向）。把 (dx,dy) 当点用会让 C2 要求本就有部分覆盖度
+             * 的像素等于 fg（r=60 的 (57,15)：中心 59.55 px > r-0.5，真值也是部分覆盖），
+             * 让 C3 把本就有部分覆盖度的像素当成"确定没覆盖"（r=60 的 (-11,-60)：
+             * 最近角 59.84 px < r，圆确实切进这个像素）。 */
+            int fx = (dx >= 0) ? dx + 1 : dx;      /* 最远点 */
+            int fy = (dy >= 0) ? dy + 1 : dy;
+            int nx = (dx >= 0) ? dx : dx + 1;      /* 最近点 */
+            int ny = (dy >= 0) ? dy : dy + 1;
+            if (fx * fx + fy * fy <= (r - 1) * (r - 1)) {
+                if (aa_get(x, y) != 255) FAIL("C2：内部像素不等于 fg");
+            }
+            if (nx * nx + ny * ny >= (r + 1) * (r + 1)) {
+                if (aa_get(x, y) != 128) FAIL("C3：外部像素被写");
+            }
+        }
+    /* C4：过心水平扫描线上存在严格介于背景与前景之间的像素
+     * （本测试底色是 128，所以"部分覆盖"必须是 128 < v < 255；写 v>0 会把背景当部分覆盖 → 假通过）。
+     * 半径不能太大：圆心与半径都是整数时，圆在水平方向恰好与像素栅格相切，最外圈像素
+     * 切掉的小角面积只有 ≈ 1/(6r) px²——r=60 时 0.3%，128 底 + 8bpp 舍入后饱和成 255，
+     * 与硬边不可分（r=60 的圆在过心行上根本没有中间值像素）。r=8 时切掉 2%，
+     * 最外圈落到 253，判别性成立，因此这里用小半径单独探一次。 */
+    {
+        const int r4 = 8;
+        eui_canvas_set_bg_color(c, (eui_color_t)128);
+        eui_canvas_clear(c);
+        eui_canvas_set_color(c, (eui_color_t)255);
+        eui_canvas_aa_arc(c, (int16_t)cx, (int16_t)cy, (uint16_t)r4, 0, 0, 360);
+        int found = 0;
+        for (int x = cx - r4 - 1; x <= cx + r4 + 1; x++) {
+            uint32_t v = aa_get(x, cy);
+            if (v > 128 && v < 255) found = 1;
+        }
+        if (!found) FAIL("C4：水平扫描线上没有部分覆盖像素（假 AA）");
+        /* 复原后面 C6/C7 要用的 r=60 底图 */
+        eui_canvas_clear(c);
+        eui_canvas_set_color(c, (eui_color_t)255);
+        eui_canvas_aa_arc(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, 0, 0, 360);
+    }
+    /* C6：圆顶行的"肩部"有部分覆盖（单轴弦模型在此会给满格或 0） */
+    {
+        int partial = 0;
+        for (int x = cx - r; x <= cx + r; x++) {
+            uint32_t v = aa_get(x, cy - r);
+            if (v > 128 && v < 255) partial = 1;
+        }
+        if (!partial) FAIL("C6：圆顶行没有部分覆盖像素（圆顶被削平）");
+    }
+    /* C7：沿半径向右（自左边界向内），覆盖度单调不减。
+     * 原稿的循环从圆心往外走却仍要求"不减"，与实际值的方向相反，必然假红。 */
+    {
+        uint32_t prev = 0;
+        for (int x = cx - r - 1; x <= cx; x++) {
+            uint32_t v = aa_get(x, cy);
+            if (v < prev) FAIL("C7：覆盖度沿半径非单调");
+            prev = v;
+        }
+    }
+    eui_canvas_set_bg_color(c, EUI_COLOR_BLACK);
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+#endif
+
+static void test_clip_boundary(void)   /* C11：全色深可跑 */
+{
+    TEST("C11：跨裁剪边界时不越界、边界像素与真实 dst 混合（无黑边）");
+    const int r = 24;   /* 20 < r < 20√2 ≈ 28.3：圆要伸出裁剪块的四条边（r > 20），
+                         * 又不能把 40x40 块整个包住（半径大于块角距离 28.28 时，
+                         * 块内全是内部像素，下面的"有混合像素"必然假红——r=30 正是如此）。 */
+    const eui_color_t bright = eui_color_from_gray(255);
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+    /* 先铺一层亮底，再裁剪出一块区域，让圆心落在裁剪块内、圆伸出块外。
+     * 注意不能拿 EUI_COLOR_WHITE 当"亮"：8bpp 下它是 1（近黑）。 */
+    eui_canvas_set_bg_color(c, bright);
+    eui_canvas_clear(c);
+    eui_rect_t clip = { 100, 100, 40, 40 };
+    eui_canvas_set_clip(c, &clip);
+    eui_canvas_set_color(c, EUI_COLOR_BLACK);
+    /* Task 3 的 AA 路径就是内核本身；fill_circle 要到 Task 4 才改走内核，
+     * 用 fill_circle 测的是旧硬阈值路径（无混合像素，必然假红）。 */
+    eui_canvas_aa_arc(c, 120, 120, (uint16_t)r, 0, 0, 360);
+    eui_canvas_clear_clip(c);
+    /* 裁剪块外必须原封不动 */
+    for (int y = 0; y < AA_H; y++)
+        for (int x = 0; x < AA_W; x++) {
+            int inside = (x >= 100 && x < 140 && y >= 100 && y < 140);
+            if (!inside && aa_get(x, y) != (uint32_t)bright) {
+                printf("\n  (%d,%d) v=%u\n", x, y, (unsigned)aa_get(x, y));
+                FAIL("裁剪块外被写入");
+            }
+        }
+#if EUI_COLOR_DEPTH == 8 || EUI_COLOR_DEPTH == 16
+    /* 裁剪块内的边界像素应与亮 dst 混合，而不是与黑混合（否则会出现黑边）。
+     * 只在能表示中间值的色深上检查：1/2bpp 的中间值靠抖动，不存在"中间像素值"。 */
+    {
+        int found_blend = 0;
+        for (int y = 100; y < 140; y++)
+            for (int x = 100; x < 140; x++) {
+                uint32_t v = aa_get(x, y);
+                if (v != 0 && v != (uint32_t)bright) found_blend = 1;
+            }
+        if (!found_blend) FAIL("裁剪块内没有混合像素（疑似按 clip 外颜色混合）");
+    }
+#endif
+    eui_canvas_set_clip(c, &(eui_rect_t){ 0, 0, AA_W, AA_H });
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+
+static void test_mirror_symmetry(void)   /* C5：全色深可跑 */
+{
+    TEST("C5：四向镜像对称 + sweep=0/360 与环的边界语义");
+    const int r = 21, cx = 130, cy = 130;
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+    eui_canvas_aa_arc(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, 0, 0, 360);
+#if EUI_COLOR_DEPTH >= 4
+    /* 1/2bpp 的混合带 4x4 Bayer 抖动，而 C10 要求抖动相位锚在屏幕坐标
+     * (x, y + page_y_offset)；镜像像素 (2*cx - x - 1) 的相位与 x 不同，
+     * 于是"逐像素一致"在抖动色深上不可能成立（4bpp 只有 round-to-nearest，无抖动，
+     * 因此 >= 4bpp 成立）。 */
+    for (int y = cy - r - 1; y <= cy + r + 1; y++)
+        for (int x = cx - r - 1; x <= cx + r + 1; x++) {
+            uint32_t v = aa_get(x, y);
+            if (v != aa_get(2 * cx - x - 1, y) ||      /* 镜像索引：2*cx - x - 1 */
+                v != aa_get(x, 2 * cy - y - 1)) {
+                printf("\n  (%d,%d) v=%u\n", x - cx, y - cy, v);
+                FAIL("镜像不对称");
+            }
+        }
+#endif
+    /* sweep == 0 不画 */
+    eui_canvas_clear(c);
+    eui_canvas_aa_arc(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, 0, 45, 45);
+    for (int y = cy - r; y <= cy + r; y++)
+        for (int x = cx - r; x <= cx + r; x++)
+            if (aa_get(x, y) != 0) FAIL("sweep=0 仍然画了像素");
+    /* r_in >= r_out 不画 */
+    eui_canvas_clear(c);
+    eui_canvas_aa_arc(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, (uint16_t)r, 0, 360);
+    for (int y = cy - r; y <= cy + r; y++)
+        for (int x = cx - r; x <= cx + r; x++)
+            if (aa_get(x, y) != 0) FAIL("r_in >= r_out 仍然画了像素");
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+
 int main(void)
 {
     eui_allocator_init_tlsf(aa_pool, AA_POOL_SIZE);
@@ -308,6 +662,22 @@ int main(void)
 #if EUI_COLOR_DEPTH == 16
     test_16bpp_blend_matches_legacy();
 #endif
+
+#if EUI_COLOR_DEPTH == 8
+    test_reference_agreement_disc();
+    test_reference_agreement_sector();
+#endif
+
+#if EUI_COLOR_DEPTH == 16
+    test_reference_agreement_disc_16();
+#endif
+
+#if EUI_COLOR_DEPTH == 8
+    test_contracts_c2_c3_c4_c6_c7();
+#endif
+
+    test_clip_boundary();
+    test_mirror_symmetry();
 
     return eui_test_summary();
 }
