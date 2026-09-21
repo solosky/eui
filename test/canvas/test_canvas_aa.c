@@ -443,7 +443,15 @@ static void test_reference_agreement_disc(void)   /* C15 @8bpp */
 #if EUI_COLOR_DEPTH == 16
 static void test_reference_agreement_disc_16(void)  /* C15 @16bpp：比绿通道 */
 {
-    TEST("C15：与 64 子样本参考一致（16bpp 绿通道，容差 2 级）");
+    TEST("C15：与 64 子样本参考一致（16bpp 绿通道，容差 6 级）");
+    /* 容差取 6 级（≈24.3/256，与本任务 8bpp 门的 24/256 同一预算），不是 ±2：
+     * - 8x8 参考自身就有 ±2.55 级偏置（r=120 的 (-5,-120)：参考 224/256，精确面积
+     *   234.3/256），连精确面积的实现都要偏 3 级，所以 ±2 对任何实现都不可能通过；
+     *   把参考加密到 16x16 也不解决（实测仍偏 1/3/3/3/3 级）。
+     * - 叠加 6bit 绿通道的量化（1 级 = 4.05/256）后，判别力仍充足：实测本内核与参考
+     *   的最大偏差是 4 级（r=20/60/120），留 1.5 倍余量。
+     * - 结构性错误仍然必被抓住：被推翻的单轴弦模型偏差 ~115/256 ≈ 28 级。 */
+    const int tol = 6;
     static const int radii[] = { 3, 8, 20, 60, 120 };
     eui_canvas_t *c = aa_new_canvas();
     aa_cur = c;
@@ -459,7 +467,7 @@ static void test_reference_agreement_disc_16(void)  /* C15 @16bpp：比绿通道
                 int want = (int)((ref * 63u + 127u) / 255u);
                 int got  = (int)(((uint32_t)aa_get(x, y) >> 5) & 0x3Fu);
                 int d    = got - want;
-                if (d < -2 || d > 2) {
+                if (d < -tol || d > tol) {
                     printf("\n  r=%d (%d,%d) got=%d want=%d ref=%u\n", r, x - cx, y - cy, got, want, ref);
                     FAIL("16bpp 与参考偏差超容差");
                 }
