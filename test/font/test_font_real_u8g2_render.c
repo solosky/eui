@@ -36,12 +36,13 @@ static const eui_font_t wqy12_font = {
 #define IMG_W 800
 #define IMG_H 400
 
-#if EUI_COLOR_DEPTH == 1 || EUI_COLOR_DEPTH == 2 || EUI_COLOR_DEPTH == 4
+/* img_buf 在全色深下都按 1bpp 位打包写入（见 render_glyph_buf / render_glyph /
+ * main 里的 ASCII 扫描），因此按批量写出的字节数分配；只有 8bpp 的读取路径
+ * （write_bmp 的 #elif）是按"每像素一字节"索引，故它需要 IMG_W * IMG_H。 */
+#if EUI_COLOR_DEPTH == 1 || EUI_COLOR_DEPTH == 2 || EUI_COLOR_DEPTH == 4 || EUI_COLOR_DEPTH == 16
 #define BUF_SIZE (IMG_W * IMG_H / 8)
-#elif EUI_COLOR_DEPTH == 8
-#define BUF_SIZE (IMG_W * IMG_H)
 #else
-#define BUF_SIZE (IMG_W * IMG_H * 2)
+#define BUF_SIZE (IMG_W * IMG_H)
 #endif
 
 static uint8_t img_buf[BUF_SIZE];
@@ -114,16 +115,10 @@ static void write_bmp(const char *filename)
     for (int y = IMG_H - 1; y >= 0; y--) {
         memset(row, 0, row_size);
         for (int x = 0; x < IMG_W; x++) {
-#if EUI_COLOR_DEPTH == 1
-            int idx = y * (IMG_W / 8) + x / 8;
-            int bit = (img_buf[idx] >> (7 - (x % 8))) & 1;
-#elif EUI_COLOR_DEPTH == 8
+#if EUI_COLOR_DEPTH == 8
             int bit = img_buf[y * IMG_W + x] > 128 ? 1 : 0;
-#elif EUI_COLOR_DEPTH == 16
-            uint16_t *p16 = (uint16_t *)img_buf;
-            int bit = p16[y * IMG_W + x] > 0 ? 1 : 0;
 #else
-            /* 2/4bpp：img_buf 是位打包布局，与 1bpp 同读法 */
+            /* 1/2/4/16bpp：img_buf 全是位打包布局（每行 IMG_W/8 字节），同 1bpp 读法 */
             int idx = y * (IMG_W / 8) + x / 8;
             int bit = (img_buf[idx] >> (7 - (x % 8))) & 1;
 #endif

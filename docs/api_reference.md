@@ -144,9 +144,10 @@ void eui_canvas_fill_pie(eui_canvas_t *canvas, int16_t cx, int16_t cy, uint16_t 
 
 - **低色深**：1bpp / 2bpp 用 4×4 Bayer 有序抖动模拟中间灰，抖动阈值相位锚定在屏幕坐标 `(x, y)`（含 PAGE 模式的 `page_y_offset`，跨 band 连续）；**实心内部不抖动**——完全覆盖的像素写入的颜色已在色深量化网格上，输出精确等于前景色，因此填充区零噪点。4bpp 量化到 16 级、8bpp 精确到 256 级、16bpp 在 RGB565 空间逐通道混合，均无抖动。
 - **角度**：整数度，0° = 3 点钟方向，顺时针为正（屏幕 y 向下增长）。
-- **弧段扫描规则**：`delta = end_deg - start_deg`；`delta == 0` 不画任何像素；`|delta| >= 360` 画整圆；其余折到 1..359°（`delta < 0` 时取 `delta + 360`，即 `end_deg` 与 `end_deg + 360` 等价，`start=0, end=-90` 与 `start=0, end=270` 画出的扇形相同）。端帽为平头（butt），扇形始终从 `start_deg` 沿顺时针量取 `|delta|` 归一化后的度数。
+- **弧段扫描规则**：`delta = end_deg - start_deg`；`delta == 0` 不画任何像素；`|delta| >= 360` 画整圆；其余折到 1..359°——`delta < 0` 且 `|delta| < 360` 时取 `delta + 360`，此时 `end_deg` 与 `end_deg + 360` 画出的扇形逐像素相同（`start=0, end=-90` 与 `start=0, end=270` 实测一致）。注意 `|delta| >= 360` 那一档优先于该等价关系：`end=-400`（`delta = -400`）画的是整圆，而不是 320° 扇形。端帽为平头（butt），扇形始终从 `start_deg` 沿顺时针量取归一化后的度数。
 - **描边宽度**：`eui_canvas_draw_arc` 的描边占据半径区间 `[r - thickness, r]`；`thickness == 0` 不画；`thickness >= r` 时内半径夹到 0，退化为扇形（等价于 `eui_canvas_fill_pie`）。`eui_canvas_draw_ring` 的描边占据 `[r_inner, r_outer]`，`r_inner >= r_outer` 不画。
 - **退化情形**：`eui_canvas_fill_pie(cx, cy, 0, ...)` 不画（半径为 0 的扇形没有面积），而 `eui_canvas_fill_circle(cx, cy, 0)` 仍按既有契约画一个点。
+- **圆心约定（消费者需注意）**：新内核把圆心放在**连续点** `(cx, cy)`（像素跨 `[px, px+1]`），与画布既有的 `draw_line` / `draw_rect` / `fill_rect` 索引空间一致；legacy 的中点光栅器把圆心放在像素中心 `(x+0.5, y+0.5)`。因此圆与圆角的右/下边缘可能比旧版窄一像素：`eui_canvas_fill_circle(c, 100, 100, 20)` 现在覆盖列 `[80, 119]`（40 列、左右对称），旧版覆盖 `[80, 120]`（41 列、不对称）。这是**修正而非整体位移**（`draw_circle(r == 0)` 的单点位置等既有约定不变），断言图形**内部**像素的代码不受影响，断言图形**边缘**像素的代码会看到 1 px 差。
 
 ### 文本
 
