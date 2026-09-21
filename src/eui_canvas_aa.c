@@ -319,9 +319,36 @@ void eui_canvas_fill_round_rect(eui_canvas_t *canvas, int16_t x, int16_t y,
         eui_canvas_fill_rect(canvas, x, t, r, (uint16_t)(b - t + 1));
         eui_canvas_fill_rect(canvas, (int16_t)(ri + 1), t, r, (uint16_t)(b - t + 1));
     }
-    /* 四个角用四分之一圆盘补齐（与中间矩形重叠处为全覆盖，px_set 幂等） */
+    /* 四个角用四分之一圆盘补齐。正常情况下（夹取后 2r < w 且 2r < h）这些角盘与
+     * 中间/两侧矩形的像素互不相交；但 2r == w（或 2r == h）时相邻的两个角盘会在
+     * 一列（一行）上重叠，该列被两次部分覆盖混合、略暗约 4%（1-2 px 接缝）——已知限制。 */
     eui_canvas_aa_arc(canvas, l,  t,  r, 0, 180, 270);
     eui_canvas_aa_arc(canvas, ri, t,  r, 0, 270, 360);
     eui_canvas_aa_arc(canvas, ri, b,  r, 0,   0,  90);
     eui_canvas_aa_arc(canvas, l,  b,  r, 0,  90, 180);
+}
+
+/* ---- 圆弧/圆环/扇形入口：内核之上的薄包装 --------------------- */
+void eui_canvas_draw_arc(eui_canvas_t *canvas, int16_t cx, int16_t cy,
+                         uint16_t r, uint16_t thickness,
+                         int16_t start_deg, int16_t end_deg)
+{
+    if (!canvas || thickness == 0 || r == 0) return;
+    uint16_t r_in = (thickness >= r) ? 0 : (uint16_t)(r - thickness);
+    eui_canvas_aa_arc(canvas, cx, cy, r, r_in, start_deg, end_deg);
+}
+
+void eui_canvas_draw_ring(eui_canvas_t *canvas, int16_t cx, int16_t cy,
+                          uint16_t r_outer, uint16_t r_inner,
+                          int16_t start_deg, int16_t end_deg)
+{
+    if (!canvas || r_inner >= r_outer) return;
+    eui_canvas_aa_arc(canvas, cx, cy, r_outer, r_inner, start_deg, end_deg);
+}
+
+void eui_canvas_fill_pie(eui_canvas_t *canvas, int16_t cx, int16_t cy, uint16_t r,
+                         int16_t start_deg, int16_t end_deg)
+{
+    if (!canvas || r == 0) return;
+    eui_canvas_aa_arc(canvas, cx, cy, r, 0, start_deg, end_deg);
 }

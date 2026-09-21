@@ -719,6 +719,91 @@ static void test_corner_matches_quarter_arc(void)   /* C5 后半 */
     PASS();
 }
 
+#if EUI_COLOR_DEPTH == 8
+static void test_seam_single_blend(void)          /* C8 */
+{
+    TEST("C8：跨 180° 无接缝（紧容差 16/256 比对参考）");
+    /* 为什么用参考比对而不是手挑坐标：端帽线是"过圆心、沿该端半径方向"的直线，
+     * 手算它穿过哪些像素很容易算反；而把大弧拆成两段绘制会让接缝像素叠加成
+     * ~0.25·dst + 0.75·fg（8bpp 下 ~191 而非 ~128），偏差 ~63/256，
+     * 相对 16/256 的紧容差必然暴露。sweep=180 与 181 分别走两条不同公式。 */
+    static const int sweeps[] = { 180, 181 };
+    const int r = 50, cx = 130, cy = 130;
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+    for (unsigned i = 0; i < sizeof(sweeps) / sizeof(sweeps[0]); i++) {
+        int sw = sweeps[i];
+        eui_canvas_set_bg_color(c, EUI_COLOR_BLACK);
+        eui_canvas_clear(c);
+        eui_canvas_set_color(c, eui_color_from_gray(255));
+        eui_canvas_fill_pie(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, 0, (int16_t)sw);
+        for (int y = cy - r - 2; y <= cy + r + 2; y++)
+            for (int x = cx - r - 2; x <= cx + r + 2; x++) {
+                uint32_t want = aa_ref_sector_cov(x, y, cx, cy, 0, r, 0, sw);
+                uint32_t got  = aa_get(x, y);
+                uint32_t diff = (got > want) ? (got - want) : (want - got);
+                if (diff > 16) {
+                    printf("\n  sweep=%d (%d,%d) got=%u want=%u\n", sw, x - cx, y - cy, got, want);
+                    FAIL("端帽附近偏差超紧容差（疑似接缝双重混合）");
+                }
+            }
+    }
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+#endif
+
+static void test_equivalence_and_extremes(void)   /* C9 + C14 */
+{
+    TEST("C9/C14：等价关系与极端输入");
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+    /* fill_pie(0,360) == fill_circle */
+    eui_canvas_clear(c);
+    eui_canvas_fill_pie(c, 60, 60, 25, 0, 360);
+    uint32_t a[64 * 64]; int n = 0;
+    for (int y = 40; y < 80; y++) for (int x = 40; x < 80; x++) a[n++] = aa_get(x, y);
+    eui_canvas_clear(c);
+    eui_canvas_fill_circle(c, 60, 60, 25);
+    n = 0;
+    for (int y = 40; y < 80; y++) for (int x = 40; x < 80; x++)
+        if (aa_get(x, y) != a[n++]) FAIL("fill_pie(0,360) 与 fill_circle 不一致");
+    /* draw_ring(r,0,0,360) == fill_circle */
+    eui_canvas_clear(c);
+    eui_canvas_draw_ring(c, 60, 60, 25, 0, 0, 360);
+    n = 0;
+    for (int y = 40; y < 80; y++) for (int x = 40; x < 80; x++) a[n++] = aa_get(x, y);
+    eui_canvas_clear(c);
+    eui_canvas_fill_circle(c, 60, 60, 25);
+    n = 0;
+    for (int y = 40; y < 80; y++) for (int x = 40; x < 80; x++)
+        if (aa_get(x, y) != a[n++]) FAIL("draw_ring(r,0,0,360) 与 fill_circle 不一致");
+    /* 极端输入：不得崩溃，且明确空的条件必须什么都不画。
+     * 原稿把这条"应为空"的断言放在下面那条 thickness>=r（退化为扇形，**非空**）
+     * 之后，断言窗口 [36,84)² 与扇形覆盖的 [60,80]² 相交（例如 (70,66) 的像素中心
+     * 在圆内、角度 31.7° ∈ [0°,90°]），因此原稿在正确实现下也必红。这里只把该断言
+     * 上移到最后一个"非空"绘制之前，断言文本与窗口逐字不变。 */
+    eui_canvas_clear(c);
+    eui_canvas_draw_arc(c, 60, 60, 20, 0, 0, 90);            /* thickness=0 → 空 */
+    eui_canvas_draw_ring(c, 60, 60, 20, 20, 0, 90);          /* r_inner>=r_outer → 空 */
+    eui_canvas_draw_ring(c, 60, 60, 20, 30, 0, 90);          /* 同上 */
+    eui_canvas_fill_pie(c, 60, 60, 0, 0, 360);               /* r=0 → 空 */
+    for (int y = 36; y < 84; y++) for (int x = 36; x < 84; x++)
+        if (aa_get(x, y) != 0) FAIL("极端输入在应为空时画了像素");
+    eui_canvas_clear(c);
+    eui_canvas_draw_arc(c, 60, 60, 20, 999, 0, 90);          /* thickness>=r → 扇形，非空 */
+    if (aa_get(60, 66) == 0) FAIL("thickness>=r 未退化为扇形");
+    /* r=1/2、sweep=1/359 不得崩溃 */
+    eui_canvas_draw_arc(c, 100, 100, 1, 1, 0, 1);
+    eui_canvas_draw_arc(c, 100, 100, 2, 2, 0, 359);
+    eui_canvas_fill_pie(c, 100, 100, 2, -90, 90);
+    eui_canvas_draw_ring(c, 100, 100, 2, 1, -170, 170);
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+
 int main(void)
 {
     eui_allocator_init_tlsf(aa_pool, AA_POOL_SIZE);
@@ -754,6 +839,7 @@ int main(void)
 
 #if EUI_COLOR_DEPTH == 8
     test_contracts_c2_c3_c4_c6_c7();
+    test_seam_single_blend();
 #endif
 
     test_clip_boundary();
@@ -761,6 +847,7 @@ int main(void)
 
     test_round_rect_edges_geometry();
     test_corner_matches_quarter_arc();
+    test_equivalence_and_extremes();
 
     return eui_test_summary();
 }
