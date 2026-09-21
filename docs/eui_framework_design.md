@@ -777,6 +777,18 @@ ViewDispatcher 在切换 View 时自动使用转场动画，底层基于 MotionC
 | `EUI_ANIM_SCALE` | 缩放弹出 | spring 模式 |
 | `EUI_ANIM_SLIDE_UP` | 从底部滑入（弹窗效果） | spring 模式 |
 
+### 9.5 两套动画风格的边界（eui_anim 与 mc_transition）
+
+MotionC 提供两套互补的动画语义，EUI 内同时存在，二者的职责边界如下：
+
+| | `eui_anim`（框架适配层，基于 `mc_animate`） | `mc_transition`（motionc 模块，经 eui 的 motionc 依赖引入） |
+|---|---|---|
+| 时间模型 | **dt 驱动**：`eui_anim_update(delta_ms)` 由 `eui_tick()` 每帧喂入时间增量 | **绝对时间**：`mc_transition_update(t, now_ms)` 由调用方传入当前时钟 |
+| 数据流向 | **push**：框架每帧把插值结果写回 widget 属性，完成时经 `on_done` 回调通知 | **pull**：不主动写状态，调用方在需要时读取当前值（如绘制时 `mc_transition2d_x()`） |
+| 归属层级 | **框架级**：框架驱动的视图转场（ViewDispatcher 的 `EUI_ANIM_*`） | **元素级**：视图内部单个元素的动画（位置/尺寸/颜色），随视图绘制逐帧读取 |
+
+**实践规则：框架 push，视图 pull。** 框架级的视图转场归 `eui_anim`，由 `eui_tick()` 统一推进、经回调收尾；视图内部元素的动画归 `mc_transition`，视图在自己的 `EUI_VIEW_EVT_DRAW` 中按需读取当前值并直接绘制。二者不要混用：不要用 `eui_anim` 去驱动一个由视图自绘的元素（其时间推进与视图绘制时序脱节），也不要用 `mc_transition` 承接框架级转场（框架不掌握视图的绘制时机，也无法替视图管理时钟锚点）。
+
 ---
 
 ## 10. 渲染流水线
