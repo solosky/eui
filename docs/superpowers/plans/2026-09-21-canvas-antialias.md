@@ -23,20 +23,27 @@
 
 ## 改动前基线（实测，务必先读）
 
-在基线提交（`main` + 本 spec 文档，无任何 AA 代码）上，`ctest` 的既有结果是：
+在基线提交（`main` + 本 spec 文档，无任何 AA 代码）上**逐个色深跑完整 `ctest`** 的结果：
 
-| 色深 | `test_canvas_render` | `test_font_real_u8g2_render` | 256x750 画布需要 / 测试池 |
-|---|---|---|---|
-| 1 | pass | pass | 24000 B / 65536 B |
-| 2 | pass | **SEGFAULT** | 48000 B / 65536 B |
-| 4 | **FAIL** | **SEGFAULT** | 96000 B / 65536 B |
-| 8 | **FAIL** | pass | 192000 B / 65536 B |
-| 16 | **FAIL** | **SEGFAULT** | 384000 B / 65536 B |
+| 色深 | 全套结果 | 失败的测试 |
+|---|---|---|
+| 1 | **20/20 全绿** | — |
+| 2 | 6 红 | `test_canvas`、`test_font_canvas`、`test_font_wqy13_render`、`test_font_real_u8g2_render`(段错误)、`test_font_vlw_render`、`test_view_transition` |
+| 4 | 7 红 | 上面 6 个 + `test_canvas_render` |
+| 8 | 1 红 | `test_canvas_render` |
+| 16 | 2 红 | `test_canvas_render`、`test_font_real_u8g2_render`(段错误) |
 
-两个都是**既有缺陷、与本次 AA 无关**，但会污染每个任务"跑 5 个色深"的验收口径，且让 CI 的 8bpp/16bpp job 在 `main` 上就是红的。它们在 Task 7 一并修掉——这也是"把 CI 矩阵扩到 5 个色深"能成立的前提：
+**这些都是既有缺陷、与 AA 无关**，分两类：
 
-1. `test/canvas/test_canvas_render.c` 用 `common/eui_test.h` 的 65536 B 池去建 256x750 全缓冲画布（16bpp 需 384 KB），`eui_canvas_create` 返回 NULL 后 `return 1`。修法：像 `test_canvas_16bpp.c` 那样自建池。
-2. `test/font/test_font_real_u8g2_render.c` 的 `write_bmp()` 在 `#else`（即 2/4/16bpp）分支把 `img_buf` 当 `uint16_t[]` 按 `IMG_W*IMG_H` 个元素读，而 `BUF_SIZE` 只按每像素 1 字节分配（320000 B）→ 越界读约一倍 → 段错误。1bpp/8bpp 各有专门分支，所以只有 2/4/16 崩。
+1. `test/canvas/test_canvas_render.c` 用 `common/eui_test.h` 的 65536 B 池去建 256x750 全缓冲画布（16bpp 需 384 KB），`eui_canvas_create` 返回 NULL 后 `return 1`。
+2. **2/4bpp 那一批（5 个测试文件）是同一类夹具缺陷**：它们的 mock 显示回调与像素计数器写死了 8/16bpp 的字节步长（例如 `test_canvas.c` 的 `mock_write_buffer` 用 `bytes_per_row = r->w * 2`、按 `MOCK_W * 2` 索引，在按位打包的 2bpp/4bpp 上就会错位读写，于是"应有 N 个像素"这类断言全错）。`test_view_transition` 报的 74.85% 未覆盖也是同一原因。
+   另一个是 `test/font/test_font_real_u8g2_render.c` 的 `write_bmp()` 在 `#else`（2/4/16bpp）分支把位打包的 `img_buf` 当 `uint16_t[]` 按 `IMG_W*IMG_H` 个元素读，`BUF_SIZE` 只按 1 字节/像素分配 → 越界读约一倍 → 段错误。
+
+**因此本计划的验收口径是**（Task 1-6 与 Task 7 的 Step 1 之后）：
+
+- **AA 相关（`test_canvas_aa`）必须在 5 个色深全绿**——这是本计划的产物。
+- **`test_canvas_render` 在 4/8/16bpp 与 u8g2 测试在 2/4/16bpp 的既有红，在 Task 7 Step 1 里修掉**（前者是 canvas 测试，后者是唯一的段错误）。
+- **2/4bpp 那 5 个夹具缺陷（`test_canvas`、`test_font_canvas`、`test_font_wqy13_render`、`test_font_vlw_render`、`test_view_transition`）不在本计划范围内**：它们需要逐个文件重写 mock 回调与像素计数以支持按位打包色深，属于独立的"测试夹具低色深支持"工程，AA 的低色深信号改由 Task 7 的专用 CI job 覆盖。
 
 **各任务验收口径**：AA 相关测试必须全绿；上表里的既有红只要不恶化即算通过；Task 7 修完后才要求 5 个色深全绿。
 
@@ -1752,7 +1759,7 @@ git commit -m "test(canvas): AA visual galleries (1/2/16bpp) and cost ratio prin
 
 ---
 
-### Task 7: CI 色深矩阵 + 文档
+### Task 7: CI 门（全量 3 档 + AA 专用 5 档）+ 两个既有夹具 + 文档
 
 **Files:**
 - Modify: `.github/workflows/build.yml:11`
@@ -1761,7 +1768,9 @@ git commit -m "test(canvas): AA visual galleries (1/2/16bpp) and cost ratio prin
 - Modify: `docs/api_reference.md`（绘图原语段）
 - Modify: `docs/eui_framework_design.md`（图形引擎段）
 
-- [ ] **Step 1: 修既有基线缺陷（先让 5 个色深真有绿的机会）**
+- [ ] **Step 1: 修两个既有夹具缺陷**
+
+这两个是**与本计划无关的既有缺陷**，但一个挡住了 canvas 测试在 4/8/16bpp 的信号，另一个是全套唯一的段错误，修它们成本极低：
 
 `test/canvas/test_canvas_render.c`：把 `eui_test_init()` 换成自建池（对齐 `test_canvas_16bpp.c` 的既有做法）：
 
@@ -1804,9 +1813,42 @@ int main(void)
 #endif
 ```
 
-跑一遍确认 5 个色深这两个测试都转绿（诊断依据见计划开头的基线表）。
+跑一遍确认：`test_canvas_render` 在 4/8/16bpp 转绿、u8g2 测试在 2/4/16bpp 不再段错误。**注意 2/4bpp 全套仍有既有红**（`test_canvas`、`test_font_canvas`、`test_font_wqy13_render`、`test_font_vlw_render`、`test_view_transition` 的同类夹具缺陷），那些**不在本计划范围**，不要顺手去改（见计划开头的基线说明）。
 
-- [ ] **Step 2: 扩 CI 矩阵**
+- [ ] **Step 2: 改 CI——全量矩阵保持 3 档，另加一个"5 色深只跑 AA"的专用 job**
+
+**不要**把全量矩阵扩到 5 个色深：2/4bpp 有 5 个既有夹具缺陷（见计划开头基线表），扩了只会多出红 job，把 AA 的信号埋掉。改法是两件事：
+
+(a) 全量矩阵保持 `[1, 8, 16]`（Step 1 修完两个缺陷后这三档应为全绿）；
+(b) 新增一个只跑 `test_canvas_aa` 的 job，在 5 个色深上分别构建该目标并执行——低色深的抖动/量化代码由此获得真正的门，且不继承无关的既有红：
+
+```yaml
+  aa-by-depth:
+    name: Canvas AA (bpp=${{ matrix.color_depth }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        color_depth: [1, 2, 4, 8, 16]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DEUI_BUILD_TESTS=ON \
+            -DEUI_BUILD_EXAMPLES=OFF \
+            -DEUI_BUILD_CROSS_EXAMPLES=OFF \
+            -DEUI_COLOR_DEPTH=${{ matrix.color_depth }}
+
+      - name: Build and run the anti-aliasing test only
+        run: |
+          cmake --build build -j --target test_canvas_aa
+          cd build && ctest -R canvas_aa --output-on-failure
+```
+
+（`test_canvas_aa` 是唯一在 5 个色深都能全绿的测试，且它正是本计划的产物——这样这一列的绿/红完全由 AA 代码决定，是本计划想要的判别信号。）
 
 ```yaml
         color_depth: [1, 2, 4, 8, 16]
@@ -1824,10 +1866,13 @@ int main(void)
 
 ```bash
 git add .github/workflows/build.yml test/canvas/test_canvas_render.c test/font/test_font_real_u8g2_render.c docs/api_reference.md docs/eui_framework_design.md
-git commit -m "ci(test): cover all five color depths, fix two pre-existing test fixture defects, document AA"
+git commit -m "ci(test): gate the AA test on all five color depths, fix two pre-existing fixtures, document AA"
 git push -u origin feat/canvas-antialias
 ```
-Expected: 5 个色深 job 全绿（Step 1 修完两个既有缺陷后，5 个色深本地全量 ctest 也应为 20/20）。
+Expected:
+- 全量矩阵 `[1, 8, 16]` 三档全绿（Step 1 修掉 `test_canvas_render` 与 u8g2 后）。
+- 新 job `aa-by-depth` 五档全绿——这是本计划低色深代码的判别门。
+- 2/4bpp 的**全量**套件仍有 5 个既有夹具红，**不在本计划范围**，不得为了让它们变绿而扩大改动。
 
 ---
 

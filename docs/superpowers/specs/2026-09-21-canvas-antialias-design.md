@@ -288,9 +288,9 @@ cap_cov256 = clamp(128 - capd256, 0, 256)
 | `test/canvas/test_canvas_16bpp.c`（扩充） | C4、C6 `[V]` | 现有 BMP 画廊加：发丝弧、粗环、扇形、极小半径（r=1/2）、跨裁剪样本 |
 | `test/canvas/test_canvas_2bpp.c`（扩充） | C10 `[V]` | 同上形状的 4 级抖动目检 |
 | `test/canvas/test_canvas_1bpp.c`（新增） | C10 `[V]` | 目前没有 1bpp 画廊；1bpp 网点感需人工确认是预期效果 |
-| `.github/workflows/build.yml` | — | 色深矩阵 `[1, 8, 16]` → `[1, 2, 4, 8, 16]`：抖动（1/2bpp）与 16 级量化（4bpp）代码需要一个真正跑过的门，否则本次新增的低色深分支等于无人验证 |
+| `.github/workflows/build.yml` | — | **全量矩阵保持 `[1, 8, 16]`**（不扩到 5 档），另加一个只在 5 个色深上跑 `test_canvas_aa` 的专用 job。见下：扩全量矩阵在本仓当前状态下无法变绿，而专用 job 恰好只由本计划的代码决定红绿 |
 
-**改动前基线（实测，决定了上面两行的前提）：** 在无任何 AA 代码的基线上，`test_canvas_render` 在 4/8/16bpp 失败（测试夹具用 65536 B 池建 256×750 全缓冲画布，16bpp 需 384 KB），`test_font_real_u8g2_render` 在 2/4/16bpp 段错误（`write_bmp()` 的 `#else` 分支把位打包的 `img_buf` 当 `uint16_t[]` 读，越界约一倍）。也就是说 CI 的 8bpp/16bpp job 在 `main` 上本来就是红的。这两处与 AA 无关，但会污染每次"跑 5 个色深"的验收，因此实施计划把它们的修复放在 CI 矩阵扩展之前作为前提。
+**改动前基线（实测，决定了上面这一行）：** 逐个色深跑完整 `ctest` 的实测结果是——1bpp 20/20 全绿；2bpp 6 红；4bpp 7 红；8bpp 1 红（`test_canvas_render`）；16bpp 2 红（`test_canvas_render` + `test_font_real_u8g2_render` 段错误）。除 `test_canvas_render`（夹具池 65536 B 装不下 256×750 全缓冲画布）与 u8g2 的段错误（`write_bmp()` 的 `#else` 分支把位打包的 `img_buf` 当 `uint16_t[]` 越界读）之外，2/4bpp 还有 5 个**同类夹具缺陷**（`test_canvas`、`test_font_canvas`、`test_font_wqy13_render`、`test_font_vlw_render`、`test_view_transition` 的 mock 回调与像素计数写死了 8/16bpp 字节步长）。前者两个在实施计划里修掉，5 个打包色深的夹具缺陷属独立的"测试夹具低色深支持"工程，不在本设计范围——因此低色深的 AA 信号由专用 job 承担，而不是靠把全量矩阵扩到 5 档。
 | VAMeter `app-eui` ctest | 迁移回归 | 原地升级的回归面：已扫描确认现有断言探的是**形状内部**像素（遮罩圆心 `sm_px(...) == 0xFFFFFF`）与 app 自身的抖动格，理论上不移动；仍须实测逐个复核 |
 
 验收 = 契约测试全绿（5 个色深） + BMP 目检 + VAMeter 套件复核 + C13 的成本比值记录。
@@ -305,7 +305,7 @@ cap_cov256 = clamp(128 - capd256, 0, 256)
 ## 8. 风险
 
 1. **圆顶与端帽是最容易做错的地方，且单轴弦模型是一个有吸引力的陷阱**（C6/C8/C15 是回归网）。C15 应先写、先 RED：它对"想省一次 isqrt 而退回单轴弦模型"的优化会立刻报警。TDD 的第一批 RED 建议是 C15 → C8 → C6。
-2. **色深矩阵扩展会连带暴露既有问题**（已实测，不再是"可能"）：CI 在 `[1,8,16]` 下本就红于 8bpp/16bpp 的两个测试夹具缺陷（见 §6 基线）。实施顺序必须是"先修夹具、再扩矩阵"，否则新增的 2bpp/4bpp job 会在噪声里失去门的作用。
+2. **色深矩阵与既有红**（已实测，不再是推测）：全量 `ctest` 只在 1bpp 全绿，8bpp 有 1 个既有夹具红、16bpp 有 2 个、2/4bpp 各 6-7 个（详见 §6 基线）。因此"把全量矩阵扩到 5 档"这个原方案被实测否决：它只会多出红 job，把 AA 的信号埋进既有噪声。改为"全量矩阵保持 3 档 + 专用 job 在 5 个色深只跑 `test_canvas_aa`"，低色深代码仍有真正的门，且红绿完全由本计划的代码决定。
 3. **原地升级会改变既有界面的像素输出**：eui 自身无形状像素断言（安全），示例只有 BMP（安全），VAMeter 需实测复核；低性能目标（nRF52）每帧开销上升且无法回退——C13 记录比值，若超预算则改为对 `draw_circle` 保留快路径。
 4. **1bpp 的网点感是物理极限**，spec 明确为预期效果；选 4×4 Bayer（16 级阈值）而非 8×8（64 级但 8×8 可见纹理）以与 VAMeter 既有先例一致。
 
@@ -322,6 +322,6 @@ cap_cov256 = clamp(128 - capd256, 0, 256)
 | `test/canvas/test_canvas_1bpp.c` | **新增**：1bpp BMP 画廊 |
 | `test/canvas/test_canvas_16bpp.c`、`test_canvas_2bpp.c` | 扩充 AA 样本 |
 | `test/CMakeLists.txt` | 注册新测试 |
-| `.github/workflows/build.yml` | 色深矩阵扩到 5 个 |
+| `.github/workflows/build.yml` | 全量矩阵保持 `[1, 8, 16]`，新增 `aa-by-depth` job 在 5 个色深只跑 `test_canvas_aa` |
 | `docs/api_reference.md` | 绘图原语段补三个 arc 入口 |
 | `docs/eui_framework_design.md` | 图形引擎段补 AA 与抖动语义 |
