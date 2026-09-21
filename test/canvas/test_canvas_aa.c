@@ -221,6 +221,52 @@ static void test_no_dither_in_solid_area(void)
 }
 #endif /* depth 1 / 2 */
 
+#if EUI_COLOR_DEPTH == 4
+static void test_4bpp_quantize_grid(void)
+{
+    TEST("4bpp：量化恒为 round(g*15/255)（步长 17），cov==255 幂等");
+    /* 4bpp 的取整臂 ((g*15+127)/255) 是唯一没有数值断言的色深专属量化路径：
+     * 8bpp/16bpp 有参考比对，1/2bpp 有 Bayer 相位与密度测试，它只被深度无关的
+     * 测试间接执行。这里把 0..255 整段混合灰度都喂给它。
+     * 底 dst = 0（灰度 0）时混合值 g 恰好等于 cov（(255c + 127)/255 == c），
+     * 于是这一条循环就是"对每个 g 检查量化到 16 级网格"。 */
+    const eui_color_t bright = eui_color_from_gray(255);   /* 4bpp 下 = 15，灰度 255 */
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+    if (bright != 15) FAIL("4bpp 的 eui_color_from_gray(255) 应为 15");
+    int prev = -1;
+    for (int a = 1; a <= 255; a++) {
+        eui_canvas_px_set(c, 30, 30, 0);
+        eui_canvas_px_blend(c, 30, 30, bright, (uint8_t)a);
+        int got  = (int)aa_get(30, 30);
+        int want = (a * 30 + 255) / 510;      /* floor(a*15/255 + 0.5)：独立于 +127 的写法 */
+        if (got != want) {
+            printf("\n  g=%d → 级 %d，应为 %d\n", a, got, want);
+            FAIL("4bpp 量化不是 round(g*15/255)");
+        }
+        if (got < prev) FAIL("4bpp 量化级随覆盖度非单调");
+        prev = got;
+    }
+    /* 两端点恰好：g=1 → 0、g=255 → 15 */
+    if ((int)aa_get(30, 30) != 15) FAIL("g=255 未落到最高级 15");
+    eui_canvas_px_set(c, 33, 33, 0);
+    eui_canvas_px_blend(c, 33, 33, bright, 1);
+    if ((int)aa_get(33, 33) != 0) FAIL("g=1 未落到最低级 0");
+    /* cov == 255 幂等：任何 dst 都被直接覆盖为 fg（不读 dst） */
+    for (int d = 0; d <= 15; d++) {
+        eui_canvas_px_set(c, 31, 31, (eui_color_t)d);
+        eui_canvas_px_blend(c, 31, 31, bright, 255);
+        if ((int)aa_get(31, 31) != 15) {
+            printf("\n  dst=%d → %d\n", d, (int)aa_get(31, 31));
+            FAIL("4bpp 全覆盖未幂等写 fg");
+        }
+    }
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+#endif
+
 #if EUI_COLOR_DEPTH == 8
 static void test_8bpp_coverage_is_pixel_value(void)
 {
@@ -561,6 +607,33 @@ static void test_contracts_c2_c3_c4_c6_c7(void)
 }
 #endif
 
+static void test_zero_radius_single_point(void)   /* C1：r == 0 的退化（全色深） */
+{
+    TEST("C1：draw_circle(0)/fill_circle(0) 恰好画 (x,y) 一点，3x3 邻域其余为空");
+    const int16_t x = 130, y = 130;
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+    for (int pass = 0; pass < 2; pass++) {
+        eui_canvas_clear(c);
+        if (pass == 0) eui_canvas_fill_circle(c, x, y, 0);
+        else           eui_canvas_draw_circle(c, x, y, 0);
+        for (int dy = -1; dy <= 1; dy++)
+            for (int dx = -1; dx <= 1; dx++) {
+                uint32_t v = aa_get(x + dx, y + dy);
+                if (dx == 0 && dy == 0) {
+                    if (v == 0) FAIL("r == 0 没有画圆心那一点");
+                } else if (v != 0) {
+                    printf("\n  %s(%d,%d) = %u\n", pass == 0 ? "fill" : "draw",
+                           dx, dy, (unsigned)v);
+                    FAIL("r == 0 画到了 3x3 邻域里的其他像素");
+                }
+            }
+    }
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+
 static void test_clip_boundary(void)   /* C11：全色深可跑 */
 {
     TEST("C11：跨裁剪边界时不越界、边界像素与真实 dst 混合（无黑边）");
@@ -611,7 +684,14 @@ static void test_clip_boundary(void)   /* C11：全色深可跑 */
 
 static void test_mirror_symmetry(void)   /* C5：全色深可跑 */
 {
+#if EUI_COLOR_DEPTH >= 4
     TEST("C5：四向镜像对称 + sweep=0/360 与环的边界语义");
+#else
+    /* 1/2bpp 下镜像断言被下面的 #if 编译掉（抖动相位锚在屏幕坐标 (x, y+offset)，
+     * 镜像像素的相位不同，逐像素一致不可能成立）。标签必须如实反映这一点，
+     * 否则 CI 日志会声称"四向镜像对称已检查"。 */
+    TEST("C5：sweep=0/360 与环的边界语义（1/2bpp 无镜像断言）");
+#endif
     const int r = 21, cx = 130, cy = 130;
     eui_canvas_t *c = aa_new_canvas();
     aa_cur = c;
@@ -653,16 +733,25 @@ static void test_round_rect_edges_geometry(void)   /* C1：全色深 */
     TEST("C1：圆角矩形直边几何与夹取行为");
     const int16_t x = 10, y = 10; const uint16_t w = 70, h = 24, r = 6;
     /* l = x+r = 16, t = y+r = 16, ri = x+w-r-1 = 73, b = y+h-r-1 = 27 */
+    const uint32_t fg = (uint32_t)eui_color_from_gray(255);
     eui_canvas_t *c = aa_new_canvas();
     aa_cur = c;
+    eui_canvas_set_color(c, eui_color_from_gray(255));
     eui_canvas_draw_round_rect(c, x, y, w, h, r);
+    /* 直边必须**恰好**是前景值（与等价 draw_line 的输出逐字节一致：px_set 不混合），
+     * 外侧紧邻的一行/一列必须完全没被碰过——若实现把直边也走了 AA 路径，那里会出现
+     * 部分覆盖度的混合值而不再是纯 fg，且会外溢到相邻行/列。 */
     for (int i = 16; i <= 73; i++) {
-        if (aa_get(i, 10) == 0) FAIL("上直边缺失");
-        if (aa_get(i, 33) == 0) FAIL("下直边缺失");
+        if (aa_get(i, 10) != fg) FAIL("上直边不是纯前景值（直边走了 AA 路径？）");
+        if (aa_get(i, 33) != fg) FAIL("下直边不是纯前景值（直边走了 AA 路径？）");
+        if (aa_get(i, 9) != 0) FAIL("上直边外溢到了 y-1 行");
+        if (aa_get(i, 34) != 0) FAIL("下直边外溢到了 y+h 行");
     }
     for (int i = 16; i <= 27; i++) {
-        if (aa_get(10, i) == 0) FAIL("左直边缺失");
-        if (aa_get(79, i) == 0) FAIL("右直边缺失");
+        if (aa_get(10, i) != fg) FAIL("左直边不是纯前景值（直边走了 AA 路径？）");
+        if (aa_get(79, i) != fg) FAIL("右直边不是纯前景值（直边走了 AA 路径？）");
+        if (aa_get(9, i) != 0) FAIL("左直边外溢到了 x-1 列");
+        if (aa_get(80, i) != 0) FAIL("右直边外溢到了 x+w 列");
     }
     /* 直边之外不应有像素（角落圆心在 (16,16)/(73,16)/(16,27)/(73,27)）。
      * 注意紧邻角起点的 (15,10)/(74,10) 是**角弧自己的**像素：(15,10) 的像素中心距
@@ -848,6 +937,31 @@ static void test_equivalence_and_extremes(void)   /* C9 + C14 */
     n = 0;
     for (int y = 40; y < 80; y++) for (int x = 40; x < 80; x++)
         if (aa_get(x, y) != a[n++]) FAIL("draw_arc(20,5) 与 draw_ring(20,15) 不一致");
+    /* C9：负角与"start > end 跨 0"必须与等价的正角写法逐像素相同——两者都折到
+     * 同一个 sweep（-90 → 270、0-90 = -90 → 270）并都走补扇形公式。
+     * (45,45) 是圆心 (60,60)、r=25 的 225° 方向上的像素（距心 21.2 < 25）：
+     * 它落在两个"270° 从 0° 起"的扇形内、落在 0..90° 那个补扇形外，因此既证明
+     * 图形非空（否则"两个空图相同"会让这条等价性断言空转），又区分了两个补扇形。 */
+    eui_canvas_clear(c);
+    eui_canvas_fill_pie(c, 60, 60, 25, 0, -90);
+    if (aa_get(45, 45) == 0) FAIL("fill_pie(0,-90) 什么都没画（等价性断言会空转）");
+    n = 0;
+    for (int y = 40; y < 80; y++) for (int x = 40; x < 80; x++) a[n++] = aa_get(x, y);
+    eui_canvas_clear(c);
+    eui_canvas_fill_pie(c, 60, 60, 25, 0, 270);
+    n = 0;
+    for (int y = 40; y < 80; y++) for (int x = 40; x < 80; x++)
+        if (aa_get(x, y) != a[n++]) FAIL("fill_pie(0,-90) 与 fill_pie(0,270) 不一致");
+    eui_canvas_clear(c);
+    eui_canvas_fill_pie(c, 60, 60, 25, 90, 0);
+    if (aa_get(45, 45) == 0) FAIL("fill_pie(90,0) 什么都没画（等价性断言会空转）");
+    n = 0;
+    for (int y = 40; y < 80; y++) for (int x = 40; x < 80; x++) a[n++] = aa_get(x, y);
+    eui_canvas_clear(c);
+    eui_canvas_fill_pie(c, 60, 60, 25, 90, 360);
+    n = 0;
+    for (int y = 40; y < 80; y++) for (int x = 40; x < 80; x++)
+        if (aa_get(x, y) != a[n++]) FAIL("fill_pie(90,0) 与 fill_pie(90,360) 不一致");
     /* 头文件公开的两条 sweep 规则：delta == 0 不画、|delta| >= 360 整圆。
      * 取 start == end（而不是非 360 的 sweep）与 delta = 400（而不是恰好 360）。 */
     eui_canvas_clear(c);
@@ -1059,6 +1173,10 @@ int main(void)
     test_no_dither_in_solid_area();
 #endif
 
+#if EUI_COLOR_DEPTH == 4
+    test_4bpp_quantize_grid();
+#endif
+
 #if EUI_COLOR_DEPTH == 8
     test_8bpp_coverage_is_pixel_value();
 #endif
@@ -1083,6 +1201,7 @@ int main(void)
 
     test_clip_boundary();
     test_mirror_symmetry();
+    test_zero_radius_single_point();
 
     test_round_rect_edges_geometry();
     test_corner_matches_quarter_arc();
