@@ -231,15 +231,31 @@ static void test_aa_gallery(void)
     /* 用"该色深的最亮级"而不是 EUI_COLOR_WHITE：8bpp 下后者是 1（近黑） */
     eui_canvas_set_color(c, eui_color_from_gray(255));
 
-    /* 与 16bpp 画廊同一组样本，坐标缩放到 128x64 的 mock */
-    eui_canvas_draw_arc(c,  24, 18, 16,  1, -90,  90);     /* 发丝弧 */
-    eui_canvas_draw_arc(c,  60, 18, 16,  5,   0, 300);     /* 粗弧 */
-    eui_canvas_draw_ring(c, 100, 18, 16, 10,   0, 270);    /* 圆环 */
-    eui_canvas_fill_pie(c,   24, 48, 14, 30, 210);         /* 扇形 */
-    eui_canvas_fill_circle(c, 60, 48, 2);                  /* 极小半径 */
-    eui_canvas_draw_circle(c, 60, 48, 6);
-    eui_canvas_fill_round_rect(c, 78, 36, 44, 12, 4);      /* 圆角矩形角部 */
-    eui_canvas_draw_round_rect(c, 78, 52, 44, 12, 4);
+    /* 形状家族（128x64 里排成三带）：弧/环/圆/扇形/圆角矩形 */
+    eui_canvas_draw_arc(c,  14, 14, 11, 1, -90,  90);      /* 发丝弧 */
+    eui_canvas_draw_arc(c,  40, 14, 11, 4,   0, 300);      /* 粗弧 */
+    eui_canvas_draw_ring(c, 66, 14, 11, 6,   0, 270);      /* 圆环 */
+    eui_canvas_fill_circle(c, 88, 14, 2);                  /* 极小半径 */
+    eui_canvas_draw_circle(c, 88, 14, 6);
+    eui_canvas_fill_round_rect(c, 102,  4, 24, 9, 3);      /* 圆角矩形角部 */
+    eui_canvas_draw_round_rect(c, 102, 16, 24, 9, 3);
+
+    /* 覆盖度阶梯：半径递增的实心圆 + 同半径 1px / 3px 弧（每像素覆盖度真的不同） */
+    eui_canvas_fill_pie(c,   12, 38, 10, 30, 210);         /* 扇形 */
+    eui_canvas_fill_circle(c, 40, 38, 1);
+    eui_canvas_fill_circle(c, 48, 38, 2);
+    eui_canvas_fill_circle(c, 56, 38, 3);
+    eui_canvas_fill_circle(c, 65, 38, 4);
+    eui_canvas_draw_arc(c,   86, 40, 11, 1, -90, 90);      /* 1px 带 */
+    eui_canvas_draw_arc(c,  112, 40, 11, 3, -90, 90);      /* 3px 带 */
+
+    /* 越界与 clip：跨出画布边缘 / 被 clip 矩形切断 */
+    eui_canvas_fill_circle(c, 130, 64, 16);                /* 圆心在画布外：右/下边缘切 */
+    eui_rect_t cut = { 20, 49, 40, 14 };
+    eui_canvas_set_clip(c, &cut);
+    eui_canvas_fill_circle(c, 30, 57, 14);                 /* 被 clip 切掉左/上/下 */
+    eui_canvas_fill_round_rect(c, 45, 51, 30, 10, 3);      /* 被 clip 切掉右 */
+    eui_canvas_clear_clip(c);                              /* 复位（set_clip(NULL) 是空操作） */
     eui_canvas_commit(c);
 
     if (write_level_bmp("test_canvas_2bpp.bmp") == 0)

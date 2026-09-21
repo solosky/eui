@@ -9,7 +9,7 @@
 #include <string.h>
 
 #define GAL_W 200
-#define GAL_H 200
+#define GAL_H 260          /* 上 200 行是形状画廊，下 60 行是覆盖度阶梯 + 越界/clip 样本 */
 #define GAL_POOL 65536
 static uint8_t gal_pool[GAL_POOL];
 static uint8_t gal_buf[GAL_W * GAL_H * (EUI_COLOR_DEPTH == 16 ? 2 : 1)];
@@ -81,15 +81,31 @@ int main(void)
     /* 用"该色深的最亮级"而不是 EUI_COLOR_WHITE：8bpp 下后者是 1（近黑） */
     eui_canvas_set_color(c, eui_color_from_gray(255));
 
-    /* 细弧（1px） / 粗环 / 扇形 / 极小半径 / 抖动斜坡 */
+    /* 细弧（1px） / 粗环 / 扇形 / 极小半径 / 同半径同心圆弧组 */
     eui_canvas_draw_arc(c, 50, 50, 40, 1, -90, 90);
     eui_canvas_draw_ring(c, 150, 50, 40, 30, 0, 270);
     eui_canvas_fill_pie(c, 50, 150, 40, 30, 210);
     eui_canvas_fill_circle(c, 155, 155, 2);
     eui_canvas_draw_circle(c, 170, 170, 5);
-    for (int i = 0; i < 32; i++) {                 /* 覆盖度斜坡：目检抖动密度 */
+    for (int i = 0; i < 32; i++) {                 /* 32 段同半径同厚度的弧段 */
         eui_canvas_draw_ring(c, 100, 100, 90, 80, (int16_t)(i * 11), (int16_t)(i * 11 + 8));
     }
+
+    /* --- 覆盖度阶梯：这些样本的每像素覆盖度**真的不同**，可见抖动密度递变 --- */
+    eui_canvas_fill_circle(c,  20, 212, 1);        /* 边界像素覆盖度≈0.79 */
+    eui_canvas_fill_circle(c,  34, 212, 2);
+    eui_canvas_fill_circle(c,  48, 212, 3);
+    eui_canvas_fill_circle(c,  62, 212, 4);        /* 面积/包围盒 → 1 */
+    eui_canvas_draw_arc(c, 110, 218, 18, 1, -90, 90);   /* 1px 带：径向覆盖≈半 */
+    eui_canvas_draw_arc(c, 160, 218, 18, 3, -90, 90);   /* 3px 带：径向覆盖≈满 */
+
+    /* --- 越界与 clip：跨出画布边缘 / 被 clip 矩形切断 --- */
+    eui_canvas_fill_circle(c, -6, 266, 26);        /* 圆心在画布外：可见部分被左/下边缘切 */
+    eui_rect_t cut = { 136, 226, 60, 30 };
+    eui_canvas_set_clip(c, &cut);
+    eui_canvas_fill_circle(c, 146, 240, 22);       /* 被 clip 切掉左/上/下 */
+    eui_canvas_fill_round_rect(c, 150, 232, 70, 20, 6);  /* 被 clip 切掉右 */
+    eui_canvas_clear_clip(c);                      /* 复位（set_clip(NULL) 是空操作） */
     eui_canvas_commit(c);
 
     static uint8_t gray[GAL_W * GAL_H];

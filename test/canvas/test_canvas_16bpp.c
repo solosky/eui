@@ -196,6 +196,21 @@ int main(void)
     eui_canvas_draw_circle(c, 120, y + 130, 12);
     eui_canvas_fill_round_rect(c, 160, y + 100, 70, 24, 6);     /* 圆角矩形角部 */
     eui_canvas_draw_round_rect(c, 160, y + 130, 70, 24, 6);
+
+    /* --- 覆盖度阶梯：半径递增的实心圆 + 同半径 1px / 3px 弧 --- */
+    eui_canvas_fill_circle(c, 252, y + 10, 1);
+    eui_canvas_fill_circle(c, 259, y + 10, 2);
+    eui_canvas_fill_circle(c, 266, y + 10, 3);
+    eui_canvas_fill_circle(c, 274, y + 10, 4);
+    eui_canvas_draw_arc(c, 266, y + 56, 20, 1, -90, 90);    /* 1px 带：径向覆盖≈半 */
+    eui_canvas_draw_arc(c, 266, y + 104, 20, 3, -90, 90);   /* 3px 带：径向覆盖≈满 */
+
+    /* --- 越界与 clip：跨出画布边缘 / 被 clip 矩形切断 --- */
+    eui_canvas_fill_circle(c, 318, y + 148, 26);            /* 圆心在画布外：右/下边缘切 */
+    eui_rect_t cut = { 246, y + 116, 38, 38 };
+    eui_canvas_set_clip(c, &cut);
+    eui_canvas_fill_circle(c, 265, y + 135, 30);            /* 四条边都被 clip 切断 */
+    eui_canvas_clear_clip(c);                               /* 复位（set_clip(NULL) 是空操作） */
     y += 175;
 
     /* Commit and write BMP */

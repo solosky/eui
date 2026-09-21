@@ -888,22 +888,50 @@ static void test_equivalence_and_extremes(void)   /* C9 + C14 */
     PASS();
 }
 
+/* 画布上非背景像素数：用**各自真正画到的像素**做分母。
+ * 圆只覆盖 πr² ≈ 0.785·(2r)²，用包围盒归一化会把圆的单像素成本低估约 27%。 */
+static long aa_count_ink(void)
+{
+    long n = 0;
+    for (int y = 0; y < AA_H; y++)
+        for (int x = 0; x < AA_W; x++)
+            if (aa_get(x, y) != 0) n++;
+    return n;
+}
+
 static void test_cost_ratio(void)                 /* C13：只打印，不断言绝对阈值 */
 {
-    TEST("C13：成本比值（AA 填充 vs 同面积 fill_rect）");
+    TEST("C13：成本比值（AA fill_circle vs 等包围盒 fill_rect，各按自身覆盖像素归一化）");
     eui_canvas_t *c = aa_new_canvas();
     aa_cur = c;
     const int r = 120, N = 20;
+
+    /* 先量两个形状各自真正覆盖的像素数（背景为 0；dither 掉到 0 的边界像素不算覆盖） */
+    eui_canvas_clear(c);
+    eui_canvas_fill_circle(c, 130, 130, (uint16_t)r);
+    long aa_px = aa_count_ink();
+    eui_canvas_clear(c);
+    eui_canvas_fill_rect(c, 10, 10, (uint16_t)(2 * r), (uint16_t)(2 * r));
+    long rc_px = aa_count_ink();
+    eui_canvas_clear(c);
+
     clock_t t0 = clock();
     for (int i = 0; i < N; i++) eui_canvas_fill_circle(c, 130, 130, (uint16_t)r);
     clock_t t1 = clock();
     for (int i = 0; i < N; i++) eui_canvas_fill_rect(c, 10, 10, (uint16_t)(2 * r), (uint16_t)(2 * r));
     clock_t t2 = clock();
-    double px = (double)(2 * r) * (2 * r);
-    double aa_ns = (double)(t1 - t0) * 1e9 / (CLOCKS_PER_SEC * (double)N) / px;
-    double rc_ns = (double)(t2 - t1) * 1e9 / (CLOCKS_PER_SEC * (double)N) / px;
-    printf("AA fill_circle r=%d: %.2f ns/px | fill_rect 同面积: %.2f ns/px | 比值 %.2fx\n",
-           r, aa_ns, rc_ns, (rc_ns > 0) ? aa_ns / rc_ns : 0.0);
+
+    double aa_call = (double)(t1 - t0) * 1e9 / (CLOCKS_PER_SEC * (double)N);  /* ns/次 */
+    double rc_call = (double)(t2 - t1) * 1e9 / (CLOCKS_PER_SEC * (double)N);
+    double aa_ns = (aa_px > 0) ? aa_call / (double)aa_px : 0.0;
+    double rc_ns = (rc_px > 0) ? rc_call / (double)rc_px : 0.0;
+    printf("AA fill_circle r=%d: %.0f ns/次, 覆盖 %ld px -> %.2f ns/px/自身像素\n",
+           r, aa_call, aa_px, aa_ns);
+    printf("fill_rect %dx%d（同包围盒）: %.0f ns/次, 覆盖 %ld px -> %.2f ns/px/自身像素\n",
+           2 * r, 2 * r, rc_call, rc_px, rc_ns);
+    printf("比值（各按自身覆盖像素）%.2fx；按包围盒比 %.2fx\n",
+           (rc_ns > 0) ? aa_ns / rc_ns : 0.0,
+           (rc_call > 0) ? aa_call / rc_call : 0.0);
     eui_canvas_destroy(c);
     aa_cur = NULL;
     PASS();
