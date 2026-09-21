@@ -1,4 +1,5 @@
 #include "eui/eui_canvas.h"
+#include "eui/eui_canvas_internal.h"
 #include "eui/eui_allocator.h"
 #include "eui/eui_font.h"
 #include "eui/eui_font_internal.h"
@@ -30,7 +31,7 @@ static uint32_t utf8_decode_next(const char **s) {
     return cp;
 }
 
-static void canvas_set_pixel(eui_canvas_t *c, int16_t x, int16_t y, eui_color_t color)
+void eui_canvas_px_set(eui_canvas_t *c, int16_t x, int16_t y, eui_color_t color)
 {
     if (x < c->clip.x || x >= c->clip.x + (int16_t)c->clip.w ||
         y < c->clip.y || y >= c->clip.y + (int16_t)c->clip.h) {
@@ -71,13 +72,9 @@ static void canvas_set_pixel(eui_canvas_t *c, int16_t x, int16_t y, eui_color_t 
 #endif
 }
 
-static eui_color_t canvas_get_pixel(eui_canvas_t *c, int16_t x, int16_t y)
+eui_color_t eui_canvas_px_get(eui_canvas_t *c, int16_t x, int16_t y)
 {
-#if EUI_COLOR_DEPTH != 16
-    /* pixel readback is only needed for 16bpp alpha blending */
-    (void)c; (void)x; (void)y;
-    return 0;
-#else
+    if (!c || c->buffer == NULL) return 0;
     if (x < c->clip.x || x >= c->clip.x + (int16_t)c->clip.w ||
         y < c->clip.y || y >= c->clip.y + (int16_t)c->clip.h) {
         return 0;
@@ -88,8 +85,22 @@ static eui_color_t canvas_get_pixel(eui_canvas_t *c, int16_t x, int16_t y)
 
     if (x < 0 || x >= (int16_t)screen_w || y < 0 || y >= (int16_t)screen_h) return 0;
 
-    uint16_t *buf16 = (uint16_t*)c->buffer;
-    return buf16[y * screen_w + x];
+#if EUI_COLOR_DEPTH == 1
+    uint16_t byte_idx = (uint16_t)(y * (int16_t)(screen_w / 8u)) + (uint16_t)(x / 8);
+    return (eui_color_t)((c->buffer[byte_idx] >> (x % 8)) & 1u);
+#elif EUI_COLOR_DEPTH == 2
+    uint16_t byte_idx = (uint16_t)(y * (int16_t)(screen_w / 4u)) + (uint16_t)(x / 4u);
+    uint8_t shift = (uint8_t)(6u - 2u * (uint8_t)(x % 4u));
+    return (eui_color_t)((c->buffer[byte_idx] >> shift) & 3u);
+#elif EUI_COLOR_DEPTH == 4
+    uint16_t byte_idx = (uint16_t)(y * (int16_t)(screen_w / 2u)) + (uint16_t)(x / 2u);
+    if (x & 1) return (eui_color_t)(c->buffer[byte_idx] & 0x0Fu);
+    return (eui_color_t)(c->buffer[byte_idx] >> 4);
+#elif EUI_COLOR_DEPTH == 8
+    return (eui_color_t)c->buffer[y * screen_w + x];
+#else
+    uint16_t *buf16 = (uint16_t *)c->buffer;
+    return (eui_color_t)buf16[y * screen_w + x];
 #endif
 }
 
@@ -291,7 +302,7 @@ void eui_canvas_clear(eui_canvas_t *canvas)
 void eui_canvas_draw_dot(eui_canvas_t *canvas, int16_t x, int16_t y)
 {
     if (!canvas) return;
-    canvas_set_pixel(canvas, x, y, canvas->fg_color);
+    eui_canvas_px_set(canvas, x, y, canvas->fg_color);
 }
 
 void eui_canvas_draw_line(eui_canvas_t *canvas, int16_t x1, int16_t y1, int16_t x2, int16_t y2)
@@ -309,7 +320,7 @@ void eui_canvas_draw_line(eui_canvas_t *canvas, int16_t x1, int16_t y1, int16_t 
     if (dx > dy) {
         err = dx / 2;
         while (x1 != x2) {
-            canvas_set_pixel(canvas, x1, y1, canvas->fg_color);
+            eui_canvas_px_set(canvas, x1, y1, canvas->fg_color);
             err -= dy;
             if (err < 0) { y1 += step_y; err += dx; }
             x1 += step_x;
@@ -317,13 +328,13 @@ void eui_canvas_draw_line(eui_canvas_t *canvas, int16_t x1, int16_t y1, int16_t 
     } else {
         err = dy / 2;
         while (y1 != y2) {
-            canvas_set_pixel(canvas, x1, y1, canvas->fg_color);
+            eui_canvas_px_set(canvas, x1, y1, canvas->fg_color);
             err -= dx;
             if (err < 0) { x1 += step_x; err += dy; }
             y1 += step_y;
         }
     }
-    canvas_set_pixel(canvas, x2, y2, canvas->fg_color);
+    eui_canvas_px_set(canvas, x2, y2, canvas->fg_color);
 }
 
 void eui_canvas_fill_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t w, uint16_t h)
@@ -333,7 +344,7 @@ void eui_canvas_fill_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t w
     int16_t ey = y + (int16_t)h;
     for (int16_t yi = y; yi < ey; yi++) {
         for (int16_t xi = x; xi < ex; xi++) {
-            canvas_set_pixel(canvas, xi, yi, canvas->fg_color);
+            eui_canvas_px_set(canvas, xi, yi, canvas->fg_color);
         }
     }
 }
@@ -344,7 +355,7 @@ void eui_canvas_draw_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t w
     int16_t x2 = x + (int16_t)w - 1;
     int16_t y2 = y + (int16_t)h - 1;
     if (w == 1 && h == 1) {
-        canvas_set_pixel(canvas, x, y, canvas->fg_color);
+        eui_canvas_px_set(canvas, x, y, canvas->fg_color);
         return;
     }
     eui_canvas_draw_line(canvas, x, y, x2, y);
@@ -356,7 +367,7 @@ void eui_canvas_draw_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t w
 void eui_canvas_draw_circle(eui_canvas_t *canvas, int16_t x0, int16_t y0, uint16_t r)
 {
     if (!canvas || r == 0) {
-        if (r == 0) canvas_set_pixel(canvas, x0, y0, canvas->fg_color);
+        if (r == 0) eui_canvas_px_set(canvas, x0, y0, canvas->fg_color);
         return;
     }
 
@@ -366,10 +377,10 @@ void eui_canvas_draw_circle(eui_canvas_t *canvas, int16_t x0, int16_t y0, uint16
     int16_t x = 0;
     int16_t y = (int16_t)r;
 
-    canvas_set_pixel(canvas, x0, y0 + (int16_t)r, canvas->fg_color);
-    canvas_set_pixel(canvas, x0, y0 - (int16_t)r, canvas->fg_color);
-    canvas_set_pixel(canvas, x0 + (int16_t)r, y0, canvas->fg_color);
-    canvas_set_pixel(canvas, x0 - (int16_t)r, y0, canvas->fg_color);
+    eui_canvas_px_set(canvas, x0, y0 + (int16_t)r, canvas->fg_color);
+    eui_canvas_px_set(canvas, x0, y0 - (int16_t)r, canvas->fg_color);
+    eui_canvas_px_set(canvas, x0 + (int16_t)r, y0, canvas->fg_color);
+    eui_canvas_px_set(canvas, x0 - (int16_t)r, y0, canvas->fg_color);
 
     while (x < y) {
         if (f >= 0) {
@@ -381,14 +392,14 @@ void eui_canvas_draw_circle(eui_canvas_t *canvas, int16_t x0, int16_t y0, uint16
         ddF_x += 2;
         f += ddF_x + 1;
 
-        canvas_set_pixel(canvas, x0 + x, y0 + y, canvas->fg_color);
-        canvas_set_pixel(canvas, x0 - x, y0 + y, canvas->fg_color);
-        canvas_set_pixel(canvas, x0 + x, y0 - y, canvas->fg_color);
-        canvas_set_pixel(canvas, x0 - x, y0 - y, canvas->fg_color);
-        canvas_set_pixel(canvas, x0 + y, y0 + x, canvas->fg_color);
-        canvas_set_pixel(canvas, x0 - y, y0 + x, canvas->fg_color);
-        canvas_set_pixel(canvas, x0 + y, y0 - x, canvas->fg_color);
-        canvas_set_pixel(canvas, x0 - y, y0 - x, canvas->fg_color);
+        eui_canvas_px_set(canvas, x0 + x, y0 + y, canvas->fg_color);
+        eui_canvas_px_set(canvas, x0 - x, y0 + y, canvas->fg_color);
+        eui_canvas_px_set(canvas, x0 + x, y0 - y, canvas->fg_color);
+        eui_canvas_px_set(canvas, x0 - x, y0 - y, canvas->fg_color);
+        eui_canvas_px_set(canvas, x0 + y, y0 + x, canvas->fg_color);
+        eui_canvas_px_set(canvas, x0 - y, y0 + x, canvas->fg_color);
+        eui_canvas_px_set(canvas, x0 + y, y0 - x, canvas->fg_color);
+        eui_canvas_px_set(canvas, x0 - y, y0 - x, canvas->fg_color);
     }
 }
 
@@ -396,7 +407,7 @@ void eui_canvas_fill_circle(eui_canvas_t *canvas, int16_t x0, int16_t y0, uint16
 {
     if (!canvas) return;
     if (r == 0) {
-        canvas_set_pixel(canvas, x0, y0, canvas->fg_color);
+        eui_canvas_px_set(canvas, x0, y0, canvas->fg_color);
         return;
     }
 
@@ -472,15 +483,15 @@ void eui_canvas_draw_round_rect(eui_canvas_t *canvas, int16_t x, int16_t y,
         ddF_x += 2;
         f += ddF_x + 1;
 
-        canvas_set_pixel(canvas, l - cx, t - cy, canvas->fg_color);
-        canvas_set_pixel(canvas, ri + cx, t - cy, canvas->fg_color);
-        canvas_set_pixel(canvas, l - cx, b + cy, canvas->fg_color);
-        canvas_set_pixel(canvas, ri + cx, b + cy, canvas->fg_color);
+        eui_canvas_px_set(canvas, l - cx, t - cy, canvas->fg_color);
+        eui_canvas_px_set(canvas, ri + cx, t - cy, canvas->fg_color);
+        eui_canvas_px_set(canvas, l - cx, b + cy, canvas->fg_color);
+        eui_canvas_px_set(canvas, ri + cx, b + cy, canvas->fg_color);
 
-        canvas_set_pixel(canvas, l - cy, t - cx, canvas->fg_color);
-        canvas_set_pixel(canvas, ri + cy, t - cx, canvas->fg_color);
-        canvas_set_pixel(canvas, l - cy, b + cx, canvas->fg_color);
-        canvas_set_pixel(canvas, ri + cy, b + cx, canvas->fg_color);
+        eui_canvas_px_set(canvas, l - cy, t - cx, canvas->fg_color);
+        eui_canvas_px_set(canvas, ri + cy, t - cx, canvas->fg_color);
+        eui_canvas_px_set(canvas, l - cy, b + cx, canvas->fg_color);
+        eui_canvas_px_set(canvas, ri + cy, b + cx, canvas->fg_color);
     }
 }
 
@@ -557,7 +568,7 @@ static void draw_u8g2_glyph(eui_canvas_t *canvas, const eui_font_t *font,
             uint16_t px = (uint16_t)row * g.width + col;
             if (get_bitmap_pixel(font->data, g.bitmap_byte, g.bitmap_bit, px,
                                    g.width, g.height)) {
-                canvas_set_pixel(canvas,
+                eui_canvas_px_set(canvas,
                                  x + col + g.x_offset,
                                  (int16_t)(y - g.height - g.y_offset + row),
                                  canvas->fg_color);
@@ -583,7 +594,7 @@ static void draw_u8g2_glyph_by_index(eui_canvas_t *canvas,
             uint16_t px = (uint16_t)row * g.width + col;
             if (get_bitmap_pixel(font->data, g.bitmap_byte, g.bitmap_bit, px,
                                    g.width, g.height)) {
-                canvas_set_pixel(canvas,
+                eui_canvas_px_set(canvas,
                                  x + col + g.x_offset,
                                  (int16_t)(y - g.height - g.y_offset + row),
                                  canvas->fg_color);
@@ -625,7 +636,7 @@ static void draw_bdf_glyph(eui_canvas_t *canvas, const eui_font_t *font,
             uint8_t byte = bitmap[row * bytes_per_row + col / 8];
             uint8_t bit = (byte >> (7 - (col % 8))) & 1;
             if (bit) {
-                canvas_set_pixel(canvas, x + col + x_off, y + row + y_off,
+                eui_canvas_px_set(canvas, x + col + x_off, y + row + y_off,
                                  canvas->fg_color);
             }
         }
@@ -656,15 +667,15 @@ static void draw_vlw_glyph(eui_canvas_t *canvas, const eui_font_t *font,
             int16_t py = (int16_t)(gy + row);
 #if EUI_COLOR_DEPTH == 16
             if (a >= 250) {
-                canvas_set_pixel(canvas, px, py, canvas->fg_color);
+                eui_canvas_px_set(canvas, px, py, canvas->fg_color);
             } else {
-                eui_color_t dst = canvas_get_pixel(canvas, px, py);
-                canvas_set_pixel(canvas, px, py,
+                eui_color_t dst = eui_canvas_px_get(canvas, px, py);
+                eui_canvas_px_set(canvas, px, py,
                                  vlw_blend_pixel(dst, canvas->fg_color, a));
             }
 #else
             if (a >= 128)
-                canvas_set_pixel(canvas, px, py, canvas->fg_color);
+                eui_canvas_px_set(canvas, px, py, canvas->fg_color);
 #endif
         }
     }
@@ -784,7 +795,7 @@ void eui_canvas_draw_xbm(eui_canvas_t *canvas, int16_t x, int16_t y,
             uint16_t byte_off = row * bytes_per_row + (col / 8);
             uint8_t bit = 7 - (col % 8);
             if (data[byte_off] & (1u << bit)) {
-                canvas_set_pixel(canvas, x + (int16_t)col, y + (int16_t)row, canvas->fg_color);
+                eui_canvas_px_set(canvas, x + (int16_t)col, y + (int16_t)row, canvas->fg_color);
             }
         }
     }
@@ -818,7 +829,7 @@ void eui_canvas_draw_bitmap(eui_canvas_t *canvas, int16_t x, int16_t y, const eu
             } else {
                 color = (eui_color_t)(pixel_raw & 0xFFFF);
             }
-            canvas_set_pixel(canvas, x + (int16_t)col, y + (int16_t)row, color);
+            eui_canvas_px_set(canvas, x + (int16_t)col, y + (int16_t)row, color);
         }
     }
 }
