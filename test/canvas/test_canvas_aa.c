@@ -647,6 +647,78 @@ static void test_mirror_symmetry(void)   /* C5：全色深可跑 */
     PASS();
 }
 
+static void test_round_rect_edges_geometry(void)   /* C1：全色深 */
+{
+    TEST("C1：圆角矩形直边几何与夹取行为");
+    const int16_t x = 10, y = 10; const uint16_t w = 70, h = 24, r = 6;
+    /* l = x+r = 16, t = y+r = 16, ri = x+w-r-1 = 73, b = y+h-r-1 = 27 */
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+    eui_canvas_draw_round_rect(c, x, y, w, h, r);
+    for (int i = 16; i <= 73; i++) {
+        if (aa_get(i, 10) == 0) FAIL("上直边缺失");
+        if (aa_get(i, 33) == 0) FAIL("下直边缺失");
+    }
+    for (int i = 16; i <= 27; i++) {
+        if (aa_get(10, i) == 0) FAIL("左直边缺失");
+        if (aa_get(79, i) == 0) FAIL("右直边缺失");
+    }
+    /* 直边之外不应有像素（角落圆心在 (16,16)/(73,16)/(16,27)/(73,27)）。
+     * 注意紧邻角起点的 (15,10)/(74,10) 是**角弧自己的**像素：(15,10) 的像素中心距
+     * 角心 √(0.5²+5.5²) ≈ 5.5 < r+0.5 = 6.5，角弧必然画它；旧中点圆光栅器同样把
+     * (15,10) 画成实心，所以原稿在此断言 ==0 在改动**前**的树上就已经是红的
+     * （把"角弧最外圈像素"误当成"直边越界"）。角弧只触及中心距角心 ≤ 6.5 px 的像素，
+     * 故退到 (11,10)/(78,10)（中心距 ≈ 7.1 / 7.8）再断言：直边若误画成从 x 到 x+w-1，
+     * 这两处必然被点亮，判别力不减。 */
+    if (aa_get(11, 10) != 0) FAIL("上直边越过左角起点");
+    if (aa_get(78, 10) != 0) FAIL("上直边越过右角起点");
+    /* 半径夹取：w < 2r 时 r 收敛为 w/2，不越界 */
+    eui_canvas_clear(c);
+    eui_canvas_draw_round_rect(c, 10, 10, 5, 5, 9);
+    if (aa_get(10, 10) == 0 && aa_get(14, 14) == 0) FAIL("夹取后完全没有绘制");
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+
+static void test_corner_matches_quarter_arc(void)   /* C5 后半 */
+{
+    TEST("C5：圆角与对应四分之一圆逐像素一致");
+    const int cx = 100, cy = 100, r = 9;
+    /* 关键：让圆角矩形的角心 (x+r, y+r) 正好落在 (cx, cy)，
+     * 即 x = cx - r、y = cy - r；若取 cx-r-1 则角心差一像素，比对必然失败。 */
+    const int16_t x = (int16_t)(cx - r), y = (int16_t)(cy - r);
+    uint32_t corner_px[16 * 16];
+    int n = 0, cap = (int)(sizeof(corner_px) / sizeof(corner_px[0]));
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+
+    /* 矩形取 2r+4 见方而不是 2r：w == 2r 会让直边退化成 2 px（ri == l-1、b == t-1），
+     * 于是 (a) 上/左直边的端点像素落进比较象限（dx=-1/dy=-1），且 (b) 相邻角的圆心
+     * 只差 1 px，其角弧也能覆盖到该象限——实测两者共造成 4 处差异
+     * （8bpp：(−1,−9)=255/252、(−9,−1)=255/252、(−1,−8)=8/4、(−8,−1)=8/4），
+     * 与"C5 后半"要断言的角弧几何无关。w = h = 2r+4 时四角圆心相距 4 px，
+     * 直边退到象限之外，"该区域内只有角弧贡献"才真正成立。 */
+    eui_canvas_draw_round_rect(c, x, y, (uint16_t)(2 * r + 4), (uint16_t)(2 * r + 4), (uint16_t)r);
+    /* 只比"严格外侧象限"(dx<0 且 dy<0)：该区域内只有角弧贡献。
+     * dx==0 / dy==0 那两行/列上有直边的端点像素，裸弧不会画成同样的值。 */
+    for (int dy = -r - 1; dy <= -1; dy++)
+        for (int dx = -r - 1; dx <= -1; dx++) {
+            if (n >= cap) FAIL("测试缓冲不足");
+            corner_px[n++] = aa_get(cx + dx, cy + dy);
+        }
+    eui_canvas_clear(c);
+    eui_canvas_aa_arc(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, (uint16_t)(r - 1), 180, 270);
+    n = 0;
+    for (int dy = -r - 1; dy <= -1; dy++)
+        for (int dx = -r - 1; dx <= -1; dx++)
+            if (aa_get(cx + dx, cy + dy) != corner_px[n++])
+                FAIL("圆角与四分之一圆不一致");
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+
 int main(void)
 {
     eui_allocator_init_tlsf(aa_pool, AA_POOL_SIZE);
@@ -686,6 +758,9 @@ int main(void)
 
     test_clip_boundary();
     test_mirror_symmetry();
+
+    test_round_rect_edges_geometry();
+    test_corner_matches_quarter_arc();
 
     return eui_test_summary();
 }

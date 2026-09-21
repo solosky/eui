@@ -106,8 +106,9 @@ eui_color_t eui_canvas_px_get(eui_canvas_t *c, int16_t x, int16_t y)
 
 #if EUI_COLOR_DEPTH == 16
 /* Alpha-blend fg over dst in native RGB565 space (a: 0..255 ink coverage).
- * Non-static: eui_canvas_px_blend reuses the same formula at 16bpp. */
-eui_color_t blend_565(eui_color_t dst, eui_color_t fg, uint8_t a)
+ * static：只被同 TU 的 eui_canvas_px_blend 使用（Task 2 曾临时去掉 static，
+ * Task 4 收回，以免未加 eui_ 前缀的符号进入库全局命名空间）。 */
+static eui_color_t blend_565(eui_color_t dst, eui_color_t fg, uint8_t a)
 {
     uint16_t r = (uint16_t)((((fg >> 11) & 0x1Fu) * a + ((dst >> 11) & 0x1Fu) * (255u - a) + 127u) / 255u);
     uint16_t g = (uint16_t)((((fg >> 5) & 0x3Fu) * a + ((dst >> 5) & 0x3Fu) * (255u - a) + 127u) / 255u);
@@ -428,78 +429,6 @@ void eui_canvas_draw_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t w
     eui_canvas_draw_line(canvas, x, y2, x, y);
 }
 
-void eui_canvas_draw_circle(eui_canvas_t *canvas, int16_t x0, int16_t y0, uint16_t r)
-{
-    if (!canvas || r == 0) {
-        if (r == 0) eui_canvas_px_set(canvas, x0, y0, canvas->fg_color);
-        return;
-    }
-
-    int16_t f = 1 - (int16_t)r;
-    int16_t ddF_x = 0;
-    int16_t ddF_y = -2 * (int16_t)r;
-    int16_t x = 0;
-    int16_t y = (int16_t)r;
-
-    eui_canvas_px_set(canvas, x0, y0 + (int16_t)r, canvas->fg_color);
-    eui_canvas_px_set(canvas, x0, y0 - (int16_t)r, canvas->fg_color);
-    eui_canvas_px_set(canvas, x0 + (int16_t)r, y0, canvas->fg_color);
-    eui_canvas_px_set(canvas, x0 - (int16_t)r, y0, canvas->fg_color);
-
-    while (x < y) {
-        if (f >= 0) {
-            y--;
-            ddF_y += 2;
-            f += ddF_y;
-        }
-        x++;
-        ddF_x += 2;
-        f += ddF_x + 1;
-
-        eui_canvas_px_set(canvas, x0 + x, y0 + y, canvas->fg_color);
-        eui_canvas_px_set(canvas, x0 - x, y0 + y, canvas->fg_color);
-        eui_canvas_px_set(canvas, x0 + x, y0 - y, canvas->fg_color);
-        eui_canvas_px_set(canvas, x0 - x, y0 - y, canvas->fg_color);
-        eui_canvas_px_set(canvas, x0 + y, y0 + x, canvas->fg_color);
-        eui_canvas_px_set(canvas, x0 - y, y0 + x, canvas->fg_color);
-        eui_canvas_px_set(canvas, x0 + y, y0 - x, canvas->fg_color);
-        eui_canvas_px_set(canvas, x0 - y, y0 - x, canvas->fg_color);
-    }
-}
-
-void eui_canvas_fill_circle(eui_canvas_t *canvas, int16_t x0, int16_t y0, uint16_t r)
-{
-    if (!canvas) return;
-    if (r == 0) {
-        eui_canvas_px_set(canvas, x0, y0, canvas->fg_color);
-        return;
-    }
-
-    int16_t f = 1 - (int16_t)r;
-    int16_t ddF_x = 0;
-    int16_t ddF_y = -2 * (int16_t)r;
-    int16_t x = 0;
-    int16_t y = (int16_t)r;
-
-    eui_canvas_draw_line(canvas, x0 - (int16_t)r, y0, x0 + (int16_t)r, y0);
-
-    while (x < y) {
-        if (f >= 0) {
-            y--;
-            ddF_y += 2;
-            f += ddF_y;
-        }
-        x++;
-        ddF_x += 2;
-        f += ddF_x + 1;
-
-        eui_canvas_draw_line(canvas, x0 - x, y0 + y, x0 + x, y0 + y);
-        eui_canvas_draw_line(canvas, x0 - x, y0 - y, x0 + x, y0 - y);
-        eui_canvas_draw_line(canvas, x0 - y, y0 + x, x0 + y, y0 + x);
-        eui_canvas_draw_line(canvas, x0 - y, y0 - x, x0 + y, y0 - x);
-    }
-}
-
 void eui_canvas_draw_triangle(eui_canvas_t *canvas, int16_t x1, int16_t y1,
                                int16_t x2, int16_t y2, int16_t x3, int16_t y3)
 {
@@ -508,105 +437,7 @@ void eui_canvas_draw_triangle(eui_canvas_t *canvas, int16_t x1, int16_t y1,
     eui_canvas_draw_line(canvas, x3, y3, x1, y1);
 }
 
-void eui_canvas_draw_round_rect(eui_canvas_t *canvas, int16_t x, int16_t y,
-                                 uint16_t w, uint16_t h, uint16_t r)
-{
-    if (!canvas || w == 0 || h == 0) return;
-    if (r == 0) {
-        eui_canvas_draw_rect(canvas, x, y, w, h);
-        return;
-    }
-
-    uint16_t r2 = r * 2;
-    if (r2 > w) r = w / 2;
-    if (r2 > h) r = h / 2;
-
-    int16_t l = x + (int16_t)r;
-    int16_t t = y + (int16_t)r;
-    int16_t ri = x + (int16_t)w - (int16_t)r - 1;
-    int16_t b = y + (int16_t)h - (int16_t)r - 1;
-
-    eui_canvas_draw_line(canvas, l, y, ri, y);
-    eui_canvas_draw_line(canvas, l, y + (int16_t)h - 1, ri, y + (int16_t)h - 1);
-    eui_canvas_draw_line(canvas, x, t, x, b);
-    eui_canvas_draw_line(canvas, x + (int16_t)w - 1, t, x + (int16_t)w - 1, b);
-
-    int16_t f = 1 - (int16_t)r;
-    int16_t ddF_x = 0;
-    int16_t ddF_y = -2 * (int16_t)r;
-    int16_t cx = 0;
-    int16_t cy = (int16_t)r;
-
-    while (cx < cy) {
-        if (f >= 0) {
-            cy--;
-            ddF_y += 2;
-            f += ddF_y;
-        }
-        cx++;
-        ddF_x += 2;
-        f += ddF_x + 1;
-
-        eui_canvas_px_set(canvas, l - cx, t - cy, canvas->fg_color);
-        eui_canvas_px_set(canvas, ri + cx, t - cy, canvas->fg_color);
-        eui_canvas_px_set(canvas, l - cx, b + cy, canvas->fg_color);
-        eui_canvas_px_set(canvas, ri + cx, b + cy, canvas->fg_color);
-
-        eui_canvas_px_set(canvas, l - cy, t - cx, canvas->fg_color);
-        eui_canvas_px_set(canvas, ri + cy, t - cx, canvas->fg_color);
-        eui_canvas_px_set(canvas, l - cy, b + cx, canvas->fg_color);
-        eui_canvas_px_set(canvas, ri + cy, b + cx, canvas->fg_color);
-    }
-}
-
-void eui_canvas_fill_round_rect(eui_canvas_t *canvas, int16_t x, int16_t y,
-                                 uint16_t w, uint16_t h, uint16_t r)
-{
-    if (!canvas || w == 0 || h == 0) return;
-    if (r == 0) {
-        eui_canvas_fill_rect(canvas, x, y, w, h);
-        return;
-    }
-
-    uint16_t r2 = r * 2;
-    if (r2 > w) r = w / 2;
-    if (r2 > h) r = h / 2;
-
-    int16_t l = x + (int16_t)r;
-    int16_t t = y + (int16_t)r;
-    int16_t ri = x + (int16_t)w - (int16_t)r - 1;
-    int16_t b = y + (int16_t)h - (int16_t)r - 1;
-
-    eui_canvas_fill_rect(canvas, l, y, (uint16_t)(ri - l + 1), h);
-
-    if (b > t) {
-        eui_canvas_fill_rect(canvas, x, t, r, (uint16_t)(b - t + 1));
-        eui_canvas_fill_rect(canvas, ri + 1, t, r, (uint16_t)(b - t + 1));
-    }
-
-    int16_t f = 1 - (int16_t)r;
-    int16_t ddF_x = 0;
-    int16_t ddF_y = -2 * (int16_t)r;
-    int16_t cx = 0;
-    int16_t cy = (int16_t)r;
-
-    while (cx < cy) {
-        if (f >= 0) {
-            cy--;
-            ddF_y += 2;
-            f += ddF_y;
-        }
-        cx++;
-        ddF_x += 2;
-        f += ddF_x + 1;
-
-        eui_canvas_draw_line(canvas, l - cx, t - cy, ri + cx, t - cy);
-        eui_canvas_draw_line(canvas, l - cx, b + cy, ri + cx, b + cy);
-
-        eui_canvas_draw_line(canvas, l - cy, t - cx, ri + cy, t - cx);
-        eui_canvas_draw_line(canvas, l - cy, b + cx, ri + cy, b + cx);
-    }
-}
+/* 圆、圆角矩形的实现在 src/eui_canvas_aa.c（AA 内核之上的薄包装）。 */
 
 /* ---- Text ---- */
 

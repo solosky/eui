@@ -251,3 +251,77 @@ void eui_canvas_aa_arc(eui_canvas_t *c, int16_t cx, int16_t cy,
         }
     }
 }
+
+/* ---- 公开曲线原语：内核之上的薄包装 ---------------------------------------
+ * 签名与几何契约（圆心、l/t/ri/b、半径夹取规则）与旧的中点光栅器逐字一致，
+ * 只有边缘从硬阈值变为覆盖度混合。r == 0 的退化情形仍是单像素。 */
+
+void eui_canvas_fill_circle(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t r)
+{
+    if (!canvas) return;
+    if (r == 0) { eui_canvas_px_set(canvas, x, y, canvas->fg_color); return; }
+    eui_canvas_aa_arc(canvas, x, y, r, 0, 0, 360);
+}
+
+void eui_canvas_draw_circle(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t r)
+{
+    if (!canvas) return;
+    if (r == 0) { eui_canvas_px_set(canvas, x, y, canvas->fg_color); return; }
+    eui_canvas_aa_arc(canvas, x, y, r, (uint16_t)(r - 1), 0, 360);
+}
+
+/* 圆角半径夹取与旧实现一致：2r > w/h 时 r 收敛为 w/2、h/2 */
+static uint16_t clamp_corner_radius(uint16_t w, uint16_t h, uint16_t r)
+{
+    if ((uint32_t)r * 2u > w) r = (uint16_t)(w / 2u);
+    if ((uint32_t)r * 2u > h) r = (uint16_t)(h / 2u);
+    return r;
+}
+
+void eui_canvas_draw_round_rect(eui_canvas_t *canvas, int16_t x, int16_t y,
+                                uint16_t w, uint16_t h, uint16_t r)
+{
+    if (!canvas || w == 0 || h == 0) return;
+    if (r == 0) { eui_canvas_draw_rect(canvas, x, y, w, h); return; }
+    r = clamp_corner_radius(w, h, r);
+
+    int16_t l  = (int16_t)(x + (int16_t)r);
+    int16_t t  = (int16_t)(y + (int16_t)r);
+    int16_t ri = (int16_t)(x + (int16_t)w - (int16_t)r - 1);
+    int16_t b  = (int16_t)(y + (int16_t)h - (int16_t)r - 1);
+
+    eui_canvas_draw_line(canvas, l, y, ri, y);
+    eui_canvas_draw_line(canvas, l, (int16_t)(y + (int16_t)h - 1), ri, (int16_t)(y + (int16_t)h - 1));
+    eui_canvas_draw_line(canvas, x, t, x, b);
+    eui_canvas_draw_line(canvas, (int16_t)(x + (int16_t)w - 1), t, (int16_t)(x + (int16_t)w - 1), b);
+
+    uint16_t rin = (uint16_t)(r - 1);
+    eui_canvas_aa_arc(canvas, l,  t,  r, rin, 180, 270);   /* 左上 */
+    eui_canvas_aa_arc(canvas, ri, t,  r, rin, 270, 360);   /* 右上 */
+    eui_canvas_aa_arc(canvas, ri, b,  r, rin,   0,  90);   /* 右下 */
+    eui_canvas_aa_arc(canvas, l,  b,  r, rin,  90, 180);   /* 左下 */
+}
+
+void eui_canvas_fill_round_rect(eui_canvas_t *canvas, int16_t x, int16_t y,
+                               uint16_t w, uint16_t h, uint16_t r)
+{
+    if (!canvas || w == 0 || h == 0) return;
+    if (r == 0) { eui_canvas_fill_rect(canvas, x, y, w, h); return; }
+    r = clamp_corner_radius(w, h, r);
+
+    int16_t l  = (int16_t)(x + (int16_t)r);
+    int16_t t  = (int16_t)(y + (int16_t)r);
+    int16_t ri = (int16_t)(x + (int16_t)w - (int16_t)r - 1);
+    int16_t b  = (int16_t)(y + (int16_t)h - (int16_t)r - 1);
+
+    eui_canvas_fill_rect(canvas, l, y, (uint16_t)(ri - l + 1), h);
+    if (b > t) {
+        eui_canvas_fill_rect(canvas, x, t, r, (uint16_t)(b - t + 1));
+        eui_canvas_fill_rect(canvas, (int16_t)(ri + 1), t, r, (uint16_t)(b - t + 1));
+    }
+    /* 四个角用四分之一圆盘补齐（与中间矩形重叠处为全覆盖，px_set 幂等） */
+    eui_canvas_aa_arc(canvas, l,  t,  r, 0, 180, 270);
+    eui_canvas_aa_arc(canvas, ri, t,  r, 0, 270, 360);
+    eui_canvas_aa_arc(canvas, ri, b,  r, 0,   0,  90);
+    eui_canvas_aa_arc(canvas, l,  b,  r, 0,  90, 180);
+}
