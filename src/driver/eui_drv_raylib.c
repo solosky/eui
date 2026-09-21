@@ -18,6 +18,7 @@ typedef struct {
 } raylib_display_t;
 
 static raylib_display_t *g_active_display = NULL;
+static int g_pending_scale = 0; /* requested before the display exists */
 
 static int disp_init(void *ud) {
     raylib_display_t *d = (raylib_display_t*)ud;
@@ -31,6 +32,14 @@ static int disp_init(void *ud) {
         SetTextureWrap(d->fb.texture, TEXTURE_WRAP_CLAMP);
     d->rgba_buffer = (uint8_t*)malloc((size_t)d->width * d->height * 4);
     g_active_display = d;
+    /* Present one frame right away.  On macOS a window that has never
+     * committed a CAML layer shows black, and an app-side SetWindowSize
+     * before the first present does not count — only a user-driven
+     * resize would force it.  Pushing a frame here makes the window
+     * live as soon as it opens. */
+    BeginDrawing();
+    ClearBackground(BLACK);
+    EndDrawing();
     SetTargetFPS(60);
     return 0;
 }
@@ -143,7 +152,11 @@ eui_display_drv_t* eui_drv_raylib_create_display(uint16_t width, uint16_t height
     d->width = width;
     d->height = height;
     d->color_depth = color_depth;
-    d->scale = 1;
+    /* Honor a scale requested before creation so InitWindow opens the
+     * window at its final size directly — resizing a macOS window before
+     * its first present leaves it black until the user resizes it. */
+    d->scale = (g_pending_scale >= 1) ? g_pending_scale : 1;
+    g_pending_scale = 0;
     d->base.caps.width = width;
     d->base.caps.height = height;
     d->base.caps.color_depth = color_depth;
@@ -167,10 +180,15 @@ void eui_drv_raylib_destroy_display(eui_display_drv_t *hal) {
 }
 
 void eui_drv_raylib_set_scale(int scale) {
-    if (!g_active_display) return;
     if (scale < 1) scale = 1;
     if (scale > 16) scale = 16;
+    if (!g_active_display) {
+        g_pending_scale = scale;
+        return;
+    }
     raylib_display_t *d = g_active_display;
+    if (d->scale == scale)
+        return;
     d->scale = scale;
     SetWindowSize(d->width * d->scale, d->height * d->scale);
 }
