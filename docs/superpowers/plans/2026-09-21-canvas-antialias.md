@@ -845,7 +845,11 @@ static void test_reference_agreement_disc(void)   /* C15 @8bpp */
 #if EUI_COLOR_DEPTH == 16
 static void test_reference_agreement_disc_16(void)  /* C15 @16bpp：比绿通道 */
 {
-    TEST("C15：与 64 子样本参考一致（16bpp 绿通道，容差 2 级）");
+    /* 容差 6 级（≈24/256，与 8bpp 门槛同一预算），不是 2 级：
+     * 8×8 参考自身的量化偏差可达 2.55 级（r=120 像素 (−5,−120)：参考 224 vs 精确 234.3），
+     * 加上 16bpp 绿通道 6bit 量化，连"面积精确"的内核在该配置下也差 3 级（r=120）。
+     * 6 级仍足以抓住结构性错误（被否决的单轴弦模型在此偏 115/256 ≈ 28 级）。 */
+    TEST("C15：与 64 子样本参考一致（16bpp 绿通道，容差 6 级）");
     static const int radii[] = { 3, 8, 20, 60, 120 };
     eui_canvas_t *c = aa_new_canvas();
     aa_cur = c;
@@ -861,7 +865,7 @@ static void test_reference_agreement_disc_16(void)  /* C15 @16bpp：比绿通道
                 int want = (int)((ref * 63u + 127u) / 255u);
                 int got  = (int)(((uint32_t)aa_get(x, y) >> 5) & 0x3Fu);
                 int d    = got - want;
-                if (d < -2 || d > 2) {
+                if (d < -6 || d > 6) {
                     printf("\n  r=%d (%d,%d) got=%d want=%d ref=%u\n", r, x - cx, y - cy, got, want, ref);
                     FAIL("16bpp 与参考偏差超容差");
                 }
@@ -1021,7 +1025,12 @@ Expected: 链接失败（`eui_canvas_aa_arc` 未定义）。
 
 - [ ] **Step 4: 实现内核**
 
-在 `src/eui_canvas_aa.c` 追加（`eui_canvas_isqrt` 之后）：
+**勘误（实施后修正，以 `src/eui_canvas_aa.c` 的实际实现为准）**：下面给的代码在端帽部分有两处错误，实施期被 C15 的**扇区**参考比对抓住（圆盘测试不涉及端帽，所以只看圆盘是发现不了的）：
+
+1. **端帽距离的量纲错**：`u` 是 Q14（`|u| = 16384`）、`v` 以 1/256 px 计，故 `cross(u,v) = 2^22·d·sinΔ`，垂直距离（1/256 px 单位）是 `cross >> 14`。原稿的 `cross / (64·d256)` 得到的是无量纲的 `256·sinΔ`，量纲错、数值差 256 倍量级。实测提交的实现把该系数吸收进"4×4 单位"的裁剪坐标（局部 1024 单位 = 1 px）。
+2. **角向覆盖度不能用两个半平面覆盖率相乘**：实测最好情况 57–68/256（门槛 24/256），且 `sweep=180°` 时两条端帽线重合会把 0.5 平方成 0.25。改为端帽带内做**锥 ∩ 像素的精确面积**（像素方格对两条半平面做 Sutherland–Hodgman 裁剪 + 鞋带公式），纯定点、仅作用在端帽那条约 1px 宽带内。spec §4.3 已同步修正。
+
+`eui_canvas_aa_arc` 的骨架（行阈值、三区、径向覆盖度、sweep 归一化、补扇形、裁剪、混合）与下面的代码一致，**端帽带部分以仓库实现为准**：
 
 ```c
 /* sin(0..90°) * 16384（Q14）。cos(θ) = sin(θ + 90°)，因此只需这一张表。 */
@@ -1506,6 +1515,10 @@ Expected: 链接失败（三个新入口未定义）。
  * 0 deg = 3 o'clock, increasing clockwise (screen y grows downward).
  * thickness == 0 draws nothing; thickness >= r degenerates to a filled
  * sector (equivalent to eui_canvas_fill_pie). Caps are butt (flat).
+ *
+ * Sweep rule: delta = end_deg - start_deg; delta == 0 draws nothing,
+ * |delta| >= 360 draws a full circle, otherwise the sweep is folded into
+ * 1..359 degrees (a negative delta wraps to the complementary side).
  */
 void eui_canvas_draw_arc(eui_canvas_t *canvas, int16_t cx, int16_t cy,
                          uint16_t r, uint16_t thickness,
