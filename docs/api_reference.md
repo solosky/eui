@@ -148,6 +148,7 @@ void eui_canvas_fill_pie(eui_canvas_t *canvas, int16_t cx, int16_t cy, uint16_t 
 - **描边宽度**：`eui_canvas_draw_arc` 的描边占据半径区间 `[r - thickness, r]`；`thickness == 0` 不画；`thickness >= r` 时内半径夹到 0，退化为扇形（等价于 `eui_canvas_fill_pie`）。`eui_canvas_draw_ring` 的描边占据 `[r_inner, r_outer]`，`r_inner >= r_outer` 不画。
 - **退化情形**：`eui_canvas_fill_pie(cx, cy, 0, ...)` 不画（半径为 0 的扇形没有面积），而 `eui_canvas_fill_circle(cx, cy, 0)` 仍按既有契约画一个点。
 - **圆心约定（消费者需注意）**：新内核把圆心放在**连续点** `(cx, cy)`（像素跨 `[px, px+1]`），与画布既有的 `draw_line` / `draw_rect` / `fill_rect` 索引空间一致；legacy 的中点光栅器把圆心放在像素中心 `(x+0.5, y+0.5)`。因此圆与圆角的右/下边缘可能比旧版窄一像素：`eui_canvas_fill_circle(c, 100, 100, 20)` 现在覆盖列 `[80, 119]`（40 列、左右对称），旧版覆盖 `[80, 120]`（41 列、不对称）。这是**修正而非整体位移**（`draw_circle(r == 0)` 的单点位置等既有约定不变），断言图形**内部**像素的代码不受影响，断言图形**边缘**像素的代码会看到 1 px 差。
+- **圆角矩形的角心**：四个四分之一圆盘的圆心取**外边界内缩 r**，即 `(x+r, y+r)` / `(x+w-r, y+r)` / `(x+w-r, y+h-r)` / `(x+r, y+h-r)`。因此角弧与直边在相切处严丝合缝（无 1 px 台阶；描边版无 1 px 断口），整个形状落在 `[x, x+w] × [y, y+h]` 内、与 `fill_rect` 的边界约定一致，并满足 180° 旋转对称。`2r == w`（或 `2r == h`）的胶囊形退化配置同样精确：两角盘圆心重合、分界轴落在像素边界上，没有像素被两次混合。
 
 ### 文本
 

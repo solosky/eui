@@ -407,6 +407,32 @@ static uint32_t aa_ref_sector_cov(int px, int py, int cx, int cy,
     return (uint32_t)((hit * 256 + 32) / 64);
 }
 
+/* 圆角矩形参考：SDF 定义（把点夹取到内矩形后测距 ≤ r），64 子样本面积占比 0..256。
+ * 边界取整数坐标 x..x+w / y..y+h（与 eui 的像素中心约定一致），与被测实现无关——
+ * 实现是"直边矩形 + 四个四分之一圆盘"拼出来的，参考是"一个整体形状"，两者只在
+ * 几何一致时才逐像素吻合。 */
+static uint32_t aa_ref_round_rect_cov(int px, int py, int16_t x, int16_t y,
+                                      int w, int h, int r)
+{
+    const int32_t x0 = x * 16, y0 = y * 16, x1 = (x + w) * 16, y1 = (y + h) * 16;
+    const int32_t il = (x + r) * 16, ir = (x + w - r) * 16;
+    const int32_t it = (y + r) * 16, ib = (y + h - r) * 16;
+    const int64_t r2 = (int64_t)(r * 16) * (r * 16);
+    int hit = 0;
+
+    for (int sy = 0; sy < 8; sy++)
+        for (int sx = 0; sx < 8; sx++) {
+            int32_t sx16 = px * 16 + 2 * sx + 1;
+            int32_t sy16 = py * 16 + 2 * sy + 1;
+            if (sx16 < x0 || sx16 > x1 || sy16 < y0 || sy16 > y1) continue;
+            int32_t qx = sx16 < il ? il : (sx16 > ir ? ir : sx16);
+            int32_t qy = sy16 < it ? it : (sy16 > ib ? ib : sy16);
+            int64_t dx = sx16 - qx, dy = sy16 - qy;
+            if (dx * dx + dy * dy <= r2) hit++;
+        }
+    return (uint32_t)((hit * 256 + 32) / 64);
+}
+
 #if EUI_COLOR_DEPTH == 8
 static void test_reference_agreement_sector(void)   /* C8/C9 的一般化验证 */
 {
@@ -814,6 +840,126 @@ static void test_corner_matches_quarter_arc(void)   /* C5 后半 */
     PASS();
 }
 
+/* C16：直边与角弧相切处不允许 1 px 缺口/台阶。
+ * 角盘圆心必须取**外边界内缩 r**：右上角是 (x+w-r, y+r)，不是 (x+w-r-1, y+r)。
+ * 若按"直边最后一列 ri = x+w-r-1"当圆心，整个右上角弧就比直边内缩 1 px，于是
+ * 相切那两行之间出现 1 px 台阶（轮廓上肉眼可见的"折角"）；同一处对描边圆角矩形
+ * 是 1 px 的**断口**（角弧接不到右直边那一列）。旧中点光栅器把"含边界点的像素"
+ * 整格涂满，恰好掩盖了这 1 px，所以这是 AA 化之后才显形的问题。
+ * 判别量：相切处外侧紧邻的像素（如 (x+w-1, y+r-1)）在真实几何里有
+ * 0.5 + r - √((r-0.5)² + 0.5²) ≈ 0.997 的覆盖度；角心内缩 1 px 时它 ≤ 0，完全不写。 */
+static void test_round_rect_corner_flush(void)
+{
+    TEST("C16：圆形矩形的角弧与直边相切处无缺口 + 180° 旋转对称");
+    const int16_t x = 30, y = 40; const uint16_t w = 130, h = 100, r = 42;
+    /* 直边带 y+r..y+h-r-1（行）/ x+r..x+w-r-1（列）；相切处外侧紧邻的一行/一列 */
+    const int tx_r = x + w - 1, tx_l = x, ty_t = y + r - 1, ty_b = y + h - r;
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+
+    eui_canvas_set_color(c, eui_color_from_gray(255));
+    eui_canvas_fill_round_rect(c, x, y, w, h, r);
+    if (aa_get(tx_r, ty_t) == 0) FAIL("实心：右上角弧没接到右直边（角心内缩 1 px）");
+    if (aa_get(tx_l, ty_t) == 0) FAIL("实心：左上角弧没接到左直边（角心内缩 1 px）");
+    if (aa_get(tx_l, ty_b) == 0) FAIL("实心：左下角弧没接到左直边（角心内缩 1 px）");
+    if (aa_get(tx_r, ty_b) == 0) FAIL("实心：右下角弧没接到右直边（角心内缩 1 px）");
+#if EUI_COLOR_DEPTH >= 4
+    /* 180° 旋转对称：(i,j) ↔ (x+w-1-(i-x), y+h-1-(j-y))。角心取"外边界内缩 r"时，
+     * 右上角心 (x+w-r, y+r) 的旋转像正是左下角心 (x+r, y+h-r)——这条对称把四个角心
+     * 的取法整体钉住（右侧/下侧内缩 1 px 会立刻破对称）。1/2bpp 的抖动相位锚在屏幕
+     * 坐标上，镜像像素相位不同，故不做断言（与 C5 镜像测试同一理由）。 */
+    for (int py = y; py < y + h; py++)
+        for (int px = x; px < x + w; px++) {
+            uint32_t v = aa_get(px, py);
+            if (v != aa_get(x + w - 1 - (px - x), y + h - 1 - (py - y))) {
+                printf("\n  fill (%d,%d) v=%u 镜像=%u\n", px - x, py - y, v,
+                       aa_get(x + w - 1 - (px - x), y + h - 1 - (py - y)));
+                FAIL("实心圆角矩形不满足 180° 旋转对称");
+            }
+        }
+#endif
+
+    /* 描边同理：这里缺口是"断口"（轮廓不连通），比实心的台阶更明显 */
+    eui_canvas_clear(c);
+    eui_canvas_set_color(c, eui_color_from_gray(255));
+    eui_canvas_draw_round_rect(c, x, y, w, h, r);
+    if (aa_get(tx_r, ty_t) == 0) FAIL("描边：右上角弧没接到右直边（1 px 断口）");
+    if (aa_get(tx_l, ty_t) == 0) FAIL("描边：左上角弧没接到左直边（1 px 断口）");
+    if (aa_get(tx_l, ty_b) == 0) FAIL("描边：左下角弧没接到左直边（1 px 断口）");
+    if (aa_get(tx_r, ty_b) == 0) FAIL("描边：右下角弧没接到右直边（1 px 断口）");
+#if EUI_COLOR_DEPTH >= 4
+    for (int py = y; py < y + h; py++)
+        for (int px = x; px < x + w; px++) {
+            uint32_t v = aa_get(px, py);
+            if (v != aa_get(x + w - 1 - (px - x), y + h - 1 - (py - y))) {
+                printf("\n  draw (%d,%d) v=%u 镜像=%u\n", px - x, py - y, v,
+                       aa_get(x + w - 1 - (px - x), y + h - 1 - (py - y)));
+                FAIL("描边圆角矩形不满足 180° 旋转对称");
+            }
+        }
+#endif
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+
+#if EUI_COLOR_DEPTH == 8
+static void test_reference_agreement_round_rect(void)   /* C16 */
+{
+    TEST("C16：圆角矩形与 64 子样本参考一致（8bpp，容差 24/256）");
+    /* 参考是"一个整体形状"的 SDF，实现是"矩形 + 四角圆盘"拼出来的：直边处两者本来
+     * 就逐字节相同（覆盖度 0/256），判别性全在圆弧上——角心内缩 1 px 时，角弧外那
+     * 1 px 宽的一圈会整体缺失，偏差高达 255/256，比 24/256 的容差大一个量级
+     * （实测 r=3 的角心像素 got=149 / want=244，偏 95/256）。修好角心后实测本内核与
+     * 参考的最大偏差 17/256，与 C15 圆盘门的 14/256 同量级，留 1.4 倍余量。 */
+    static const int rs[] = { 3, 6, 12, 24, 42 };
+    const int16_t x = 40, y = 50; const uint16_t w = 120, h = 90;
+    /* 退化配置：2r == w / 2r == h / 两者同时（四个角盘的圆心两两重合，甚至全部重合）。
+     * 角心取整数（外边界内缩 r）时盘的分界轴落在像素边界上，没有像素被两次部分混合，
+     * 实测最大偏差 16/256（角心差 1 px 时这几种配置会出现 1-2 px 的双重混合接缝）。 */
+    static const int degen[][2] = { { 40, 90 }, { 120, 40 }, { 40, 40 } };
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+    for (unsigned i = 0; i < sizeof(rs) / sizeof(rs[0]); i++) {
+        int r = rs[i];
+        eui_canvas_clear(c);
+        eui_canvas_set_color(c, eui_color_from_gray(255));
+        eui_canvas_fill_round_rect(c, x, y, w, h, (uint16_t)r);
+        for (int py = y - 2; py <= y + h + 2; py++)
+            for (int px = x - 2; px <= x + w + 2; px++) {
+                uint32_t want = aa_ref_round_rect_cov(px, py, x, y, w, h, r);
+                uint32_t got  = aa_get(px, py);            /* 8bpp: 像素值即覆盖度 */
+                uint32_t d    = (got > want) ? (got - want) : (want - got);
+                if (d > 24) {
+                    printf("\n  r=%d (%d,%d) got=%u want=%u\n",
+                           r, px - x, py - y, got, want);
+                    FAIL("圆角矩形与参考偏差超容差");
+                }
+            }
+    }
+    for (unsigned k = 0; k < sizeof(degen) / sizeof(degen[0]); k++) {
+        int dw = degen[k][0], dh = degen[k][1], r = 20;
+        eui_canvas_clear(c);
+        eui_canvas_set_color(c, eui_color_from_gray(255));
+        eui_canvas_fill_round_rect(c, x, y, (uint16_t)dw, (uint16_t)dh, (uint16_t)r);
+        for (int py = y - 2; py <= y + dh + 2; py++)
+            for (int px = x - 2; px <= x + dw + 2; px++) {
+                uint32_t want = aa_ref_round_rect_cov(px, py, x, y, dw, dh, r);
+                uint32_t got  = aa_get(px, py);
+                uint32_t d    = (got > want) ? (got - want) : (want - got);
+                if (d > 24) {
+                    printf("\n  degen w=%d h=%d r=%d (%d,%d) got=%u want=%u\n",
+                           dw, dh, r, px - x, py - y, got, want);
+                    FAIL("退化配置与参考偏差超容差");
+                }
+            }
+    }
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+#endif
+
 #if EUI_COLOR_DEPTH == 8
 static void test_seam_single_blend(void)          /* C8 */
 {
@@ -1193,6 +1339,7 @@ int main(void)
 #if EUI_COLOR_DEPTH == 8
     test_reference_agreement_disc();
     test_reference_agreement_sector();
+    test_reference_agreement_round_rect();
 #endif
 
 #if EUI_COLOR_DEPTH == 16
@@ -1210,6 +1357,7 @@ int main(void)
 
     test_round_rect_edges_geometry();
     test_corner_matches_quarter_arc();
+    test_round_rect_corner_flush();
     test_equivalence_and_extremes();
 
     test_cost_ratio();

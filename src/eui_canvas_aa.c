@@ -302,10 +302,15 @@ void eui_canvas_draw_round_rect(eui_canvas_t *canvas, int16_t x, int16_t y,
     eui_canvas_draw_line(canvas, (int16_t)(x + (int16_t)w - 1), t, (int16_t)(x + (int16_t)w - 1), b);
 
     uint16_t rin = (uint16_t)(r - 1);
-    eui_canvas_aa_arc(canvas, l,  t,  r, rin, 180, 270);   /* 左上 */
-    eui_canvas_aa_arc(canvas, ri, t,  r, rin, 270, 360);   /* 右上 */
-    eui_canvas_aa_arc(canvas, ri, b,  r, rin,   0,  90);   /* 右下 */
-    eui_canvas_aa_arc(canvas, l,  b,  r, rin,  90, 180);   /* 左下 */
+    /* 角弧圆心取**外边界内缩 r**：右上 (x+w-r, y+r) = (ri+1, t)、右下 (x+w-r, y+h-r)
+     * = (ri+1, b+1)、左下 (x+r, y+h-r) = (l, b+1)。直边最后一列/行 ri/b 比右、下角心
+     * 小 1，直接拿它们当圆心会让右、下两侧的角弧整体内缩 1 px：轮廓在"直边与角弧相切"
+     * 的那一行/列出现 1 px 台阶，描边版更是 1 px 断口（弧接不到直边那一列）。旧中点
+     * 光栅器把"含边界点的像素"整格涂满，恰好掩盖了这 1 px 差，所以是 AA 化后才显形的。 */
+    eui_canvas_aa_arc(canvas, l,      t,     r, rin, 180, 270);   /* 左上 */
+    eui_canvas_aa_arc(canvas, ri + 1, t,     r, rin, 270, 360);   /* 右上 */
+    eui_canvas_aa_arc(canvas, ri + 1, b + 1, r, rin,   0,  90);   /* 右下 */
+    eui_canvas_aa_arc(canvas, l,      b + 1, r, rin,  90, 180);   /* 左下 */
 }
 
 void eui_canvas_fill_round_rect(eui_canvas_t *canvas, int16_t x, int16_t y,
@@ -325,19 +330,22 @@ void eui_canvas_fill_round_rect(eui_canvas_t *canvas, int16_t x, int16_t y,
         eui_canvas_fill_rect(canvas, x, t, r, (uint16_t)(b - t + 1));
         eui_canvas_fill_rect(canvas, (int16_t)(ri + 1), t, r, (uint16_t)(b - t + 1));
     }
-    /* 四个角用四分之一圆盘补齐。角盘与中间矩形的像素集合会相接（例如中间矩形的 ri 列
-     * 被右上角盘部分覆盖，实测 w=70/h=24/r=6 下 4 个像素），但这无妨：矩形先以全覆盖
-     * 写下 fg，角盘随后的部分混合算出的 g 恒等于 gray(fg) 且落在量化网格上（rem == 0
-     * → quantize 恒等），值不变——没有任何像素被部分覆盖混合两次。
-     * 已知限制：2r == w（或 2r == h）时相邻两角盘共享一列（一行），该列被两次部分混合，
-     * 向 fg 偏移实测 +1..+18/256（r = 2..24；r=1 的退化情形 53），每处 1-2 px 接缝。
-     * 修法是让被共享的那一列（一行）只由**一次** arc 调用覆盖（把相邻两角盘合并成一次
-     * 调用）；**不要**改用 r_in = r-1——角内部没有矩形覆盖、只由该角盘覆盖，那样会在
-     * 每个角挖出一个 r x r 的空洞。 */
-    eui_canvas_aa_arc(canvas, l,  t,  r, 0, 180, 270);
-    eui_canvas_aa_arc(canvas, ri, t,  r, 0, 270, 360);
-    eui_canvas_aa_arc(canvas, ri, b,  r, 0,   0,  90);
-    eui_canvas_aa_arc(canvas, l,  b,  r, 0,  90, 180);
+    /* 四个角用四分之一圆盘补齐，圆心取外边界内缩 r（见 draw_round_rect 处的说明）：
+     * 左/上角心与旧式的 (l,t)/(ri,t) 恰好相同，右/下角心是 (ri+1, b+1)，比 ri/b 大 1。
+     * 角盘与中间矩形的像素集合会相接（例如中间矩形的 ri 列被右上角盘部分覆盖，实测
+     * w=70/h=24/r=6 下 4 个像素），但这无妨：矩形先以全覆盖写下 fg，角盘随后的部分混合
+     * 算出的 g 恒等于 gray(fg) 且落在量化网格上（rem == 0 → quantize 恒等），值不变——
+     * 没有任何像素被部分覆盖混合两次。
+     * 退化配置（2r == w / 2r == h，即相邻两角盘圆心重合）也因此变得精确：圆心是整数，
+     * 两个盘的分界轴正好落在像素**边界**上（没有像素被轴切开），每个像素整格属于某一侧，
+     * 不会被两次部分混合。实测三种退化组合与 64 子样本参考的最大偏差 16/256，与非退化
+     * 配置同量级（见 test_canvas_aa.c 的 C16 参考门）。
+     * **不要**改用 r_in = r-1：角内部没有矩形覆盖、只由该角盘覆盖，那样会在每个角挖出
+     * 一个 r x r 的空洞。 */
+    eui_canvas_aa_arc(canvas, l,      t,     r, 0, 180, 270);
+    eui_canvas_aa_arc(canvas, ri + 1, t,     r, 0, 270, 360);
+    eui_canvas_aa_arc(canvas, ri + 1, b + 1, r, 0,   0,  90);
+    eui_canvas_aa_arc(canvas, l,      b + 1, r, 0,  90, 180);
 }
 
 /* ---- 圆弧/圆环/扇形入口：内核之上的薄包装 --------------------- */

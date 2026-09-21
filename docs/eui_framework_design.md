@@ -291,7 +291,7 @@ Canvas 维护一个**裁剪矩形栈**，所有绘图操作都受当前裁剪区
 
 ### 4.6 抗锯齿（Anti-Aliasing）
 
-圆形与圆角相关原语输出**覆盖度混合**的边缘：`draw_circle` / `fill_circle` / `draw_round_rect` / `fill_round_rect` 原地升级（签名不变，消费方零改动），并新增 `draw_arc` / `draw_ring` / `fill_pie` 三个共享同一内核的入口。直边部分逐字节等于 `draw_rect` / `fill_rect` 的既有输出，圆角与对应四分之一圆逐像素一致。
+圆形与圆角相关原语输出**覆盖度混合**的边缘：`draw_circle` / `fill_circle` / `draw_round_rect` / `fill_round_rect` 原地升级（签名不变，消费方零改动），并新增 `draw_arc` / `draw_ring` / `fill_pie` 三个共享同一内核的入口。直边部分逐字节等于 `draw_rect` / `fill_rect` 的既有输出，圆角与对应四分之一圆逐像素一致。圆角矩形的四个角盘圆心取**外边界内缩 r**（`x+r` / `x+w-r` / `y+r` / `y+h-r`），因此角弧与直边在相切处无台阶（描边版无断口）、形状与 `fill_rect` 的边界约定一致，`2r == w` 的胶囊形退化配置也不会出现双重混合。
 
 **覆盖度模型（解析扫描线，不是超采样）。** 每行先按**像素中心行**的平方距离算出两个阈值，再用一次整数开方定出该行需要访问的像素窗口：
 
