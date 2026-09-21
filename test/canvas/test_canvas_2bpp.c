@@ -4,6 +4,7 @@
 #include "eui/eui_config.h"
 #include "common/eui_test.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define MOCK_W 128
@@ -210,7 +211,9 @@ static void print_level_histogram(void)
            hist[0], hist[1], hist[2], hist[3]);
 }
 
-/* 逐像素打印灰度级（' '=0 '.'=1 '+'=2 '#'=3），供人目检抖动网点 */
+/* 逐像素打印灰度级（' '=0 '.'=1 '+'=2 '#'=3），供人目检抖动网点。
+ * 默认**不打**（128x64 = 8KB ASCII，每次都灌进 ctest 日志没有价值）；
+ * 需要目检时：EUI_AA_PRINT_LEVEL_MAP=1 ctest -R test_canvas_2bpp -V */
 static void print_level_map(void)
 {
     static const char ch[4] = { ' ', '.', '+', '#' };
@@ -220,11 +223,11 @@ static void print_level_map(void)
     }
 }
 
-static void test_aa_gallery(void)
+static int test_aa_gallery(void)
 {
     printf("=== 2bpp AA gallery（目检抖动，无断言）===\n");
     eui_canvas_t *c = eui_canvas_create(&mock_display);
-    if (!c) { printf("FAIL: create\n"); return; }
+    if (!c) { printf("FAIL: create\n"); return 1; }
     memset(mock_buf, 0, sizeof(mock_buf));
     eui_canvas_set_bg_color(c, EUI_COLOR_BLACK);
     eui_canvas_clear(c);
@@ -258,14 +261,18 @@ static void test_aa_gallery(void)
     eui_canvas_clear_clip(c);                              /* 复位（set_clip(NULL) 是空操作） */
     eui_canvas_commit(c);
 
+    int rc = 0;
     if (write_level_bmp("test_canvas_2bpp.bmp") == 0)
         printf("  -> test_canvas_2bpp.bmp (%dx%d 24-bit BMP)\n", MOCK_W, MOCK_H);
-    else
+    else {
         printf("  FAIL: BMP write\n");
+        rc = 1;                        /* BMP 是交付物：写不出来就是失败 */
+    }
     print_level_histogram();
-    print_level_map();
+    if (getenv("EUI_AA_PRINT_LEVEL_MAP") != NULL) print_level_map();
 
     eui_canvas_destroy(c);
+    return rc;
 }
 
 int main(void)
@@ -279,6 +286,6 @@ int main(void)
     test_color_conversion();
     test_buffer_size();
     test_pixel_values();
-    test_aa_gallery();
-    return eui_test_summary();
+    int gallery_rc = test_aa_gallery();
+    return (eui_test_summary() != 0 || gallery_rc != 0) ? 1 : 0;
 }

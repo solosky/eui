@@ -12,7 +12,6 @@
 #define GAL_H 260          /* 上 200 行是形状画廊，下 60 行是覆盖度阶梯 + 越界/clip 样本 */
 #define GAL_POOL 65536
 static uint8_t gal_pool[GAL_POOL];
-static uint8_t gal_buf[GAL_W * GAL_H * (EUI_COLOR_DEPTH == 16 ? 2 : 1)];
 
 static void gal_write(const uint8_t *b, const eui_rect_t *r, void *ud)
 { (void)b; (void)r; (void)ud; }
@@ -26,11 +25,12 @@ static eui_display_drv_t gal_display = {
 static void put32(uint8_t *p, uint32_t v)
 { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24); }
 
-/* 单像素灰度画布 → 24 位 BMP（自下而上、BGR、4 字节行对齐） */
-static void write_gray_bmp(const char *path, const uint8_t *gray, int w, int h)
+/* 单像素灰度画布 → 24 位 BMP（自下而上、BGR、4 字节行对齐）。
+ * 返回非 0 表示交付物没写出来：BMP 就是这个测试的产物，写失败必须让测试红。 */
+static int write_gray_bmp(const char *path, const uint8_t *gray, int w, int h)
 {
     FILE *f = fopen(path, "wb");
-    if (!f) { printf("  (无法写出 %s)\n", path); return; }
+    if (!f) { printf("  FAIL: 无法写出 %s\n", path); return -1; }
     int row_bytes = (w * 3 + 3) & ~3;
     uint32_t data_size = (uint32_t)row_bytes * (uint32_t)h;
     uint8_t hdr[54];
@@ -54,6 +54,7 @@ static void write_gray_bmp(const char *path, const uint8_t *gray, int w, int h)
         fwrite(row, 1, (size_t)row_bytes, f);
     }
     fclose(f);
+    return 0;
 }
 
 /* 把 canvas 像素转成 0..255 灰度（低位深按级数放大） */
@@ -111,7 +112,10 @@ int main(void)
     static uint8_t gray[GAL_W * GAL_H];
     for (int y = 0; y < GAL_H; y++)
         for (int x = 0; x < GAL_W; x++) gray[y * GAL_W + x] = pixel_gray(c, x, y);
-    write_gray_bmp("test_canvas_1bpp.bmp", gray, GAL_W, GAL_H);
+    if (write_gray_bmp("test_canvas_1bpp.bmp", gray, GAL_W, GAL_H) != 0) {
+        eui_canvas_destroy(c);
+        return 1;                      /* BMP 是交付物：写不出来就是失败 */
+    }
     printf("wrote test_canvas_1bpp.bmp\n");
 
     eui_canvas_destroy(c);
