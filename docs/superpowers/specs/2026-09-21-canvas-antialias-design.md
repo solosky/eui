@@ -76,8 +76,8 @@ static uint32_t aa_isqrt(uint64_t x, uint8_t frac_bits);
 
 圆弧每次调用只需 **2 对** 方向向量（两条端帽的半平面法向，不是每像素），因此：
 
-- eui 内建 **91 项 `sin` 表**（0..90°，`int16` 存 Q14），`cos(θ) = sin(90−θ)`，按象限折叠符号——与 `app-eui/ui/ui_draw.c:32` 的 `k_sin_deg[91]` 同一套路，生态内已有先例。
-- 表内**线性插值**：1° 步长下 `sin` 线性插值的最大误差 `(Δ²/8)·|sin''| ≈ 3.8e-5`，在 r=240 上折合 **0.009 px**，远小于 1/16 px，因此无需加密表。
+- eui 内建 **91 项 `sin` 表**（0..90°，`int16` 存 Q14），`cos(θ) = sin(θ + 90°)`，按象限折叠符号——与 `app-eui/ui/ui_draw.c:32` 的 `k_sin_deg[91]` 同一套路，生态内已有先例。
+- **不做表内插值**：圆弧 API 的角度参数是整数度（见 §3.3），表在每个可接受角度上都精确，方向向量误差只剩 Q14 量化（1/16384 ≈ 6e-5 rad，在 r=240 上折合 0.015 px）。原本设想的 1° 步长线性插值在这个 API 下是死代码。
 - 方向向量以 **Q14** 存（`round(v · 16384)`，`|n| ≤ 16384`）；半平面有符号距离用 32 位中间量即可：`|n_q14 · d256| ≤ 16384 × 81920 = 1.34e9 < INT32_MAX`。
 
 **决策：isqrt 与三角函数私有在 eui**（`src/eui_canvas_aa.c`，约 20 行 + 182 字节表）。motionc 的章程是动画引擎（其 README 自述），整数光栅化开方不是动画数学；这样 eui 的 canvas 保持"只依赖 mc 的动画能力"这条既有边界，也避免为一个 20 行辅助函数做跨仓改动 + 子模块 bump + 100% 覆盖率配测试。
@@ -96,20 +96,21 @@ static uint32_t aa_isqrt(uint64_t x, uint8_t frac_bits);
 
 | 层 | 内容 | 位置 |
 |---|---|---|
-| 内部共享工具 | `canvas_set_pixel` / `canvas_get_pixel` 提升为内部头函数；`vlw_blend_pixel` 提升为通用 `canvas_blend_pixel` | 新增 `src/eui_canvas_internal.h`，`src/eui_canvas.c` |
-| 覆盖度内核 | `aa_isqrt`、sin 表、`aa_cov_*`、`canvas_blend_cov`、Bayer 表 | `src/eui_canvas_aa.c` |
-| 几何 | 扫描线圆 / 圆角矩形 / 圆环扇形 | `src/eui_canvas_aa.c` |
-| 公开 API | 四个原地升级 + 三个新入口 | `include/eui/eui_canvas.h`（声明）、`src/eui_canvas.c` 转发到 AA 实现 |
+| 内部共享工具 | `canvas_set_pixel` / `canvas_get_pixel` 提升为内部头函数（`eui_canvas_px_set` / `eui_canvas_px_get`）；`vlw_blend_pixel` 提升为通用覆盖度混合 `eui_canvas_px_blend` | 新增 `include/eui/eui_canvas_internal.h`，实现留在 `src/eui_canvas.c` |
+| 覆盖度内核 | `eui_canvas_isqrt`、sin 表、`eui_canvas_aa_arc`、Bayer 表 | `src/eui_canvas_aa.c` |
+| 几何 | 扫描线圆 / 圆角矩形 / 圆环扇形（均归结到 `eui_canvas_aa_arc`） | `src/eui_canvas_aa.c` |
+| 公开 API | 四个原地升级 + 三个新入口，全部实现于 AA 文件 | `include/eui/eui_canvas.h`（声明）、`src/eui_canvas_aa.c`（实现） |
 
 `canvas_get_pixel()` 从"仅 16bpp"扩到全色深（低色深抖动同样需要读回 dst）。
 
 ### 3.2 混合内核
 
 ```c
-/* 覆盖度混合：cov 0 → 不写；cov 256 → 直接写 fg；其余读 dst 后按色深混合。
- * 抖动路径的阈值相位锚在 (x, y + canvas->page_y_offset)，跨 PAGE band 连续。 */
-static void canvas_blend_cov(eui_canvas_t *c, int16_t x, int16_t y,
-                             eui_color_t fg, uint16_t cov256);
+/* 覆盖度混合：cov 0 → 不写；cov 255 → 直接写 fg；其余读 dst 后按色深混合。
+ * 抖动路径的阈值相位锚在 (x, y + canvas->page_y_offset)，跨 PAGE band 连续。
+ * cov 取 0..255，与既有的 VLW 字形 alpha 同一量纲，使 16bpp 分支可逐位复用。 */
+void eui_canvas_px_blend(eui_canvas_t *c, int16_t x, int16_t y,
+                         eui_color_t fg, uint8_t cov);
 ```
 
 | 色深 | 量化方式 |
@@ -174,6 +175,7 @@ void eui_canvas_fill_pie(eui_canvas_t *canvas, int16_t cx, int16_t cy, uint16_t 
 - 负角合法（`-90, 90` = 上半圆）。
 - `sweep = ((end - start) % 360 + 360) % 360`；`sweep == 0` → 不画；`0, 360` → 整圆。
 - 端帽为**平头**（垂直于半径的直边，无圆角），不提供 dash/圆角端帽。
+- **已知粒度限制**：整数度意味着半径 r 处的端帽位置以 `r·sin(1°)` 为最小步长——r=120 时 2.1 px、r=60 时 1.05 px。静态仪表盘无影响；按帧推进的环形动画只要每帧步进 > 1°（300ms 转 360° 在 30fps 下约 40°/帧）也无可见台阶，但"每帧 ≤1° 且半径较大"的用法会出现量化抖动。这与既有 `ui_draw_rgb565_rot(deg_cw)` 的整数度约定一致；需要更细粒度时再单独评估（不在本次范围）。
 
 ## 4. 覆盖度模型（解析扫描线）
 
@@ -311,7 +313,7 @@ cap_cov256 = clamp(128 - capd256, 0, 256)
 |---|---|
 | `include/eui/eui_canvas.h` | 三个新入口声明；四个原语的文档改为描述 AA 语义 |
 | `src/eui_canvas_aa.c` | **新增**：isqrt、sin 表、覆盖度、混合内核、扫描线几何 |
-| `src/eui_canvas_internal.h` | **新增**：`canvas_set_pixel` / `canvas_get_pixel` / `canvas_blend_pixel` 的内部声明 |
+| `include/eui/eui_canvas_internal.h` | **新增**：`eui_canvas_px_set` / `eui_canvas_px_get` / `eui_canvas_px_blend` / `eui_canvas_isqrt` / `eui_canvas_aa_arc` 的内部声明（放公开 include 目录，对齐既有的 `eui_font_internal.h` 约定，使测试可直接驱动内核） |
 | `src/eui_canvas.c` | 四个原语转发到 AA 实现；`canvas_get_pixel` 扩到全色深；`vlw_blend_pixel` 提升 |
 | `src/CMakeLists.txt` | 加入新源文件（IDF 路径是 `file(GLOB src/*.c)`，自动带上） |
 | `test/canvas/test_canvas_aa.c` | **新增**：契约测试 |
