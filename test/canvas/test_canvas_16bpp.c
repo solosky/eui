@@ -186,6 +186,18 @@ int main(void)
     }
     y += 30;
 
+    /* --- AA arc / ring / pie 目检样本 --- */
+    eui_canvas_set_color(c, WHITE);
+    eui_canvas_draw_arc(c,  40, y + 40, 35,  1, -90,  90);      /* 发丝弧 */
+    eui_canvas_draw_arc(c, 120, y + 40, 35,  8,   0, 300);      /* 粗弧 */
+    eui_canvas_draw_ring(c, 200, y + 40, 35, 22,   0, 270);     /* 圆环 */
+    eui_canvas_fill_pie(c,  40, y + 130, 35, 30, 210);          /* 扇形 */
+    eui_canvas_fill_circle(c, 120, y + 130, 2);                 /* 极小半径 */
+    eui_canvas_draw_circle(c, 120, y + 130, 12);
+    eui_canvas_fill_round_rect(c, 160, y + 100, 70, 24, 6);     /* 圆角矩形角部 */
+    eui_canvas_draw_round_rect(c, 160, y + 130, 70, 24, 6);
+    y += 175;
+
     /* Commit and write BMP */
     memset(mock_buf, 0, sizeof(mock_buf));
     eui_canvas_commit(c);

@@ -164,6 +164,94 @@ static void test_pixel_values(void)
     PASS();
 }
 
+/* ---- AA 目检画廊：只产出人工目检产物，不做新的像素断言 ---- */
+
+static void put32le(uint8_t *p, uint32_t v)
+{ p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24); }
+
+/* 2bpp 灰度级 → 24 位 BMP（自下而上、BGR、4 字节行对齐） */
+static int write_level_bmp(const char *fn)
+{
+    int row_bytes = (MOCK_W * 3 + 3) & ~3;
+    uint32_t data_size = (uint32_t)row_bytes * (uint32_t)MOCK_H;
+    uint8_t hdr[54];
+    memset(hdr, 0, sizeof(hdr));
+    hdr[0] = 'B'; hdr[1] = 'M';
+    put32le(hdr + 2, 54u + data_size);
+    put32le(hdr + 10, 54u);
+    put32le(hdr + 14, 40u);
+    put32le(hdr + 18, (uint32_t)MOCK_W);
+    put32le(hdr + 22, (uint32_t)MOCK_H);
+    hdr[26] = 1; hdr[28] = 24;
+    put32le(hdr + 34, data_size);
+
+    FILE *f = fopen(fn, "wb");
+    if (!f) return -1;
+    fwrite(hdr, 1, 54, f);
+    uint8_t row[MOCK_W * 3 + 4];
+    for (int y = MOCK_H - 1; y >= 0; y--) {
+        memset(row, 0, (size_t)row_bytes);
+        for (int x = 0; x < MOCK_W; x++) {
+            uint8_t g = (uint8_t)(get_pixel_value(x, y) * 85);   /* 0,85,170,255 */
+            row[x * 3] = g; row[x * 3 + 1] = g; row[x * 3 + 2] = g;   /* BGR */
+        }
+        fwrite(row, 1, (size_t)row_bytes, f);
+    }
+    fclose(f);
+    return 0;
+}
+
+static void print_level_histogram(void)
+{
+    int hist[4] = { 0, 0, 0, 0 };
+    for (int y = 0; y < MOCK_H; y++)
+        for (int x = 0; x < MOCK_W; x++) hist[get_pixel_value(x, y)]++;
+    printf("  level histogram: 0=%d 1=%d 2=%d 3=%d\n",
+           hist[0], hist[1], hist[2], hist[3]);
+}
+
+/* 逐像素打印灰度级（' '=0 '.'=1 '+'=2 '#'=3），供人目检抖动网点 */
+static void print_level_map(void)
+{
+    static const char ch[4] = { ' ', '.', '+', '#' };
+    for (int y = 0; y < MOCK_H; y++) {
+        for (int x = 0; x < MOCK_W; x++) putchar(ch[get_pixel_value(x, y)]);
+        putchar('\n');
+    }
+}
+
+static void test_aa_gallery(void)
+{
+    printf("=== 2bpp AA gallery（目检抖动，无断言）===\n");
+    eui_canvas_t *c = eui_canvas_create(&mock_display);
+    if (!c) { printf("FAIL: create\n"); return; }
+    memset(mock_buf, 0, sizeof(mock_buf));
+    eui_canvas_set_bg_color(c, EUI_COLOR_BLACK);
+    eui_canvas_clear(c);
+    /* 用"该色深的最亮级"而不是 EUI_COLOR_WHITE：8bpp 下后者是 1（近黑） */
+    eui_canvas_set_color(c, eui_color_from_gray(255));
+
+    /* 与 16bpp 画廊同一组样本，坐标缩放到 128x64 的 mock */
+    eui_canvas_draw_arc(c,  24, 18, 16,  1, -90,  90);     /* 发丝弧 */
+    eui_canvas_draw_arc(c,  60, 18, 16,  5,   0, 300);     /* 粗弧 */
+    eui_canvas_draw_ring(c, 100, 18, 16, 10,   0, 270);    /* 圆环 */
+    eui_canvas_fill_pie(c,   24, 48, 14, 30, 210);         /* 扇形 */
+    eui_canvas_fill_circle(c, 60, 48, 2);                  /* 极小半径 */
+    eui_canvas_draw_circle(c, 60, 48, 6);
+    eui_canvas_fill_round_rect(c, 78, 36, 44, 12, 4);      /* 圆角矩形角部 */
+    eui_canvas_draw_round_rect(c, 78, 52, 44, 12, 4);
+    eui_canvas_commit(c);
+
+    if (write_level_bmp("test_canvas_2bpp.bmp") == 0)
+        printf("  -> test_canvas_2bpp.bmp (%dx%d 24-bit BMP)\n", MOCK_W, MOCK_H);
+    else
+        printf("  FAIL: BMP write\n");
+    print_level_histogram();
+    print_level_map();
+
+    eui_canvas_destroy(c);
+}
+
 int main(void)
 {
     eui_test_init();
@@ -175,5 +263,6 @@ int main(void)
     test_color_conversion();
     test_buffer_size();
     test_pixel_values();
+    test_aa_gallery();
     return eui_test_summary();
 }

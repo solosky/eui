@@ -6,6 +6,7 @@
 #include "common/eui_test.h"
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 /* C15 参考一致性测试要放 2*120+4 的画布；16bpp 下约 135KB，因此自建池。
  * 池要能同时容下**两个** 16bpp 画布：FAIL() 是 longjmp 出测试函数的，失败的那条
@@ -887,6 +888,27 @@ static void test_equivalence_and_extremes(void)   /* C9 + C14 */
     PASS();
 }
 
+static void test_cost_ratio(void)                 /* C13：只打印，不断言绝对阈值 */
+{
+    TEST("C13：成本比值（AA 填充 vs 同面积 fill_rect）");
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+    const int r = 120, N = 20;
+    clock_t t0 = clock();
+    for (int i = 0; i < N; i++) eui_canvas_fill_circle(c, 130, 130, (uint16_t)r);
+    clock_t t1 = clock();
+    for (int i = 0; i < N; i++) eui_canvas_fill_rect(c, 10, 10, (uint16_t)(2 * r), (uint16_t)(2 * r));
+    clock_t t2 = clock();
+    double px = (double)(2 * r) * (2 * r);
+    double aa_ns = (double)(t1 - t0) * 1e9 / (CLOCKS_PER_SEC * (double)N) / px;
+    double rc_ns = (double)(t2 - t1) * 1e9 / (CLOCKS_PER_SEC * (double)N) / px;
+    printf("AA fill_circle r=%d: %.2f ns/px | fill_rect 同面积: %.2f ns/px | 比值 %.2fx\n",
+           r, aa_ns, rc_ns, (rc_ns > 0) ? aa_ns / rc_ns : 0.0);
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+
 int main(void)
 {
     eui_allocator_init_tlsf(aa_pool, AA_POOL_SIZE);
@@ -931,6 +953,8 @@ int main(void)
     test_round_rect_edges_geometry();
     test_corner_matches_quarter_arc();
     test_equivalence_and_extremes();
+
+    test_cost_ratio();
 
     return eui_test_summary();
 }
