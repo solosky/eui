@@ -161,11 +161,11 @@ static uint8_t aa_pool[AA_POOL_SIZE];
 
 #define AA_W 260
 #define AA_H 260
-static uint8_t aa_mock_buf[AA_W * AA_H * (EUI_COLOR_DEPTH == 16 ? 2 : 1)];
 
+/* 测试直接通过 eui_canvas_px_get 读 canvas 自己的缓冲，刷新回调无需做任何事 */
 static void aa_mock_write(const uint8_t *b, const eui_rect_t *r, void *ud)
 {
-    (void)b; (void)r; (void)ud;   /* 测试直接读 canvas->buffer，无需回拷 */
+    (void)b; (void)r; (void)ud;
 }
 
 static eui_display_drv_t aa_mock_display = {
@@ -690,6 +690,109 @@ static uint32_t aa_ref_disc_cov(int px, int py, int cx, int cy, int r)
     return (uint32_t)((hit * 256 + 32) / 64);
 }
 
+/* 参考方向向量：从 1° 旋转矩阵递推，Q30 精度、不用 libm、与实现的 Q14 表无关。
+ * （360 步累积的舍入误差约 3e-7，远小于 1/16 px 的容差） */
+#define REF_COS1 1073578288LL   /* round(cos 1° * 2^30) —— 实测值，勿手改 */
+#define REF_SIN1   18739379LL   /* round(sin 1° * 2^30) —— 实测值，勿手改 */
+static void aa_ref_dir(int deg, int64_t *ux, int64_t *uy)
+{
+    int64_t cx = 1LL << 30, cy = 0;                 /* 0° = (1, 0) */
+    int d = deg % 360;
+    if (d < 0) d += 360;
+    for (int i = 0; i < d; i++) {
+        int64_t nx = (cx * REF_COS1 - cy * REF_SIN1) >> 30;
+        int64_t ny = (cx * REF_SIN1 + cy * REF_COS1) >> 30;
+        cx = nx; cy = ny;
+    }
+    *ux = cx; *uy = cy;
+}
+
+/* 扇区参考：圆盘参考 + 角度区间判定。角度判定用"半平面交（sweep<=180）/
+ * 补扇形交的补（sweep>180）"两种数学形式，与实现的两条公式同源但独立实现；
+ * 被验证的是覆盖度与光栅化管线，而非三角恒等式。 */
+static uint32_t aa_ref_sector_cov(int px, int py, int cx, int cy,
+                                  int r_in, int r_out, int a0, int a1)
+{
+    int sweep = a1 - a0;
+    int has_caps = !(sweep >= 360 || sweep <= -360);
+    int complement = has_caps && sweep > 180;
+    int64_t ux0 = 1LL << 30, uy0 = 0, ux1 = 1LL << 30, uy1 = 0;
+    if (has_caps) {
+        if (complement) { aa_ref_dir(a1, &ux0, &uy0); aa_ref_dir(a0, &ux1, &uy1); }
+        else            { aa_ref_dir(a0, &ux0, &uy0); aa_ref_dir(a1, &ux1, &uy1); }
+    }
+    int hit = 0;
+    for (int sy = 0; sy < 8; sy++)
+        for (int sx = 0; sx < 8; sx++) {
+            int32_t dx = ((px * 16) + 2 * sx + 1) - cx * 16;
+            int32_t dy = ((py * 16) + 2 * sy + 1) - cy * 16;
+            int64_t d2 = (int64_t)dx * dx + (int64_t)dy * dy;
+            if (d2 < (int64_t)(r_in * 16) * (r_in * 16)) continue;
+            if (d2 > (int64_t)(r_out * 16) * (r_out * 16)) continue;
+            if (has_caps) {
+                if (complement) {
+                    /* 在补扇形内则排除 */
+                    if ((ux0 * dy - uy0 * dx) >= 0 && (ux1 * dy - uy1 * dx) <= 0) continue;
+                } else {
+                    if ((ux0 * dy - uy0 * dx) < 0) continue;   /* 起点帽内侧 ⟺ cross >= 0 */
+                    if ((ux1 * dy - uy1 * dx) > 0) continue;   /* 终点帽内侧 ⟺ cross <= 0 */
+                }
+            }
+            hit++;
+        }
+    return (uint32_t)((hit * 256 + 32) / 64);
+}
+
+#if EUI_COLOR_DEPTH == 8
+static void test_reference_agreement_sector(void)   /* C8/C9 的一般化验证 */
+{
+    TEST("C15（扇区）：与 64 子样本参考一致，含跨 180° 与整圆（8bpp，容差 24/256）");
+    /* 跨 180° 的两种路径与补扇形公式都在这组 sweep 里被逐像素比对；
+     * 若实现把大弧拆成两段绘制，接缝处会叠加成 ~0.25·dst+0.75·fg，
+     * 偏差约 63/256，必然超出容差。 */
+    static const int sweeps[] = { 1, 45, 120, 179, 180, 181, 270, 359, 360 };
+    const int r = 40, cx = 130, cy = 130;
+    eui_canvas_t *c = aa_new_canvas();
+    aa_cur = c;
+    for (unsigned i = 0; i < sizeof(sweeps) / sizeof(sweeps[0]); i++) {
+        int sw = sweeps[i];
+        eui_canvas_set_bg_color(c, EUI_COLOR_BLACK);
+        eui_canvas_clear(c);
+        eui_canvas_set_color(c, eui_color_from_gray(255));
+        eui_canvas_aa_arc(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, 0, 30, (int16_t)(30 + sw));
+        for (int y = cy - r - 2; y <= cy + r + 2; y++)
+            for (int x = cx - r - 2; x <= cx + r + 2; x++) {
+                uint32_t want = aa_ref_sector_cov(x, y, cx, cy, 0, r, 30, 30 + sw);
+                uint32_t got  = aa_get(x, y);
+                uint32_t diff = (got > want) ? (got - want) : (want - got);
+                if (diff > 24) {
+                    printf("\n  sweep=%d (%d,%d) got=%u want=%u\n",
+                           sw, x - cx, y - cy, got, want);
+                    FAIL("扇区与参考偏差超容差（可能是接缝双重混合或覆盖度模型错误）");
+                }
+            }
+    }
+    /* 圆环（内孔）也要过参考 */
+    {
+        eui_canvas_clear(c);
+        eui_canvas_aa_arc(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, 25, 0, 360);
+        for (int y = cy - r - 2; y <= cy + r + 2; y++)
+            for (int x = cx - r - 2; x <= cx + r + 2; x++) {
+                uint32_t want = aa_ref_sector_cov(x, y, cx, cy, 25, r, 0, 360);
+                uint32_t got  = aa_get(x, y);
+                uint32_t diff = (got > want) ? (got - want) : (want - got);
+                if (diff > 24) {
+                    printf("\n  ring (%d,%d) got=%u want=%u\n", x - cx, y - cy, got, want);
+                    FAIL("圆环与参考偏差超容差");
+                }
+            }
+    }
+    eui_canvas_destroy(c);
+    aa_cur = NULL;
+    PASS();
+}
+#endif
+
 #if EUI_COLOR_DEPTH == 8
 static void test_reference_agreement_disc(void)   /* C15 @8bpp */
 {
@@ -892,7 +995,7 @@ static void test_mirror_symmetry(void)   /* C5：全色深可跑 */
 }
 ```
 
-在 `main()` 中按顺序调用：`test_reference_agreement_disc()`（8bpp）、`test_reference_agreement_disc_16()`（16bpp）、`test_contracts_c2_c3_c4_c6_c7()`（8bpp）、`test_clip_boundary()`、`test_mirror_symmetry()`。
+在 `main()` 中按顺序调用：`test_reference_agreement_disc()`（8bpp）、`test_reference_agreement_sector()`（8bpp）、`test_reference_agreement_disc_16()`（16bpp）、`test_contracts_c2_c3_c4_c6_c7()`（8bpp）、`test_clip_boundary()`、`test_mirror_symmetry()`。
 
 - [ ] **Step 3: 跑测试确认失败**
 
@@ -1141,22 +1244,27 @@ static void test_corner_matches_quarter_arc(void)   /* C5 后半 */
 {
     TEST("C5：圆角与对应四分之一圆逐像素一致");
     const int cx = 100, cy = 100, r = 9;
+    /* 关键：让圆角矩形的角心 (x+r, y+r) 正好落在 (cx, cy)，
+     * 即 x = cx - r、y = cy - r；若取 cx-r-1 则角心差一像素，比对必然失败。 */
+    const int16_t x = (int16_t)(cx - r), y = (int16_t)(cy - r);
+    uint32_t corner_px[16 * 16];
+    int n = 0, cap = (int)(sizeof(corner_px) / sizeof(corner_px[0]));
     eui_canvas_t *c = aa_new_canvas();
     aa_cur = c;
-    /* 用 aa_arc 画左上角 1px 圆角（180..270），再用 round_rect 的角重现同一几何 */
-    eui_canvas_clear(c);
-    eui_canvas_draw_round_rect(c, (int16_t)(cx - r - 1), (int16_t)(cy - r - 1),
-                               (uint16_t)(2 * r + 2), (uint16_t)(2 * r + 2), (uint16_t)r);
-    uint32_t corner_px[64];
-    int n = 0;
-    for (int dy = -r - 1; dy <= 0; dy++)
-        for (int dx = -r - 1; dx <= 0; dx++)
+
+    eui_canvas_draw_round_rect(c, x, y, (uint16_t)(2 * r), (uint16_t)(2 * r), (uint16_t)r);
+    /* 只比"严格外侧象限"(dx<0 且 dy<0)：该区域内只有角弧贡献。
+     * dx==0 / dy==0 那两行/列上有直边的端点像素，裸弧不会画成同样的值。 */
+    for (int dy = -r - 1; dy <= -1; dy++)
+        for (int dx = -r - 1; dx <= -1; dx++) {
+            if (n >= cap) FAIL("测试缓冲不足");
             corner_px[n++] = aa_get(cx + dx, cy + dy);
+        }
     eui_canvas_clear(c);
     eui_canvas_aa_arc(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, (uint16_t)(r - 1), 180, 270);
     n = 0;
-    for (int dy = -r - 1; dy <= 0; dy++)
-        for (int dx = -r - 1; dx <= 0; dx++)
+    for (int dy = -r - 1; dy <= -1; dy++)
+        for (int dx = -r - 1; dx <= -1; dx++)
             if (aa_get(cx + dx, cy + dy) != corner_px[n++])
                 FAIL("圆角与四分之一圆不一致");
     eui_canvas_destroy(c);
@@ -1288,20 +1396,31 @@ git commit -m "feat(canvas)!: anti-aliased circle and rounded-rect primitives (i
 #if EUI_COLOR_DEPTH == 8
 static void test_seam_single_blend(void)          /* C8 */
 {
-    TEST("C8：跨 180° 无接缝（端帽为单次混合的半覆盖）");
-    const int cx = 130, cy = 130, r = 50;
+    TEST("C8：跨 180° 无接缝（紧容差 16/256 比对参考）");
+    /* 为什么用参考比对而不是手挑坐标：端帽线是"过圆心、沿该端半径方向"的直线，
+     * 手算它穿过哪些像素很容易算反；而把大弧拆成两段绘制会让接缝像素叠加成
+     * ~0.25·dst + 0.75·fg（8bpp 下 ~191 而非 ~128），偏差 ~63/256，
+     * 相对 16/256 的紧容差必然暴露。sweep=180 与 181 分别走两条不同公式。 */
+    static const int sweeps[] = { 180, 181 };
+    const int r = 50, cx = 130, cy = 130;
     eui_canvas_t *c = aa_new_canvas();
     aa_cur = c;
-    for (int sweep = 179; sweep <= 181; sweep++) {
+    for (unsigned i = 0; i < sizeof(sweeps) / sizeof(sweeps[0]); i++) {
+        int sw = sweeps[i];
+        eui_canvas_set_bg_color(c, EUI_COLOR_BLACK);
         eui_canvas_clear(c);
-        eui_canvas_set_color(c, eui_color_from_gray(255));   /* 8bpp 下 EUI_COLOR_WHITE 是 1 */
-        eui_canvas_fill_pie(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, 0, (int16_t)sweep);
-        /* 端帽所在半径方向上、靠近圆心的像素应接近半覆盖(~128)，
-         * 而不是两层叠加后的 ~191 */
-        int bx = cx + r / 2;
-        uint32_t v = aa_get(bx, cy);        /* sweep=180 的端帽沿 +y 方向：改查 (cx, cy+r/2) */
-        v = aa_get(cx, cy + r / 2);
-        if (v > 150) { printf("\n  sweep=%d 端帽覆盖=%u（疑似双层混合）\n", sweep, v); FAIL("接缝处过亮"); }
+        eui_canvas_set_color(c, eui_color_from_gray(255));
+        eui_canvas_fill_pie(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, 0, (int16_t)sw);
+        for (int y = cy - r - 2; y <= cy + r + 2; y++)
+            for (int x = cx - r - 2; x <= cx + r + 2; x++) {
+                uint32_t want = aa_ref_sector_cov(x, y, cx, cy, 0, r, 0, sw);
+                uint32_t got  = aa_get(x, y);
+                uint32_t diff = (got > want) ? (got - want) : (want - got);
+                if (diff > 16) {
+                    printf("\n  sweep=%d (%d,%d) got=%u want=%u\n", sw, x - cx, y - cy, got, want);
+                    FAIL("端帽附近偏差超紧容差（疑似接缝双重混合）");
+                }
+            }
     }
     eui_canvas_destroy(c);
     aa_cur = NULL;
