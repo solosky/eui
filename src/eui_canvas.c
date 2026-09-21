@@ -41,6 +41,12 @@ void eui_canvas_px_set(eui_canvas_t *c, int16_t x, int16_t y, eui_color_t color)
     uint16_t screen_h = eui_canvas_height(c);
     uint16_t screen_w = eui_canvas_width(c);
 
+    /* PAGE 模式：画布只拥有一个 width x 8 的条带缓冲（buf_height = 8），而
+     * eui_canvas_height() 返回的是**显示**高度。纵向边界不收窄的话，落在当前 band
+     * 之外的行会按 y * screen_w 寻址，直接写到条带缓冲之外（越界写）；越出的行必须
+     * 丢弃。FULL 模式下 buf_height 就等于显示高度，行为不变。 */
+    if (c->display->caps.buffer_mode & EUI_BUFFER_PAGE) screen_h = c->buf_height;
+
     if (x < 0 || x >= (int16_t)screen_w || y < 0 || y >= (int16_t)screen_h) return;
 
 #if EUI_COLOR_DEPTH == 1
@@ -82,6 +88,10 @@ eui_color_t eui_canvas_px_get(eui_canvas_t *c, int16_t x, int16_t y)
 
     uint16_t screen_h = eui_canvas_height(c);
     uint16_t screen_w = eui_canvas_width(c);
+
+    /* 同 px_set：PAGE 模式的画布只有 width x 8 的条带缓冲，band 之外的行必须读回 0
+     * （否则就是越界读）。FULL 模式下 buf_height 等于显示高度，行为不变。 */
+    if (c->display->caps.buffer_mode & EUI_BUFFER_PAGE) screen_h = c->buf_height;
 
     if (x < 0 || x >= (int16_t)screen_w || y < 0 || y >= (int16_t)screen_h) return 0;
 

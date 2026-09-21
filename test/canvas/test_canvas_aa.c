@@ -937,6 +937,112 @@ static void test_cost_ratio(void)                 /* C13：只打印，不断言
     PASS();
 }
 
+/* ---- PAGE 模式的条带边界 ----------------------------------------------------
+ * PAGE 模式画布只拥有一个 width x 8 的条带缓冲（buf_height = 8），但
+ * eui_canvas_height() 返回的是**显示**高度。若不把纵向边界收到 buf_height，落在
+ * 当前 band 之外的行会按 y * screen_w 寻址，写到条带缓冲之外（AA 路径在 <16bpp
+ * 下还要读回 dst，于是越界读一并发生）。 */
+#define AA_PG_W 64
+#define AA_PG_H 40                                            /* 5 个 band */
+#define AA_PG_BAND 8
+#define AA_PG_BAND_BYTES ((size_t)AA_PG_W * EUI_COLOR_DEPTH)  /* W * 8 * bpp / 8 */
+#define AA_PG_POOL 16384
+static uint8_t aa_pg_pool[AA_PG_POOL];
+
+static eui_display_drv_t aa_page_display = {
+    .caps = { .width = AA_PG_W, .height = AA_PG_H, .color_depth = EUI_COLOR_DEPTH,
+              .buffer_mode = EUI_BUFFER_PAGE, .has_gram = false },
+    .init = NULL,
+    .write_buffer = aa_mock_write,
+};
+
+/* 同尺寸的 FULL 模式画布：用来证明 band 内的行画得**对**（不只是"没越界"） */
+static eui_display_drv_t aa_page_ref_display = {
+    .caps = { .width = AA_PG_W, .height = AA_PG_H, .color_depth = EUI_COLOR_DEPTH,
+              .buffer_mode = EUI_BUFFER_FULL, .has_gram = false },
+    .init = NULL,
+    .write_buffer = aa_mock_write,
+};
+
+/* 放在 main() 最后：它把全局分配器换成一个独立的 16KB 池，这样"条带缓冲之后的
+ * 内存"一定落在池内、可安全当作只读 canary（我们只比对前后，不写它），而且
+ * 即便 FAIL() 提前返回也不会污染后面测试用的池。 */
+static void test_page_band_overflow(void)
+{
+    TEST("PAGE：画布只有 width x 8 的条带，band 之外的行被丢弃");
+    eui_allocator_init_tlsf(aa_pg_pool, AA_PG_POOL);
+    eui_canvas_t *pc = eui_canvas_create(&aa_page_display);
+    if (!pc) FAIL("PAGE 画布创建失败");
+    if (pc->buf_width != AA_PG_W || pc->buf_height != AA_PG_BAND)
+        FAIL("PAGE 画布的缓冲尺寸应为 width x 8");
+
+    /* canary 紧跟在条带缓冲之后：band 之外的行若被写出，这里必然变化 */
+    uint8_t *band = pc->buffer;
+    uint8_t *canary = band + AA_PG_BAND_BYTES;
+    if (canary + 16 > aa_pg_pool + AA_PG_POOL)
+        FAIL("池布局不允许 canary 检查（条带缓冲之后不在池内）");
+
+    eui_canvas_set_bg_color(pc, EUI_COLOR_BLACK);
+    eui_canvas_clear(pc);
+    /* 用"该色深的最亮级"：8bpp 下 EUI_COLOR_WHITE 是 1（近黑） */
+    eui_canvas_set_color(pc, eui_color_from_gray(255));
+
+    /* 参照：同一形状画在 FULL 画布上（64x40 与 PAGE 画布的前 8 行应逐像素相同） */
+    eui_canvas_t *fc = eui_canvas_create(&aa_page_ref_display);
+    if (!fc) FAIL("FULL 参照画布创建失败");
+    eui_canvas_set_bg_color(fc, EUI_COLOR_BLACK);
+    eui_canvas_clear(fc);
+    eui_canvas_set_color(fc, eui_color_from_gray(255));
+    eui_canvas_fill_circle(fc, 32, 6, 10);
+    static uint32_t ref_band[AA_PG_W * AA_PG_BAND];
+    int n = 0;
+    for (int y = 0; y < AA_PG_BAND; y++)
+        for (int x = 0; x < AA_PG_W; x++)
+            ref_band[n++] = (uint32_t)eui_canvas_px_get(fc, (int16_t)x, (int16_t)y);
+
+    uint8_t canary0[16];
+    memcpy(canary0, canary, sizeof canary0);
+
+    /* 圆心 y=6、r=10：圆跨 band 0（行 -4..15 中的 0..7）、band 1（8..15）与 band 2 */
+    aa_cur = pc;
+    eui_canvas_fill_circle(pc, 32, 6, 10);
+
+    /* (a) band 内画到的内容与 FULL 参照的前 8 行逐像素相同 */
+    n = 0;
+    for (int y = 0; y < AA_PG_BAND; y++)
+        for (int x = 0; x < AA_PG_W; x++)
+            if (aa_get(x, y) != ref_band[n++]) {
+                printf("\n  (%d,%d) got=%u want=%u\n", x, y, aa_get(x, y),
+                       (unsigned)ref_band[n - 1]);
+                FAIL("band 内的行与 FULL 参照不一致");
+            }
+    long ink = 0;
+    for (int y = 0; y < AA_PG_BAND; y++)
+        for (int x = 0; x < AA_PG_W; x++) if (aa_get(x, y)) ink++;
+    if (ink == 0) FAIL("band 内没有任何墨点（跨 band 的图形完全没画出来）");
+    /* (b) 条带缓冲之后的 canary 一个字节都没变（"只写到当前 band 缓冲之内"的直接证据） */
+    if (memcmp(canary0, canary, sizeof canary0) != 0)
+        FAIL("条带缓冲之后的内存被写入（band 之外的写没有被丢弃）");
+    /* (c) band 之外的行读回 0：修复前这两处读的是自己越界写进去的值 */
+    if (aa_get(32, 8) != 0 || aa_get(32, 10) != 0 || aa_get(32, 15) != 0)
+        FAIL("band 之外的行仍可读回内容（越界读写未封堵）");
+
+    /* 完全落在 band 之外的圆：band 缓冲与 canary 都必须逐字节不变 */
+    static uint8_t band_copy[AA_PG_BAND_BYTES];
+    memcpy(band_copy, band, AA_PG_BAND_BYTES);
+    memcpy(canary0, canary, sizeof canary0);
+    eui_canvas_fill_circle(pc, 32, 24, 8);            /* 行 16..32，全在 band 0 之外 */
+    if (memcmp(band_copy, band, AA_PG_BAND_BYTES) != 0)
+        FAIL("band 之外的绘制改动了当前 band 的内容");
+    if (memcmp(canary0, canary, sizeof canary0) != 0)
+        FAIL("band 之外的绘制越过了条带缓冲");
+
+    aa_cur = NULL;
+    eui_canvas_destroy(fc);
+    eui_canvas_destroy(pc);
+    PASS();
+}
+
 int main(void)
 {
     eui_allocator_init_tlsf(aa_pool, AA_POOL_SIZE);
@@ -983,6 +1089,9 @@ int main(void)
     test_equivalence_and_extremes();
 
     test_cost_ratio();
+
+    /* 最后跑：它把全局分配器换成自己的小池 */
+    test_page_band_overflow();
 
     return eui_test_summary();
 }
