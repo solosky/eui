@@ -722,13 +722,27 @@ static void test_corner_matches_quarter_arc(void)   /* C5 后半 */
 #if EUI_COLOR_DEPTH == 8
 static void test_seam_single_blend(void)          /* C8 */
 {
-    TEST("C8：跨 180° 无接缝（紧容差 16/256 比对参考）");
+    TEST("C8：跨 180° 无接缝（对比参考 32/256 + 差分单次混合）");
     /* 为什么用参考比对而不是手挑坐标：端帽线是"过圆心、沿该端半径方向"的直线，
-     * 手算它穿过哪些像素很容易算反；而把大弧拆成两段绘制会让接缝像素叠加成
-     * ~0.25·dst + 0.75·fg（8bpp 下 ~191 而非 ~128），偏差 ~63/256，
-     * 相对 16/256 的紧容差必然暴露。sweep=180 与 181 分别走两条不同公式。 */
+     * 手算它穿过哪些像素很容易算反。把大弧拆成两段绘制会让接缝像素叠加两次：
+     * 接缝像素在径向上位于圆的内部（单次混合 = 255），两次混合得 0.25·dst + 0.75·fg
+     * = 191，偏差 255 − 191 = 64/256（实测 64，见下面的差分断言），远超 32/256。
+     * sweep=180 与 181 分别走两条不同公式。
+     *
+     * 容差 32/256 的两个边界（都是实测值）：
+     *  - 本底（参考比对的下限）：内核的径向覆盖度是"线性距离"近似，与 8x8 子样本
+     *    真实面积的最大偏差为 11..21/256（r = 40..90）；本例 r = 50 → 16/256，
+     *    出现在 (-38,33)（got=56 / want=40），是径向边缘、不是端帽；
+     *  - 信号（要捕捉的接缝）：57..68/256，实测 64。
+     *  32 = 本底上限 21 的 1.5x，同时是信号 64 的 1/2，两侧都留有余量。
+     *
+     * 为什么起点取 20° 而不是 0°：0°/90°/180°/270° 的端帽线正好压在像素边界上
+     * （dy256 = ±128 → s_cap_side 判为整体在内/在外，不产生部分覆盖像素），此时把
+     * sweep 沿 90° 对半拆成两段绘制与单次绘制**逐位相同**（实测：a0=0 时拆 90° 与
+     * 单次调用 0 个像素不同），测试对它要抓的 bug 完全失明。起点取 20° 后端帽线
+     * 切过像素（同一次拆分实测 65 个像素不同、最大 64），参考比对才有判别力。 */
     static const int sweeps[] = { 180, 181 };
-    const int r = 50, cx = 130, cy = 130;
+    const int r = 50, cx = 130, cy = 130, a0 = 20;
     eui_canvas_t *c = aa_new_canvas();
     aa_cur = c;
     for (unsigned i = 0; i < sizeof(sweeps) / sizeof(sweeps[0]); i++) {
@@ -736,17 +750,59 @@ static void test_seam_single_blend(void)          /* C8 */
         eui_canvas_set_bg_color(c, EUI_COLOR_BLACK);
         eui_canvas_clear(c);
         eui_canvas_set_color(c, eui_color_from_gray(255));
-        eui_canvas_fill_pie(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, 0, (int16_t)sw);
+        eui_canvas_fill_pie(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, (int16_t)a0,
+                            (int16_t)(a0 + sw));
         for (int y = cy - r - 2; y <= cy + r + 2; y++)
             for (int x = cx - r - 2; x <= cx + r + 2; x++) {
-                uint32_t want = aa_ref_sector_cov(x, y, cx, cy, 0, r, 0, sw);
+                uint32_t want = aa_ref_sector_cov(x, y, cx, cy, 0, r, a0, a0 + sw);
                 uint32_t got  = aa_get(x, y);
                 uint32_t diff = (got > want) ? (got - want) : (want - got);
-                if (diff > 16) {
+                if (diff > 32) {
                     printf("\n  sweep=%d (%d,%d) got=%u want=%u\n", sw, x - cx, y - cy, got, want);
-                    FAIL("端帽附近偏差超紧容差（疑似接缝双重混合）");
+                    FAIL("端帽附近偏差超容差（疑似接缝双重混合）");
                 }
             }
+    }
+    /* 差分断言（"一次调用内至多混合一次"，不依赖参考光栅器）：同一个扇形沿
+     * mid-sweep 拆成两个相邻子扇区分两次调用画，与单次调用逐像素比对。拆线取
+     * 20 + 180/2 = 110°（切过像素），实测最大偏差 64/256（单次 255 / 拆段 191，
+     * 即两次部分混合的接缝信号）。
+     * 断言是**下界**而不是"相等/小于容差"：单次调用若**也**拆成两段画（C8 要抓的
+     * bug），它在同一条拆线上的取值会与拆段绘制一致，偏差塌到 ~0（实测 a0=0 沿
+     * 像素边界 90° 拆时正是 0）。所以"偏差 ≥ 40"才是这条性质的判别式，一旦内核
+     * 改回拆段绘制立刻变红；上界 96 只是量级哨兵（理论极值 64 + 径向残差 21 ≈ 85）。 */
+    {
+        const int sw = 180, split = a0 + sw / 2;
+        static uint32_t one[AA_W * AA_H];
+        int n = 0;
+        eui_canvas_clear(c);
+        eui_canvas_fill_pie(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, (int16_t)a0,
+                            (int16_t)(a0 + sw));
+        for (int y = 0; y < AA_H; y++)
+            for (int x = 0; x < AA_W; x++) one[n++] = aa_get(x, y);
+        eui_canvas_clear(c);
+        eui_canvas_fill_pie(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, (int16_t)a0,
+                            (int16_t)split);
+        eui_canvas_fill_pie(c, (int16_t)cx, (int16_t)cy, (uint16_t)r, (int16_t)split,
+                            (int16_t)(a0 + sw));
+        uint32_t worst = 0;
+        int wd = 0, wx = 0, wy = 0;
+        n = 0;
+        for (int y = 0; y < AA_H; y++)
+            for (int x = 0; x < AA_W; x++) {
+                uint32_t s = aa_get(x, y), o = one[n++];
+                uint32_t diff = (s > o) ? (s - o) : (o - s);
+                if (diff) wd++;
+                if (diff > worst) { worst = diff; wx = x - cx; wy = y - cy; }
+            }
+        if (worst < 40) {
+            printf("\n  单次 vs 拆段 maxdiff=%u n=%d at (%d,%d)\n", worst, wd, wx, wy);
+            FAIL("单次绘制与拆段绘制几乎相同（疑似内核内部拆段双重混合）");
+        }
+        if (worst > 96) {
+            printf("\n  单次 vs 拆段 maxdiff=%u n=%d at (%d,%d)\n", worst, wd, wx, wy);
+            FAIL("拆段接缝偏差超出量级上界");
+        }
     }
     eui_canvas_destroy(c);
     aa_cur = NULL;
@@ -756,7 +812,7 @@ static void test_seam_single_blend(void)          /* C8 */
 
 static void test_equivalence_and_extremes(void)   /* C9 + C14 */
 {
-    TEST("C9/C14：等价关系与极端输入");
+    TEST("C9/C14：等价关系（含带宽映射与 sweep 规则）与极端输入");
     eui_canvas_t *c = aa_new_canvas();
     aa_cur = c;
     /* fill_pie(0,360) == fill_circle */
@@ -779,6 +835,33 @@ static void test_equivalence_and_extremes(void)   /* C9 + C14 */
     n = 0;
     for (int y = 40; y < 80; y++) for (int x = 40; x < 80; x++)
         if (aa_get(x, y) != a[n++]) FAIL("draw_ring(r,0,0,360) 与 fill_circle 不一致");
+    /* 带宽映射 [r - thickness, r] 在**一般** thickness 上也必须成立：上面两条只压
+     * 住两个退化端（thickness == r → r_in=0、r_inner == 0），r_in 差 1 也能全过。
+     * draw_arc(20,5) 与 draw_ring(20,15) 必须逐像素相同。 */
+    eui_canvas_clear(c);
+    eui_canvas_draw_arc(c, 60, 60, 20, 5, 0, 360);
+    n = 0;
+    for (int y = 40; y < 80; y++) for (int x = 40; x < 80; x++) a[n++] = aa_get(x, y);
+    eui_canvas_clear(c);
+    eui_canvas_draw_ring(c, 60, 60, 20, 15, 0, 360);
+    n = 0;
+    for (int y = 40; y < 80; y++) for (int x = 40; x < 80; x++)
+        if (aa_get(x, y) != a[n++]) FAIL("draw_arc(20,5) 与 draw_ring(20,15) 不一致");
+    /* 头文件公开的两条 sweep 规则：delta == 0 不画、|delta| >= 360 整圆。
+     * 取 start == end（而不是非 360 的 sweep）与 delta = 400（而不是恰好 360）。 */
+    eui_canvas_clear(c);
+    eui_canvas_draw_arc(c, 60, 60, 20, 20, 90, 90);          /* delta == 0 → 空 */
+    for (int y = 40; y < 80; y++) for (int x = 40; x < 80; x++)
+        if (aa_get(x, y) != 0) FAIL("delta == 0 仍然画了像素");
+    eui_canvas_clear(c);
+    eui_canvas_draw_arc(c, 60, 60, 20, 20, 0, 400);          /* |delta| > 360 → 整圆 */
+    n = 0;
+    for (int y = 40; y < 80; y++) for (int x = 40; x < 80; x++) a[n++] = aa_get(x, y);
+    eui_canvas_clear(c);
+    eui_canvas_fill_circle(c, 60, 60, 20);
+    n = 0;
+    for (int y = 40; y < 80; y++) for (int x = 40; x < 80; x++)
+        if (aa_get(x, y) != a[n++]) FAIL("delta > 360 与整圆不一致");
     /* 极端输入：不得崩溃，且明确空的条件必须什么都不画。
      * 原稿把这条"应为空"的断言放在下面那条 thickness>=r（退化为扇形，**非空**）
      * 之后，断言窗口 [36,84)² 与扇形覆盖的 [60,80]² 相交（例如 (70,66) 的像素中心

@@ -319,9 +319,12 @@ void eui_canvas_fill_round_rect(eui_canvas_t *canvas, int16_t x, int16_t y,
         eui_canvas_fill_rect(canvas, x, t, r, (uint16_t)(b - t + 1));
         eui_canvas_fill_rect(canvas, (int16_t)(ri + 1), t, r, (uint16_t)(b - t + 1));
     }
-    /* 四个角用四分之一圆盘补齐。正常情况下（夹取后 2r < w 且 2r < h）这些角盘与
-     * 中间/两侧矩形的像素互不相交；但 2r == w（或 2r == h）时相邻的两个角盘会在
-     * 一列（一行）上重叠，该列被两次部分覆盖混合、略暗约 4%（1-2 px 接缝）——已知限制。 */
+    /* 四个角用四分之一圆盘补齐。角盘与中间矩形的像素集合会相接（例如中间矩形的 ri 列
+     * 被右上角盘部分覆盖，实测 w=70/h=24/r=6 下 4 个像素），但这无妨：矩形先以全覆盖
+     * 写下 fg，角盘随后的部分混合算出的 g 恒等于 gray(fg) 且落在量化网格上（rem == 0
+     * → quantize 恒等），值不变——没有任何像素被部分覆盖混合两次。
+     * 已知限制：2r == w（或 2r == h）时相邻两角盘共享一列（一行），该列被两次部分混合，
+     * 向 fg 偏移实测 +1..+18/256（r = 2..24；r=1 的退化情形 53），每处 1-2 px 接缝。 */
     eui_canvas_aa_arc(canvas, l,  t,  r, 0, 180, 270);
     eui_canvas_aa_arc(canvas, ri, t,  r, 0, 270, 360);
     eui_canvas_aa_arc(canvas, ri, b,  r, 0,   0,  90);
