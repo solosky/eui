@@ -57,7 +57,7 @@
 | `test/canvas/test_canvas_aa.c`（新建） | 契约 C1–C15 的像素级测试 + 成本打印 |
 | `test/canvas/test_canvas_1bpp.c`（新建） | 1bpp 抖动目检画廊（BMP） |
 | `test/canvas/test_canvas_16bpp.c` / `test_canvas_2bpp.c`（改） | 扩充 AA 目检样本 |
-| `.github/workflows/build.yml`（改） | 色深矩阵扩到 5 个 |
+| `.github/workflows/build.yml`（改） | 全量矩阵**保持 `[1, 8, 16]`**，另加 `aa-by-depth` job 在 5 个色深只构建并运行 `test_canvas_aa`（原稿此处写的"色深矩阵扩到 5 个"已被 R9 实测否决，落地形状见 Task 7 Step 2） |
 
 ---
 
@@ -1803,33 +1803,27 @@ int main(void)
     eui_allocator_init_tlsf(mem_pool, POOL_SIZE);   /* 取代 eui_test_init() */
 ```
 
-`test/font/test_font_real_u8g2_render.c`：`img_buf` 全是 1bpp 位打包写入，`write_bmp()` 的 `#else` 分支把它当 `uint16_t[]` 读是错的。把该分支限到 16bpp 并按其真实字节数索引：
+`test/font/test_font_real_u8g2_render.c`：`img_buf` 全是 1bpp 位打包写入，`write_bmp()` 的 `#else` 分支把它当 `uint16_t[]` 读是错的。**16bpp 也一样是位打包**（这个夹具在任何色深都不按"每像素一字节/两字节"写），所以修法不是"把越界读改成界内误读"，而是把 16bpp 归到与 1/2/4bpp 同一条位打包读法：
 
 ```c
-#if EUI_COLOR_DEPTH == 1
-            int idx = y * (IMG_W / 8) + x / 8;
-            int bit = (img_buf[idx] >> (7 - (x % 8))) & 1;
-#elif EUI_COLOR_DEPTH == 8
+#if EUI_COLOR_DEPTH == 8
             int bit = img_buf[y * IMG_W + x] > 128 ? 1 : 0;
-#elif EUI_COLOR_DEPTH == 16
-            uint16_t *p16 = (uint16_t *)img_buf;
-            int bit = p16[y * IMG_W + x] > 0 ? 1 : 0;
 #else
-            /* 2/4bpp：img_buf 是位打包布局，与 1bpp 同读法 */
+            /* 1/2/4/16bpp：img_buf 全是位打包布局（每行 IMG_W/8 字节），同 1bpp 读法 */
             int idx = y * (IMG_W / 8) + x / 8;
             int bit = (img_buf[idx] >> (7 - (x % 8))) & 1;
 #endif
 ```
 
-并把 `BUF_SIZE` 的 16bpp 情形改为 `(IMG_W * IMG_H * 2)`：
+（`#if EUI_COLOR_DEPTH == 8` 那条分支本身仍是误读——该夹具没有"每像素一字节"的合法路径，8bpp 只是恰好落在 `BUF_SIZE` 之内、不越界。修它属范围外，已在源码注释里记录。）
+
+并把 `BUF_SIZE` 的 16bpp 情形**去掉双倍**（16bpp 也是位打包，顺带省下 ~600KB BSS）：
 
 ```c
-#if EUI_COLOR_DEPTH == 1 || EUI_COLOR_DEPTH == 2 || EUI_COLOR_DEPTH == 4
+#if EUI_COLOR_DEPTH == 1 || EUI_COLOR_DEPTH == 2 || EUI_COLOR_DEPTH == 4 || EUI_COLOR_DEPTH == 16
 #define BUF_SIZE (IMG_W * IMG_H / 8)
 #elif EUI_COLOR_DEPTH == 8
 #define BUF_SIZE (IMG_W * IMG_H)
-#else
-#define BUF_SIZE (IMG_W * IMG_H * 2)
 #endif
 ```
 
@@ -1880,7 +1874,7 @@ int main(void)
 
 - [ ] **Step 4: 更新框架设计文档**
 
-在 `docs/eui_framework_design.md` 的图形引擎章节补一小节"抗锯齿"：覆盖度模型（边界带取到圆心的径向距离，内部 span 直写）、整数 isqrt + Q14 正弦表（无 libm、不依赖 motionc）、每色深量化策略表、以及"抖动相位锚在屏幕坐标（含 `page_y_offset`）"这一条。
+在 `docs/eui_framework_design.md` 的图形引擎章节补一小节"抗锯齿"：覆盖度模型（边界带取到圆心的径向距离，全覆盖区靠逐像素平方比较识别、像素逐个写出而非整段 span 直写）、整数 isqrt + Q14 正弦表（无 libm、不依赖 motionc）、每色深量化策略表、以及"抖动相位锚在屏幕坐标（含 `page_y_offset`）"这一条。
 
 - [ ] **Step 5: 提交并确认 CI**
 

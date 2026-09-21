@@ -38,7 +38,11 @@ static const eui_font_t wqy12_font = {
 
 /* img_buf 在全色深下都按 1bpp 位打包写入（见 render_glyph_buf / render_glyph /
  * main 里的 ASCII 扫描），因此按批量写出的字节数分配；只有 8bpp 的读取路径
- * （write_bmp 的 #elif）是按"每像素一字节"索引，故它需要 IMG_W * IMG_H。 */
+ * （write_bmp 的 #elif）是按"每像素一字节"索引，故它需要 IMG_W * IMG_H。
+ * 注意 8bpp 那条分支本身**不是**一条合法的"每像素一字节"路径：这个夹具在任何色深
+ * 都没有按字节写像素，8bpp 下只是把位打包缓冲当字节数组读——一次恰好落在 BUF_SIZE
+ * 之内的**误读**（所以不越界、不崩，但 BMP 内容无意义）。修它超出本分支范围，
+ * 记录在此以免下一位读者以为 8bpp 是条正确的路径。 */
 #if EUI_COLOR_DEPTH == 1 || EUI_COLOR_DEPTH == 2 || EUI_COLOR_DEPTH == 4 || EUI_COLOR_DEPTH == 16
 #define BUF_SIZE (IMG_W * IMG_H / 8)
 #else

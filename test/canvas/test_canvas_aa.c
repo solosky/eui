@@ -9,8 +9,10 @@
 #include <time.h>
 
 /* C15 参考一致性测试要放 2*120+4 的画布；16bpp 下约 135KB，因此自建池。
- * 池要能同时容下**两个** 16bpp 画布：FAIL() 是 longjmp 出测试函数的，失败的那条
- * 测试走不到末尾的 eui_canvas_destroy，于是它的 135KB 画布会留在池里。 */
+ * 池要能同时容下**两个** 16bpp 画布：common/eui_test.h 的 FAIL() 是 printf 后
+ * **直接 return**（不是 longjmp，也不是 exit），失败的那条测试走不到末尾的
+ * eui_canvas_destroy，于是它的 135KB 画布会留在池里——即**每个失败的测试漏一个
+ * 画布**（池的余量吸收这一个；再多就装不下了）。 */
 #define AA_POOL_SIZE 393216
 static uint8_t aa_pool[AA_POOL_SIZE];
 
@@ -180,8 +182,11 @@ static void test_dither_density_monotone(void)
 static void test_dither_phase_is_position_locked(void)
 {
     TEST("C10：抖动相位锁在屏幕坐标（平移 4px 后输出逐像素相同）");
-    /* 若相位跟着图形走，同一形状换位置会重新"洗牌"，动画里就会闪；
-     * 4px 是 Bayer 周期，因此平移 4px 必须逐像素一致。 */
+    /* 若相位跟着图形走，同一形状换位置会重新"洗牌"，动画里就会闪。
+     * 判别力边界（别高估这条）：4px 恰好是一个 Bayer 周期，所以"相位锚在图形上"的
+     * 实现同样能让平移 4px 逐像素相同——它真正钉住的是**平移不变性 / 不随每次调用
+     * 旋转相位**（平移 1/2/3px 会失败）。"绝对相位锚在 (x, y + page_y_offset) 的哪一格"
+     * 由内核级 test_dither_phase_matches_bayer 精确钉住。 */
     eui_canvas_t *c = aa_new_canvas();
     aa_cur = c;
     eui_canvas_clear(c);

@@ -112,8 +112,11 @@ void eui_canvas_set_bg_color(eui_canvas_t *canvas, eui_color_t color);
  * All subsequent drawing operations are constrained to this rectangle.
  * Pixels outside the clip region are discarded.
  *
+ * Passing NULL is a **silent no-op** (the previous clip stays in effect);
+ * to remove the clipping constraint use eui_canvas_clear_clip().
+ *
  * @param canvas  Pointer to the canvas.
- * @param rect    Pointer to the clip rectangle (may be NULL to clear).
+ * @param rect    Pointer to the clip rectangle (NULL is ignored).
  */
 void eui_canvas_set_clip(eui_canvas_t *canvas, const eui_rect_t *rect);
 
