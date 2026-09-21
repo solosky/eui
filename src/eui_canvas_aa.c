@@ -160,8 +160,12 @@ void eui_canvas_aa_arc(eui_canvas_t *c, int16_t cx, int16_t cy,
         else            { cap_a = start_deg; cap_b = end_deg;   }
     }
 
-    int32_t cx256 = (int32_t)cx << 8;
-    int32_t cy256 = (int32_t)cy << 8;
+    /* 用乘法而不是 << 8：cx / cy / y / x 都是**有符号**量，圆心与 clip 原点都可以
+     * 为负（fill_circle(c, -500, 40, 20)、set_clip({-10, 30, 40, 20})），而 C99 里
+     * 负值左移是 UB（UBSan: "left shift of negative value"）。乘 256 在 int32 域内
+     * 不可能溢出：|坐标| ≤ 32767 → |坐标 * 256| ≤ 8.4e6。 */
+    int32_t cx256 = (int32_t)cx * 256;
+    int32_t cy256 = (int32_t)cy * 256;
     int32_t ro256 = (int32_t)r_out << 8;
     int32_t ri256 = (int32_t)r_in << 8;
 
@@ -187,7 +191,7 @@ void eui_canvas_aa_arc(eui_canvas_t *c, int16_t cx, int16_t cy,
 
     for (int32_t y = cy_lo; y <= cy_hi; y++) {
         if (y < clip_y0 || y >= clip_y1) continue;
-        int32_t dy256 = (y << 8) + 128 - cy256;
+        int32_t dy256 = (y * 256) + 128 - cy256;
         int64_t dy2   = (int64_t)dy256 * dy256;
         int64_t b     = ex_out - dy2;                  /* 有覆盖半宽的平方 */
         if (b <= 0) continue;
@@ -199,7 +203,7 @@ void eui_canvas_aa_arc(eui_canvas_t *c, int16_t cx, int16_t cy,
         if (xe >= clip_x1) xe = clip_x1 - 1;
 
         for (int32_t x = xs; x <= xe; x++) {
-            int32_t vx = ((x << 8) + 128) - cx256;      /* p - c 的 x 分量（有符号） */
+            int32_t vx = ((x * 256) + 128) - cx256;      /* p - c 的 x 分量（有符号） */
             int64_t d2 = (int64_t)vx * vx + dy2;
 
             /* --- 径向覆盖度 --- */
