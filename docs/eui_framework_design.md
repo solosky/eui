@@ -784,10 +784,12 @@ MotionC 提供两套互补的动画语义，EUI 内同时存在，二者的职�
 | | `eui_anim`（框架适配层，基于 `mc_animate`） | `mc_transition`（motionc 模块，经 eui 的 motionc 依赖引入） |
 |---|---|---|
 | 时间模型 | **dt 驱动**：`eui_anim_update(delta_ms)` 由 `eui_tick()` 每帧喂入时间增量 | **绝对时间**：`mc_transition_update(t, now_ms)` 由调用方传入当前时钟 |
-| 数据流向 | **push**：框架每帧把插值结果写回 widget 属性，完成时经 `on_done` 回调通知 | **pull**：不主动写状态，调用方在需要时读取当前值（如绘制时 `mc_transition2d_x()`） |
-| 归属层级 | **框架级**：框架驱动的视图转场（ViewDispatcher 的 `EUI_ANIM_*`） | **元素级**：视图内部单个元素的动画（位置/尺寸/颜色），随视图绘制逐帧读取 |
+| 数据流向 | **push**：框架每帧把插值结果写回 widget 属性（`set_widget_prop`），完成时经 `on_done` 回调通知 | **pull**：不主动写状态，调用方在需要时读取当前值（如绘制时 `mc_transition2d_x()`） |
+| 归属层级 | **框架级通用补间工具**：为框架内 widget 属性（`EUI_ANIM_TARGET_X/Y/WIDTH/HEIGHT/OPACITY/PROGRESS`）提供补间；**不驱动 ViewDispatcher 的视图转场** | **元素级**：视图内部单个元素的动画（位置/尺寸/颜色），随视图绘制逐帧读取 |
 
-**实践规则：框架 push，视图 pull。** 框架级的视图转场归 `eui_anim`，由 `eui_tick()` 统一推进、经回调收尾；视图内部元素的动画归 `mc_transition`，视图在自己的 `EUI_VIEW_EVT_DRAW` 中按需读取当前值并直接绘制。二者不要混用：不要用 `eui_anim` 去驱动一个由视图自绘的元素（其时间推进与视图绘制时序脱节），也不要用 `mc_transition` 承接框架级转场（框架不掌握视图的绘制时机，也无法替视图管理时钟锚点）。
+> **注意：ViewDispatcher 的视图转场并不经过 `eui_anim`。** 转场由 dispatcher 自己以绝对时间推进：`src/eui_view_dispatcher.c` 的 `render_transition()`（第 109-202 行）用 `now = vd->get_tick_ms()`（115 行）算出 `elapsed = now - vd->transition_start_ms`，配以硬编码的 400 ms（`EUI_ANIM_FADE`）/ 300 ms（其余）时长（117 行）；收尾是 `eui_view_send_exit` 加清除 `transitioning`（198-200 行），不是 `on_done` 回调。所以 EUI 内实际存在第三条路径：框架转场即 dispatcher 的这套绝对时间实现。`eui_anim_*` 仅被 `src/eui.c`（`eui_anim_init` 与 `eui_tick()` 中的 `eui_anim_update`，52 行）及 examples 引用；名字相近的 `eui_anim_type_t` 是 `include/eui/eui_types.h:157` 的共享枚举（`EUI_ANIM_*` 转场类型），与 `eui_anim` 模块无关。
+
+**实践规则：视图内元素动画用 pull，两种模型不要混用。** 视图内部元素的动画归 `mc_transition`（绝对时间、pull 式），视图在自己的 `EUI_VIEW_EVT_DRAW` 中按需读取当前值并直接绘制；`eui_anim` 则是框架级的 dt/push 补间工具，供框架内 widget 属性动画使用。二者不要混用：不要用 `eui_anim` 去驱动一个由视图自绘的元素（其时间推进与视图绘制时序脱节），也不要用 `mc_transition` 去重复实现框架已自行管理的转场（dispatcher 的转场时钟锚点是其内部状态，视图无从接入）。
 
 ---
 
