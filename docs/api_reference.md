@@ -171,9 +171,20 @@ void eui_canvas_draw_xbm(eui_canvas_t *canvas, int16_t x, int16_t y,
                          uint16_t w, uint16_t h, const uint8_t *data);
 void eui_canvas_draw_bitmap(eui_canvas_t *canvas, int16_t x, int16_t y,
                             const eui_bitmap_t *bmp);
+void eui_canvas_draw_bitmap_rot(eui_canvas_t *canvas, int16_t x, int16_t y,
+                                const eui_bitmap_t *bmp, int16_t deg_cw);
+void eui_canvas_draw_bitmap_rot_keyed(eui_canvas_t *canvas, int16_t x, int16_t y,
+                                      const eui_bitmap_t *bmp, int16_t deg_cw,
+                                      eui_color_t key);
 void eui_canvas_invert_rect(eui_canvas_t *canvas, int16_t x, int16_t y,
                             uint16_t w, uint16_t h);
 ```
+
+- **位图数据布局**：`eui_bitmap_t.data` 按位图自身 `color_depth` 的原生打包解读——16bpp 是与画布帧缓冲同布局的 **native uint16 序列**（不是大端字节对）；1bpp 是每像素一字节的 0/1；4bpp 每字节低 4 位有效（与 `px_set` 落盘语义一致）。
+- **旋转 blit**：`(x, y)` 为未旋转图像摆放位置，旋转绕图像中心进行，`deg_cw` 顺时针整数度（内部逐度正弦表，不依赖 libm）；最近邻采样，采样越界与旋转 bbox 外的落点保留画布已有内容；90°/270° 可见区域宽高互换。`_keyed` 变体跳过等于 `key` 的源像素（透明色键）。
+- **输入边沿锁存** `eui/eui_input_edge.h`：编码器 + OK/侧键事件流的边沿锁存状态机（hold 500ms、hold 吞短按、方向键折算编码器、`reset_edges` 防幽灵边沿）；全零结构体即合法初始态。
+- **动效选择器** `eui/eui_selector.h`：SmoothSelector 语义的选项轮播（三 `mc_transition2d` 驱动挤压/回弹/开合/相机），不负责绘制——调用方经 `current_frame()`/`camera_*` 取动画值自行绘制；只依赖 motionc。
+- **显示驱动** 新增 `eui/driver/eui_drv_st7789.h`：ST7789V SPI RGB565（`invert`/`madctl`/GRAM offset 可配），初始化序列对齐 LovyanGFX Panel_ST7789。
 
 ---
 
