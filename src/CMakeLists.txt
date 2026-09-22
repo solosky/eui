@@ -5,6 +5,7 @@ add_library(eui STATIC
     eui_event.c
     eui_input.c
     eui_canvas.c
+    eui_canvas_aa.c
     eui_font.c
     eui_font_bdf.c
     eui_font_vlw.c

@@ -112,8 +112,11 @@ void eui_canvas_set_bg_color(eui_canvas_t *canvas, eui_color_t color);
  * All subsequent drawing operations are constrained to this rectangle.
  * Pixels outside the clip region are discarded.
  *
+ * Passing NULL is a **silent no-op** (the previous clip stays in effect);
+ * to remove the clipping constraint use eui_canvas_clear_clip().
+ *
  * @param canvas  Pointer to the canvas.
- * @param rect    Pointer to the clip rectangle (may be NULL to clear).
+ * @param rect    Pointer to the clip rectangle (NULL is ignored).
  */
 void eui_canvas_set_clip(eui_canvas_t *canvas, const eui_rect_t *rect);
 
@@ -243,6 +246,39 @@ void eui_canvas_draw_round_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint
  * @param r       Corner radius in pixels.
  */
 void eui_canvas_fill_round_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t r);
+
+/**
+ * @brief Draw an anti-aliased circular arc (annulus segment).
+ *
+ * The stroke spans radii [r - thickness, r]. Angles are integer degrees,
+ * 0 deg = 3 o'clock, increasing clockwise (screen y grows downward).
+ * thickness == 0 draws nothing; thickness >= r degenerates to a filled
+ * sector (equivalent to eui_canvas_fill_pie). Caps are butt (flat).
+ *
+ * Sweep rule: delta = end_deg - start_deg; delta == 0 draws nothing,
+ * |delta| >= 360 draws a full circle, otherwise the sweep is folded into
+ * 1..359 degrees (a negative delta wraps to the complementary side).
+ */
+void eui_canvas_draw_arc(eui_canvas_t *canvas, int16_t cx, int16_t cy,
+                         uint16_t r, uint16_t thickness,
+                         int16_t start_deg, int16_t end_deg);
+
+/**
+ * @brief Draw an anti-aliased circular ring segment between two radii.
+ *
+ * r_inner >= r_outer draws nothing. Angle semantics as in eui_canvas_draw_arc.
+ */
+void eui_canvas_draw_ring(eui_canvas_t *canvas, int16_t cx, int16_t cy,
+                          uint16_t r_outer, uint16_t r_inner,
+                          int16_t start_deg, int16_t end_deg);
+
+/**
+ * @brief Draw a filled anti-aliased pie sector (r_inner == 0).
+ *
+ * Angle semantics as in eui_canvas_draw_arc.
+ */
+void eui_canvas_fill_pie(eui_canvas_t *canvas, int16_t cx, int16_t cy, uint16_t r,
+                         int16_t start_deg, int16_t end_deg);
 
 /* Text */
 
