@@ -704,37 +704,156 @@ void eui_canvas_draw_xbm(eui_canvas_t *canvas, int16_t x, int16_t y,
     }
 }
 
-void eui_canvas_draw_bitmap(eui_canvas_t *canvas, int16_t x, int16_t y, const eui_bitmap_t *bmp)
+/* 从 eui_bitmap_t 解码一个像素（draw_bitmap 与旋转 blit 共享）。
+ * 位图色深可与画布不同：解码出的原始值直接作为 eui_color_t 交给
+ * px_set，由画布按自身色深落盘（与既有 draw_bitmap 语义一致）。
+ * 16bpp 位图数据与画布帧缓冲同布局——native uint16（曾按大端字节对
+ * 解析，但树内从未有 16bpp 位图消费者，且与帧缓冲布局相悖，随旋转
+ * blit 落地一并修正）。 */
+static eui_color_t bitmap_pixel_color(const eui_bitmap_t *bmp, uint16_t col, uint16_t row)
 {
-    if (!bmp || !bmp->data) return;
     uint8_t depth = bmp->color_depth;
     if (depth == 0) depth = 1;
     uint16_t bytes_per_pixel = (depth + 7) / 8;
     uint16_t row_bytes = bmp->width * bytes_per_pixel;
-    const uint8_t *src = bmp->data;
+    const uint8_t *src = bmp->data + (uint32_t)row * row_bytes + (uint32_t)col * bytes_per_pixel;
 
+    if (depth == 4) {
+        return (eui_color_t)(src[0] & 0x0Fu);
+    } else if (depth == 2) {
+        return (eui_color_t)(src[0] & 3u);
+    } else if (bytes_per_pixel == 1) {
+        return (src[0] & 1) ? EUI_COLOR_WHITE : EUI_COLOR_BLACK;
+    }
+    /* bytes_per_pixel == 2：native uint16 */
+    uint16_t v;
+    memcpy(&v, src, 2);
+    return (eui_color_t)v;
+}
+
+void eui_canvas_draw_bitmap(eui_canvas_t *canvas, int16_t x, int16_t y, const eui_bitmap_t *bmp)
+{
+    if (!canvas || !bmp || !bmp->data) return;
     for (uint16_t row = 0; row < bmp->height; row++) {
         for (uint16_t col = 0; col < bmp->width; col++) {
-            uint32_t pixel_raw = 0;
-            uint16_t src_off = row * row_bytes + col * bytes_per_pixel;
-            for (uint8_t b = 0; b < bytes_per_pixel; b++) {
-                pixel_raw = (pixel_raw << 8) | src[src_off + b];
-            }
-            eui_color_t color;
-            if (depth == 4) {
-                color = (eui_color_t)(pixel_raw & 0x0Fu);
-            } else if (depth == 2) {
-                color = (eui_color_t)(pixel_raw & 3u);
-            } else if (bytes_per_pixel == 1) {
-                color = (pixel_raw & 1) ? EUI_COLOR_WHITE : EUI_COLOR_BLACK;
-            } else if (bytes_per_pixel == 2) {
-                color = (eui_color_t)(pixel_raw & 0xFFFF);
-            } else {
-                color = (eui_color_t)(pixel_raw & 0xFFFF);
-            }
-            eui_canvas_px_set(canvas, x + (int16_t)col, y + (int16_t)row, color);
+            eui_canvas_px_set(canvas, x + (int16_t)col, y + (int16_t)row,
+                              bitmap_pixel_color(bmp, col, row));
         }
     }
+}
+
+/* ---- Rotated bitmap blit ---- */
+
+/* 逐度正弦表（0..90，6 位小数）——整数度精度对图标/表盘旋转绰绰
+ * 有余，且避免链接 libm（纯 float 乘加）。 */
+static const float k_rot_sin_deg[91] = {
+    0.0f,     0.017452f, 0.034899f, 0.052336f, 0.069756f, 0.087156f, 0.104528f,
+    0.121869f, 0.139173f, 0.156434f, 0.173648f, 0.190809f, 0.207912f, 0.224951f,
+    0.241922f, 0.258819f, 0.275637f, 0.292372f, 0.309017f, 0.325568f, 0.34202f,
+    0.358368f, 0.374607f, 0.390731f, 0.406737f, 0.422618f, 0.438371f, 0.45399f,
+    0.469472f, 0.48481f,  0.5f,      0.515038f, 0.529919f, 0.544639f, 0.559193f,
+    0.573576f, 0.587785f, 0.601815f, 0.615661f, 0.62932f,  0.642788f, 0.656059f,
+    0.669131f, 0.681998f, 0.694658f, 0.707107f, 0.71934f,  0.731354f, 0.743145f,
+    0.75471f,  0.766044f, 0.777146f, 0.788011f, 0.798636f, 0.809017f, 0.819152f,
+    0.829038f, 0.838671f, 0.848048f, 0.857167f, 0.866025f, 0.87462f,  0.882948f,
+    0.891007f, 0.898794f, 0.906308f, 0.913545f, 0.920505f, 0.927184f, 0.93358f,
+    0.939693f, 0.945519f, 0.951057f, 0.956305f, 0.961262f, 0.965926f, 0.970296f,
+    0.97437f,  0.978148f, 0.981627f, 0.984808f, 0.987688f, 0.990268f, 0.992546f,
+    0.994522f, 0.996195f, 0.997564f, 0.99863f,  0.999391f, 0.999848f, 1.0f,
+};
+
+static void bitmap_rot_blit(eui_canvas_t *canvas, int16_t x, int16_t y,
+                            const eui_bitmap_t *bmp, int16_t deg_cw,
+                            bool use_key, eui_color_t key)
+{
+    if (!canvas || !bmp || !bmp->data || !canvas->buffer ||
+        bmp->width == 0 || bmp->height == 0)
+        return;
+
+    /* deg 归一化 0..359 */
+    int deg = (int)deg_cw % 360;
+    if (deg < 0)
+        deg += 360;
+
+    /* 象限折叠取 sin/cos（屏幕坐标 y 向下，deg 为顺时针旋转角） */
+    float cosv, sinv;
+    if (deg <= 90) {
+        sinv = k_rot_sin_deg[deg];
+        cosv = k_rot_sin_deg[90 - deg];
+    } else if (deg <= 180) {
+        sinv = k_rot_sin_deg[180 - deg];
+        cosv = -k_rot_sin_deg[deg - 90];
+    } else if (deg <= 270) {
+        sinv = -k_rot_sin_deg[deg - 180];
+        cosv = -k_rot_sin_deg[270 - deg];
+    } else {
+        sinv = -k_rot_sin_deg[360 - deg];
+        cosv = k_rot_sin_deg[deg - 270];
+    }
+
+    /* 目标点 (px,py) 反演回源坐标（中心旋转 + 最近邻）：
+     * fx/fy 为相对图心的像素中心偏移，fx = px+0.5-cx；
+     *   sx =  fx*cos + fy*sin + w/2
+     *   sy = -fx*sin + fy*cos + h/2
+     * 90° 时源 (sx,sy) 前向映射 (dx,dy)=(-fy,fx)——宽高互换。 */
+    float w = (float)bmp->width, h = (float)bmp->height;
+    float cx = (float)x + w / 2.0f;
+    float cy = (float)y + h / 2.0f;
+    float abs_cos = (cosv < 0 ? -cosv : cosv);
+    float abs_sin = (sinv < 0 ? -sinv : sinv);
+    float ext_x = w / 2.0f * abs_cos + h / 2.0f * abs_sin;
+    float ext_y = w / 2.0f * abs_sin + h / 2.0f * abs_cos;
+
+    int cw = canvas->buf_width, ch = canvas->buf_height;
+    int px0 = (int)(cx - ext_x) - 1, px1 = (int)(cx + ext_x) + 2;
+    int py0 = (int)(cy - ext_y) - 1, py1 = (int)(cy + ext_y) + 2;
+    /* bbox 与 clip/屏幕求交，缩小扫描窗口；px_set 内还有第二道越界守卫 */
+    if (px0 < (int)canvas->clip.x)
+        px0 = canvas->clip.x;
+    if (py0 < (int)canvas->clip.y)
+        py0 = canvas->clip.y;
+    if (px1 > (int)(canvas->clip.x + canvas->clip.w))
+        px1 = canvas->clip.x + canvas->clip.w;
+    if (py1 > (int)(canvas->clip.y + canvas->clip.h))
+        py1 = canvas->clip.y + canvas->clip.h;
+    if (px0 < 0)
+        px0 = 0;
+    if (py0 < 0)
+        py0 = 0;
+    if (px1 > cw)
+        px1 = cw;
+    if (py1 > ch)
+        py1 = ch;
+
+    for (int py = py0; py < py1; py++) {
+        float fy = (float)py + 0.5f - cy;
+        for (int px = px0; px < px1; px++) {
+            float fx = (float)px + 0.5f - cx;
+            float sx = fx * cosv + fy * sinv + w / 2.0f;
+            float sy = -fx * sinv + fy * cosv + h / 2.0f;
+            int sxi = (int)sx;
+            int syi = (int)sy;
+            if (sx < 0.0f || sy < 0.0f || sxi >= (int)bmp->width || syi >= (int)bmp->height)
+                continue;   /* 采样越界：保留画布已有内容 */
+            eui_color_t p = bitmap_pixel_color(bmp, (uint16_t)sxi, (uint16_t)syi);
+            if (use_key && p == key)
+                continue;   /* 透明色键：保留画布已有内容 */
+            eui_canvas_px_set(canvas, (int16_t)px, (int16_t)py, p);
+        }
+    }
+}
+
+void eui_canvas_draw_bitmap_rot(eui_canvas_t *canvas, int16_t x, int16_t y,
+                                const eui_bitmap_t *bmp, int16_t deg_cw)
+{
+    bitmap_rot_blit(canvas, x, y, bmp, deg_cw, false, (eui_color_t)0);
+}
+
+void eui_canvas_draw_bitmap_rot_keyed(eui_canvas_t *canvas, int16_t x, int16_t y,
+                                      const eui_bitmap_t *bmp, int16_t deg_cw,
+                                      eui_color_t key)
+{
+    bitmap_rot_blit(canvas, x, y, bmp, deg_cw, true, key);
 }
 
 /* ---- Advanced ---- */

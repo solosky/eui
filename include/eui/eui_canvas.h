@@ -450,6 +450,37 @@ void eui_canvas_draw_xbm(eui_canvas_t *canvas, int16_t x, int16_t y,
  */
 void eui_canvas_draw_bitmap(eui_canvas_t *canvas, int16_t x, int16_t y, const eui_bitmap_t *bmp);
 
+/**
+ * @brief Draw an eui_bitmap_t rotated around its center (nearest neighbor).
+ *
+ * (x, y) 是未旋转图像的摆放位置（左上角），旋转绕图像中心
+ * (x + width/2, y + height/2) 进行，@p deg_cw 为顺时针角度
+ * （自动归一化 0..359，负角/大于 360 合法）。整数度精度，内部使用
+ * 逐度正弦表，不依赖 libm。旋转后 bbox 外的落点与采样越界的源像素
+ * 全部跳过（保留画布已有内容）；90°/270° 时可见区域宽高互换。
+ *
+ * @param canvas  Pointer to the canvas.
+ * @param x       Unrotated destination left edge (may be negative).
+ * @param y       Unrotated destination top edge (may be negative).
+ * @param bmp     Pointer to the eui_bitmap_t descriptor.
+ * @param deg_cw  Clockwise rotation in degrees.
+ */
+void eui_canvas_draw_bitmap_rot(eui_canvas_t *canvas, int16_t x, int16_t y,
+                                const eui_bitmap_t *bmp, int16_t deg_cw);
+
+/**
+ * @brief Draw a rotated eui_bitmap_t, skipping pixels equal to @p key.
+ *
+ * 带"透明色键"的旋转 blit：色值等于 @p key 的源像素不写入，保留画布
+ * 已有内容（典型用法：spinner 贴图传背景色/纯黑键）。其余语义与
+ * eui_canvas_draw_bitmap_rot 完全一致。
+ *
+ * @param key   Transparent key color（与位图同色深语义比较）。
+ */
+void eui_canvas_draw_bitmap_rot_keyed(eui_canvas_t *canvas, int16_t x, int16_t y,
+                                      const eui_bitmap_t *bmp, int16_t deg_cw,
+                                      eui_color_t key);
+
 /* Advanced */
 
 /**

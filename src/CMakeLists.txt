@@ -25,11 +25,14 @@ add_library(eui STATIC
     widget/eui_widget_dialog.c
     eui_scene.c
     eui_anim.c
+    eui_input_edge.c
+    eui_selector.c
     driver/eui_drv_ssd1306.c
     driver/eui_drv_sh1106.c
     driver/eui_drv_st7735.c
     driver/eui_drv_ili9341.c
     driver/eui_drv_st7306.c
+    driver/eui_drv_st7789.c
     driver/eui_drv_buttons.c
     driver/eui_drv_encoder.c
     driver/eui_drv_xpt2046.c

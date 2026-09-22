@@ -6,6 +6,7 @@
 #include "eui/driver/eui_drv_ssd1306.h"
 #include "eui/driver/eui_drv_sh1106.h"
 #include "eui/driver/eui_drv_st7735.h"
+#include "eui/driver/eui_drv_st7789.h"
 #include "eui/driver/eui_drv_ili9341.h"
 #include "eui/driver/eui_drv_buttons.h"
 #include "eui/driver/eui_drv_encoder.h"
@@ -116,6 +117,51 @@ static void test_st7735_create_and_caps(void) {
     if (hal->caps.height != 160) FAIL("height mismatch");
     if (hal->caps.color_depth != 16) FAIL("color depth mismatch");
     eui_drv_st7735_destroy(hal);
+    PASS();
+}
+
+/* ST7789：捕获命令字节，验证初始化序列与 invert 语义 */
+static uint8_t test_st7789_cmds[32];
+static int test_st7789_cmd_count;
+static void mock_st7789_write_cmd(uint8_t cmd, void *ud) {
+    (void)ud;
+    if (test_st7789_cmd_count < (int)sizeof(test_st7789_cmds))
+        test_st7789_cmds[test_st7789_cmd_count++] = cmd;
+}
+
+static void test_st7789_create_and_init_sequence(void) {
+    TEST("ST7789 create + init sequence (invert=true) and set_invert toggle");
+    test_st7789_cmd_count = 0;
+    eui_drv_st7789_config_t cfg = {
+        .spi = { .write_cmd = mock_st7789_write_cmd, .write_data = mock_spi_write_data,
+                 .read_data = mock_spi_read_data, .set_dc = mock_spi_set_dc,
+                 .set_cs = mock_spi_set_cs, .set_rst = mock_spi_set_rst,
+                 .delay_ms = mock_spi_delay_ms, .user_data = NULL },
+        .width = 240, .height = 240, .col_offset = 0, .row_offset = 0,
+        .madctl = 0x00, .invert = true,
+    };
+    eui_display_drv_t *hal = eui_drv_st7789_create(&cfg);
+    if (!hal) FAIL("create returned NULL");
+    if (hal->caps.width != 240) FAIL("width mismatch");
+    if (hal->caps.height != 240) FAIL("height mismatch");
+    if (hal->caps.color_depth != 16) FAIL("color depth mismatch");
+    if (hal->caps.buffer_mode != EUI_BUFFER_FULL) FAIL("buffer mode mismatch");
+
+    if (hal->init(hal->user_data) != 0) FAIL("init returned error");
+    /* SWRESET SLPOUT COLMOD MADCTL INVON NORON DISPON CASET RASET */
+    static const uint8_t want[] = { 0x01, 0x11, 0x3A, 0x36, 0x21, 0x13, 0x29, 0x2A, 0x2B };
+    if (test_st7789_cmd_count != (int)(sizeof(want))) FAIL("init command count mismatch");
+    for (unsigned i = 0; i < sizeof(want); i++) {
+        if (test_st7789_cmds[i] != want[i]) FAIL("init command sequence mismatch");
+    }
+
+    hal->set_invert(false, hal->user_data);
+    if (test_st7789_cmds[test_st7789_cmd_count - 1] != 0x20) FAIL("set_invert(false) != INVOFF");
+    hal->set_invert(true, hal->user_data);
+    if (test_st7789_cmds[test_st7789_cmd_count - 1] != 0x21) FAIL("set_invert(true) != INVON");
+
+    eui_drv_st7789_destroy(hal);
+    eui_drv_st7789_destroy(NULL);   /* NULL 安全 */
     PASS();
 }
 
@@ -327,6 +373,9 @@ int main(void) {
 
     printf("--- ST7735 ---\n");
     test_st7735_create_and_caps();
+
+    printf("--- ST7789 ---\n");
+    test_st7789_create_and_init_sequence();
 
     printf("--- ILI9341 ---\n");
     test_ili9341_create_and_caps();

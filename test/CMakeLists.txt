@@ -15,6 +15,7 @@ eui_add_test(test_allocator     allocator/test_allocator.c)
 eui_add_test(test_event         event/test_event.c)
 eui_add_test(test_scene         scene/test_scene.c)
 eui_add_test(test_input         input/test_input.c)
+eui_add_test(test_input_edge    input/test_input_edge.c)
 eui_add_test(test_str           str/test_str.c)
 
 # ---- Canvas ----
@@ -33,6 +34,9 @@ if(EUI_COLOR_DEPTH EQUAL 1 OR EUI_COLOR_DEPTH EQUAL 2)
 endif()
 eui_add_test(test_canvas_render canvas/test_canvas_render.c)
 eui_add_test(test_canvas_aa     canvas/test_canvas_aa.c)
+if(EUI_COLOR_DEPTH EQUAL 16)
+    eui_add_test(test_canvas_bitmap_rot canvas/test_canvas_bitmap_rot.c)
+endif()
 
 # ---- Font ----
 eui_add_test(test_font_formats          font/test_font_formats.c)
@@ -42,6 +46,9 @@ eui_add_test(test_font_multiline        font/test_font_multiline.c)
 eui_add_test(test_font_wqy13_render     font/test_font_wqy13_render.c)
 eui_add_test(test_font_real_u8g2_render font/test_font_real_u8g2_render.c)
 eui_add_test(test_font_vlw_render     font/test_font_vlw_render.c)
+
+# ---- Selector ----
+eui_add_test(test_selector          selector/test_selector.c)
 
 # ---- View ----
 eui_add_test(test_view              view/test_view.c)
