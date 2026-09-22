@@ -36,10 +36,14 @@ static int disp_init(void *ud) {
      * committed a CAML layer shows black, and an app-side SetWindowSize
      * before the first present does not count — only a user-driven
      * resize would force it.  Pushing a frame here makes the window
-     * live as soon as it opens. */
-    BeginDrawing();
-    ClearBackground(BLACK);
-    EndDrawing();
+     * live as soon as it opens.  无 GL 上下文（无头 shell）时 InitWindow
+     * 失败、rlgl 未初始化，BeginDrawing 会直接崩——跳过首帧呈现，让
+     * 调用方经 IsWindowReady() 自行优雅退出。 */
+    if (IsWindowReady()) {
+        BeginDrawing();
+        ClearBackground(BLACK);
+        EndDrawing();
+    }
     SetTargetFPS(60);
     return 0;
 }
