@@ -151,6 +151,18 @@ uint32_t eui_scene_manager_current_id(const eui_scene_manager_t *sm) {
     return sm->scenes[sm->stack[sm->depth - 1]].scene_id;
 }
 
+bool eui_scene_manager_send_event(eui_scene_manager_t *sm, uint32_t event_id, int32_t arg) {
+    if (!sm || sm->depth == 0 || sm->current < 0) return false;
+    eui_scene_t *top = &sm->scenes[sm->stack[sm->depth - 1]];
+    if (!top->on_event) return false;
+    return top->on_event(top->context, event_id, arg);
+}
+
+uint32_t eui_scene_manager_previous_id(const eui_scene_manager_t *sm) {
+    if (!sm || sm->previous < 0 || sm->previous >= (int8_t)sm->count) return (uint32_t)-1;
+    return sm->scenes[sm->previous].scene_id;
+}
+
 const eui_scene_t *eui_scene_manager_scene_at(const eui_scene_manager_t *sm, uint8_t level) {
     if (!sm || level >= sm->depth) return NULL;
     return &sm->scenes[sm->stack[level]];

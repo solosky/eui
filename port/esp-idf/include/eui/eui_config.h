@@ -8,6 +8,8 @@
 #define EUI_MAX_WIDGETS       32
 #define EUI_EVENT_QUEUE_SIZE  8
 #define EUI_MAX_OVERLAYS      4
+#define EUI_SCENE_MAX         24
+#define EUI_KEY_ID_MAX        8
 #define EUI_MAX_WIDGET_CHILDREN  8
 #define EUI_CANVAS_STATE_STACK   4
 

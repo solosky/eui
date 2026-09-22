@@ -25,9 +25,10 @@ typedef void (*eui_scene_on_exit_t)(void *context);
  *
  * @param context  User context pointer.
  * @param event_id Application-defined event identifier.
+ * @param arg      Application-defined event argument.
  * @return true if the event was handled.
  */
-typedef bool (*eui_scene_on_event_t)(void *context, uint32_t event_id);
+typedef bool (*eui_scene_on_event_t)(void *context, uint32_t event_id, int32_t arg);
 
 /**
  * @brief Lifecycle callback invoked when a scene is re-exposed by pop().
@@ -51,15 +52,13 @@ typedef struct {
     eui_view_t *view;              /**< The view associated with this scene. */
     eui_scene_on_enter_t on_enter; /**< Called when the scene becomes active (may be NULL). */
     eui_scene_on_exit_t  on_exit;  /**< Called when the scene becomes inactive (may be NULL). */
-    eui_scene_on_event_t on_event; /**< Called for custom events when this scene is active (may be NULL). */
+    eui_scene_on_event_t on_event; /**< Called by eui_scene_manager_send_event() when this scene is on top of the stack (may be NULL). */
     void *context;                 /**< User context passed to the callbacks (may be NULL). */
     eui_scene_on_resume_t on_resume; /**< Called when pop() re-exposes this scene (may be NULL). */
 } eui_scene_t;
 
-/** @brief Maximum number of scenes a scene manager can hold. */
-#define EUI_SCENE_MAX 16
-
-/** @brief Maximum navigation stack depth (root scene + pushed levels). */
+/** @brief Maximum navigation stack depth (root scene + pushed levels).
+ *  EUI_SCENE_MAX (maximum registered scenes) comes from eui_config.h. */
 #define EUI_SCENE_STACK_MAX EUI_SCENE_MAX
 
 /**
@@ -167,6 +166,17 @@ int  eui_scene_manager_pop(eui_scene_manager_t *sm);
 void eui_scene_manager_back(eui_scene_manager_t *sm);
 
 /**
+ * @brief Dispatch an event to the current top-of-stack scene's on_event.
+ *
+ * @param sm       Pointer to the scene manager.
+ * @param event_id Application-defined event identifier.
+ * @param arg      Application-defined event argument.
+ * @return The on_event result; false if no scene is active, the scene
+ *         has no on_event, or on_event returned false.
+ */
+bool eui_scene_manager_send_event(eui_scene_manager_t *sm, uint32_t event_id, int32_t arg);
+
+/**
  * @brief Number of scenes currently on the navigation stack.
  *
  * depth() > 1 means at least one scene is pushed above the root.
@@ -179,6 +189,14 @@ uint8_t eui_scene_manager_depth(const eui_scene_manager_t *sm);
  * @return The scene id, or (uint32_t)-1 if no scene is active.
  */
 uint32_t eui_scene_manager_current_id(const eui_scene_manager_t *sm);
+
+/**
+ * @brief Root scene id before the most recent switch().
+ *
+ * @return The scene id, or (uint32_t)-1 if there is no history
+ *         (no switch has happened yet, or the previous root was unset).
+ */
+uint32_t eui_scene_manager_previous_id(const eui_scene_manager_t *sm);
 
 /**
  * @brief Scene descriptor at a given stack level.
