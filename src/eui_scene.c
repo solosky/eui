@@ -56,6 +56,12 @@ void eui_scene_manager_switch(eui_scene_manager_t *sm, uint32_t scene_id) {
         return;
     }
 
+    /* Publish the previous root before running the lifecycle callbacks:
+     * on_enter of the target scene must observe the root it is coming from
+     * (e.g. app-level fresh-entry checks read previous_id() there). The
+     * value after the switch completes is unchanged. */
+    sm->previous = (sm->depth > 0) ? (int8_t)sm->stack[0] : -1;
+
     eui_scene_t *cur = (sm->depth > 0) ? &sm->scenes[sm->stack[0]] : NULL;
     eui_scene_t *next = &sm->scenes[target];
 
@@ -80,7 +86,6 @@ void eui_scene_manager_switch(eui_scene_manager_t *sm, uint32_t scene_id) {
         if (next->on_enter) next->on_enter(next->context);
     }
 
-    sm->previous = (sm->depth > 0) ? (int8_t)sm->stack[0] : -1;
     sm->stack[0] = (uint8_t)target;
     sm->depth = 1;
     sm->current = (int8_t)target;
