@@ -455,6 +455,18 @@ typedef struct {
 
 **阶段四：事件分发** — `ViewDispatcher` 从队列中取出事件，转发给当前活动 View 的事件处理器。View 内部按照**焦点链（Focus Chain）**将事件传递给当前获得焦点的 Widget。焦点链通过 Widget 树的**前序遍历**确定顺序，只有 `focus_policy == EUI_FOCUS_STRONG` 的控件可获得焦点。方向键（上下/左右）沿前序序列前后移动焦点。容器 Widget（如 ScrollContainer）本身不获取焦点，而是将输入转发给当前焦点子控件；如果子控件不处理事件（返回 `false`），事件沿 Widget 树向上冒泡，直到被处理或到达根节点。
 
+### 6.3 应用层边沿锁存（eui_input_edge）
+
+框架层只负责把硬件状态整理成 `eui_event_t` 事件流；对"编码器 + OK 键 + 侧键"这类设备，应用层还需要一层**边沿语义**：`eui/eui_input_edge.h` 提供的状态机把事件流整理成一次消费的锁存边沿（press/release/hold/click）与虚拟编码器计数。
+
+- **边沿一次性**：`ok_was_pressed()` / `ok_was_hold()` / `side_was_clicked()` 等读取即清零，视图每帧至多响应一次；`ok_is_released()` 是电平查询、不清锁存。
+- **hold 与短按互斥**：按住超过 500 ms 产生一次 hold 边沿并吞掉未消费的 press 边沿；侧键 hold 后释放不再转 click。语义对齐 M5Stack 系 `Button_Class`。
+- **方向键折算编码器**：UP/RIGHT 计 +1、DOWN/LEFT 计 -1，与 `ENCODER_CW/CCW` 共用同一虚拟计数；`ENCODER_CCW` 契约要求携带负 `enc_delta`，非法 CCW 被忽略。
+- **防幽灵边沿**：进入/返回视图时调 `reset_edges()`，清除视图未激活期间积累的锁存与"已释放待转 click"的未决状态（仍按住的键保留原始按下态，与 Button_Class 持续跟踪原始状态一致）。
+- **零初始化兼容**：全零结构体即合法状态（hold 阈值是编译期常量），`init` 只是显式归零。
+
+用法（每帧 tick 一次再读边沿、进入视图时 reset）见 `docs/api_reference.md` 的"应用组件"一节。
+
 ---
 
 ## 7. 视图管理子系统
@@ -826,6 +838,17 @@ MotionC 提供两套互补的动画语义，EUI 内同时存在，二者的职�
 
 **实践规则：视图内元素动画用 pull，两种模型不要混用。** 视图内部元素的动画归 `mc_transition`（绝对时间、pull 式），视图在自己的 `EUI_VIEW_EVT_DRAW` 中按需读取当前值并直接绘制；`eui_anim` 则是框架级的 dt/push 补间工具，供框架内 widget 属性动画使用。二者不要混用：不要用 `eui_anim` 去驱动一个由视图自绘的元素（其时间推进与视图绘制时序脱节），也不要用 `mc_transition` 去重复实现框架已自行管理的转场（dispatcher 的转场时钟锚点是其内部状态，视图无从接入）。
 
+### 9.6 应用组件：eui_selector（mc_transition 的 UI 语义封装）
+
+`eui/eui_selector.h` 是上述 pull 式路线的成品范例：一个 SmoothSelector 语义的选项轮播选择器，内部用三个 `mc_transition2d`（选中框 position、选中框 shape、相机 offset）驱动，把"挤压→回弹→on_click""开合→on_open_end""循环滚动 + 相机跟随"这些常见交互语义封装成状态机。设计要点：
+
+- **不负责绘制**：组件只推进动画，调用方在绘制回调里用 `eui_selector_current_frame()`（选中框当前 x/y/w/h）与 `camera_x/y()` 读取动画值自行绘制——与 mc_transition 的 pull 模型一致。
+- **钩子即原版虚函数**：`on_read_input`（20 ms 节流，喂输入与 go_next/go_last）、`on_click`（release 回弹落位后一次）、`on_open_end`（open 落位后一次）、`on_update_camera_keyframe`（选中项变化时重定相机目标），`user_data` 为第一参数。
+- **选项存指针**：`add_option` 记录调用方对象地址而非拷贝，`get_selected()` 返回对象同一性；选项生命周期须覆盖 selector 使用期。
+- **入场动画来源**：`init` 后 `is_changed = true`，第一次 `update` 把选中框移向当前项——视图进入时的"全屏收拢到选项"动画即由此驱动。
+
+只依赖 motionc（eui 静态库已导出其头与链接）。API 与时序细则见 `docs/api_reference.md` 的"应用组件"一节。
+
 ---
 
 ## 10. 渲染流水线
@@ -1069,6 +1092,65 @@ eui_widget_t* eui_counter_create(int16_t x, int16_t y, int16_t step) {
     return &cnt->widget;
 }
 ```
+
+### 12.3 边沿输入 + 动效选择器 + 旋转位图（自绘 View 组合）
+
+自绘 View（不走 Widget 树）里使用 `eui_input_edge`、`eui_selector` 与 `eui_canvas_draw_bitmap_rot_keyed` 的典型组合——一个横向图标轮播页：
+
+```c
+#include "eui/eui_input_edge.h"
+#include "eui/eui_selector.h"
+
+typedef struct {
+    eui_view_t view;
+    eui_input_edge_t in;        /* 全零即合法初始态 */
+    eui_selector_t sel;
+    int spinner_deg;            /* 每帧 +2° 的旋转图标角度 */
+} home_view_t;
+
+static const eui_selector_option_t k_opts[2] = {   /* 生命周期须覆盖使用期 */
+    { .x = 20,  .y = 56, .w = 128, .h = 128 },
+    { .x = 190, .y = 56, .w = 128, .h = 128 },
+};
+
+static void home_read_input(eui_selector_t *s) {
+    home_view_t *home = (home_view_t *)s->user_data;
+    if (eui_input_edge_side_was_clicked(&home->in)) s->config.move_in_loop = true,
+                                                    eui_selector_go_next(s);
+}
+
+static bool home_handler(eui_view_event_t *e, void *ctx) {
+    home_view_t *home = (home_view_t *)ctx;
+
+    if (e->type == EUI_VIEW_EVT_ENTER) {
+        eui_input_edge_reset_edges(&home->in);      /* 防幽灵边沿 */
+        return true;
+    }
+    if (e->type == EUI_VIEW_EVT_INPUT) {
+        eui_input_edge_on_event(&home->in, e->event.input); /* 喂边沿状态机 */
+        return true;
+    }
+    if (e->type == EUI_VIEW_EVT_DRAW) {
+        eui_canvas_t *c = e->draw.canvas;
+        uint32_t now = eui_get_tick_ms();
+
+        /* 选中框旋转图标：绕中心每帧 +2°，黑色为透明键 */
+        home->spinner_deg = (home->spinner_deg + 2) % 360;
+        eui_bitmap_t bmp = { .width = 37, .height = 37, .color_depth = 16,
+                             .data = (const uint8_t *)spinner_rgb565 };
+        eui_canvas_draw_bitmap_rot_keyed(c, 101, 101, &bmp,
+                                         home->spinner_deg, 0x0000);
+
+        eui_selector_update(&home->sel, now);       /* 推进过渡 + 节流回调 */
+        int x, y, w, h;
+        eui_selector_current_frame(&home->sel, &x, &y, &w, &h);
+        eui_canvas_draw_round_rect(c, x - 4, y - 4, w + 8, h + 8, 12);
+    }
+    return false;
+}
+```
+
+要点：`tick` 交给 `eui_selector_update` 内部的节流回调链推进（视图每帧一次 `update`）；进入视图先 `reset_edges`；旋转位图的 `(x, y)` 传**未旋转**摆放位置。
 
 ---
 

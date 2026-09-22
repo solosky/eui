@@ -180,11 +180,26 @@ void eui_canvas_invert_rect(eui_canvas_t *canvas, int16_t x, int16_t y,
                             uint16_t w, uint16_t h);
 ```
 
-- **位图数据布局**：`eui_bitmap_t.data` 按位图自身 `color_depth` 的原生打包解读——16bpp 是与画布帧缓冲同布局的 **native uint16 序列**（不是大端字节对）；1bpp 是每像素一字节的 0/1；4bpp 每字节低 4 位有效（与 `px_set` 落盘语义一致）。
-- **旋转 blit**：`(x, y)` 为未旋转图像摆放位置，旋转绕图像中心进行，`deg_cw` 顺时针整数度（内部逐度正弦表，不依赖 libm）；最近邻采样，采样越界与旋转 bbox 外的落点保留画布已有内容；90°/270° 可见区域宽高互换。`_keyed` 变体跳过等于 `key` 的源像素（透明色键）。
-- **输入边沿锁存** `eui/eui_input_edge.h`：编码器 + OK/侧键事件流的边沿锁存状态机（hold 500ms、hold 吞短按、方向键折算编码器、`reset_edges` 防幽灵边沿）；全零结构体即合法初始态。
-- **动效选择器** `eui/eui_selector.h`：SmoothSelector 语义的选项轮播（三 `mc_transition2d` 驱动挤压/回弹/开合/相机），不负责绘制——调用方经 `current_frame()`/`camera_*` 取动画值自行绘制；只依赖 motionc。
-- **显示驱动** 新增 `eui/driver/eui_drv_st7789.h`：ST7789V SPI RGB565（`invert`/`madctl`/GRAM offset 可配），初始化序列对齐 LovyanGFX Panel_ST7789。
+**位图数据布局**：`eui_bitmap_t.data` 按**位图自身** `color_depth` 的原生打包解读，与画布色深可以不同（解码出的值交给画布按自身色深落盘）：
+
+| 位图 color_depth | 数据布局 |
+|------|---------|
+| 1 | 每像素 1 字节，0/1 |
+| 2 | 每像素 1 字节，低 2 位有效 |
+| 4 | 每像素 1 字节，低 4 位有效 |
+| 16 | native `uint16` 序列（与 16bpp 画布帧缓冲同布局，**不是**大端字节对） |
+
+**旋转 blit 用法**：`(x, y)` 是**未旋转**图像的摆放位置（左上角），旋转绕图像中心 `(x+w/2, y+h/2)` 进行；`deg_cw` 为顺时针整数度（负角/超过 360 自动归一化），内部用逐度正弦表实现、不依赖 libm。最近邻采样；采样越界的源像素与旋转后 bbox 外的落点**不写入**（保留画布已有内容）；90°/270° 时可见区域宽高互换。
+
+```c
+/* spinner：37x37 图标绕中心每帧 +2°，黑色为透明键（保留表盘背景） */
+eui_bitmap_t bmp = { .width = 37, .height = 37, .color_depth = 16,
+                     .data = (const uint8_t *)spinner_rgb565 };
+eui_canvas_draw_bitmap_rot_keyed(c, 101, 101, &bmp, spinner_deg, 0x0000);
+spinner_deg = (spinner_deg + 2) % 360;
+```
+
+`_keyed` 变体跳过等于 `key` 的源像素——典型用法是图标镂空处透出页面背景。
 
 ---
 
@@ -244,6 +259,50 @@ typedef struct {
 ```
 
 事件类型：`EUI_EVT_KEY_PRESS` / `KEY_RELEASE` / `KEY_REPEAT` / `ENCODER_CW` / `ENCODER_CCW` / `TOUCH_DOWN` / `TOUCH_UP` / `TOUCH_MOVE`
+
+---
+
+## 内置设备驱动
+
+`src/driver/` 提供一组开箱即用的设备驱动，直接产出 `eui_display_drv_t *` / `eui_input_drv_t *`：
+
+| 类别 | 驱动 | 说明 |
+|------|------|------|
+| 显示（I2C） | `eui_drv_ssd1306` / `eui_drv_sh1106` | 128x64 OLED，1bpp，PAGE 缓冲 |
+| 显示（SPI） | `eui_drv_st7735` / `eui_drv_ili9341` / `eui_drv_st7306` / `eui_drv_st7789` | 彩屏 RGB565，FULL 缓冲 |
+| 输入 | `eui_drv_buttons` / `eui_drv_encoder` / `eui_drv_xpt2046` | 按键 / 旋转编码器 / 电阻触摸 |
+| 桌面 / Web | `eui_drv_raylib` / `eui_drv_web` | 模拟器窗口（键鼠映射）与 Emscripten |
+
+### ST7789（SPI 彩屏）用法
+
+```c
+#include "eui/driver/eui_drv_st7789.h"
+
+static eui_drv_st7789_config_t lcd_cfg = {
+    .spi = {
+        .write_cmd = my_spi_write_cmd,      /* 实现 eui_hal_spi_t 五个回调 */
+        .write_data = my_spi_write_data,
+        .read_data  = my_spi_read_data,
+        .set_dc = my_spi_set_dc, .set_cs = my_spi_set_cs, .set_rst = my_spi_set_rst,
+        .delay_ms = my_delay_ms, .user_data = NULL,
+    },
+    .width = 240, .height = 240,
+    .col_offset = 0, .row_offset = 0,       /* 135x240 类面板需 40/53 */
+    .madctl = 0x00,                          /* 方向/RGB 顺序；旋转改此值 */
+    .invert = true,                          /* 多数 IPS 面板需要 INVON */
+};
+
+eui_display_drv_t *lcd = eui_drv_st7789_create(&lcd_cfg);
+eui_config_t cfg = { .display = lcd, /* ... */ };
+eui_init(&cfg);
+
+lcd->init(lcd->user_data);     /* 硬复位 → SLPOUT → COLMOD 16bit → MADCTL
+                                  → INVON/INVOFF → NORON → DISPON */
+/* 运行期可用 lcd->set_invert(lcd->user_data, true/false) 切换反色 */
+/* eui_drv_st7789_destroy(lcd); 释放 */
+```
+
+初始化序列对齐 LovyanGFX `Panel_ST7789` 的默认行为（240x240 真机配置为参照）；运行期反色经 `set_invert` 回调发送 `INVON(0x21)`/`INVOFF(0x20)`。
 
 ---
 
@@ -421,6 +480,88 @@ bool eui_anim_is_running(eui_anim_handle_t handle);
 可动画属性：`EUI_ANIM_TARGET_X` / `Y` / `WIDTH` / `HEIGHT` / `OPACITY` / `PROGRESS` / `CUSTOM`
 
 MotionC 预定义缓动函数（30个）：`mc_ease_linear`, `mc_ease_cubic_in`, `mc_ease_cubic_out`, `mc_ease_bounce_out`, `mc_ease_elastic_out` 等。
+
+---
+
+## 应用组件
+
+不属于 Widget 树的独立 UI 组件：直接在 View 的绘制回调里消费，只依赖画布与 motionc。
+
+### eui_input_edge — 输入边沿锁存
+
+面向"编码器 + OK 键 + 侧键"设备，把 eui 事件流整理成应用层一次消费的边沿锁存。
+
+```c
+#include "eui/eui_input_edge.h"
+
+eui_input_edge_t in;                 /* 全零即合法初始态；init 只是显式归零 */
+eui_input_edge_init(&in);
+
+/* View 输入回调里喂事件 */
+bool my_view_input(eui_view_event_t *e, void *ctx) {
+    if (e->type == EUI_VIEW_EVT_INPUT)
+        eui_input_edge_on_event(&in, e->event.input);
+    return false;
+}
+
+/* 每帧先推进 hold 计时，再一次性读取边沿（读取即清零） */
+void my_view_frame(uint32_t now_ms) {
+    eui_input_edge_tick(&in, now_ms);
+
+    if (eui_input_edge_encoder_count(&in) != last_count) { /* 旋转 */ }
+    if (eui_input_edge_ok_was_pressed(&in))   { /* 按下：挤压动画 */ }
+    if (eui_input_edge_ok_was_hold(&in))      { /* 长按（>=500ms） */ }
+    if (eui_input_edge_side_was_clicked(&in)) { /* 侧键短按 */ }
+}
+```
+
+语义：
+
+- **hold 500ms**（`EUI_INPUT_EDGE_DEFAULT_HOLD_MS`）：按住过阈值产生一次 `*_was_hold`，并**吞掉**未消费的 OK press 边沿——同一次按压 hold 与短按互斥；侧键 hold 后释放不再产生 click。
+- **方向键折算**：UP/RIGHT 计入 +1，DOWN/LEFT 计入 -1，与编码器共用虚拟计数。契约：`ENCODER_CCW` 事件须携带负 `enc_delta`，非法 CCW（delta >= 0）被忽略。
+- **防幽灵边沿**：进入/返回视图时调用 `eui_input_edge_reset_edges(&in)`，清掉视图未激活期间积累的边沿与"已释放待转 click"的未决状态；仍按住的键保留按下态与 hold 计时。
+
+### eui_selector — 动效选项轮播
+
+SmoothSelector 语义的选项选择器：选中框 position/shape 与相机 offset 三个 `mc_transition2d` 驱动，支持挤压/回弹/开合/循环滚动。**不负责绘制**——调用方读取动画值后自行画。
+
+```c
+#include "eui/eui_selector.h"
+
+eui_selector_t sel;
+eui_selector_init(&sel);                      /* move_in_loop=true, is_changed=true */
+eui_selector_set_duration(&sel, 300);         /* position+shape 过渡时长 */
+eui_selector_set_path(&sel, mc_ease_back_out);
+
+static const eui_selector_option_t opts[] = { /* 注意：selector 存指针！生命周期须覆盖使用期 */
+    { .x = 20,  .y = 56, .w = 128, .h = 128 },
+    { .x = 190, .y = 56, .w = 128, .h = 128 },
+};
+eui_selector_add_option(&sel, &opts[0]);
+eui_selector_add_option(&sel, &opts[1]);
+
+/* 回调钩子（对齐原版虚函数），user_data 为第一参数 */
+sel.on_read_input = my_read_input;              /* 20ms 节流：在此喂输入、go_next/go_last */
+sel.on_click = my_click;                        /* release 回弹落位后触发一次 */
+sel.on_open_end = my_open_end;                  /* open 全屏动画落位后触发一次 */
+sel.on_update_camera_keyframe = my_camera_kf;   /* 选中项变化时：在此 move_to 相机目标 */
+
+/* 帧驱动（View 绘制回调内） */
+eui_selector_update(&sel, now_ms);
+int x, y, w, h;
+eui_selector_current_frame(&sel, &x, &y, &w, &h);
+int cam_x = eui_selector_camera_x(&sel);
+/* 按 (x - cam_x, y, w, h) 画选中框，按各选项与相机的相对位置画内容 */
+
+/* 交互 */
+eui_selector_go_next(&sel);                    /* 循环滚动（可关 move_in_loop） */
+eui_selector_press(&sel, &squeeze_kf);         /* 按下挤压到关键帧 */
+eui_selector_release(&sel);                    /* 释放：回弹选中项 → 落位触发 on_click */
+eui_selector_open(&sel, &fullscreen_kf);       /* 展开到全屏 → 落位触发 on_open_end */
+eui_selector_close(&sel);                      /* 收拢回选中项（view 进入时的入场来源） */
+```
+
+时序要点：`is_changed` 初始为 true——第一次 `update` 就会把选中框移向 option 0（可作 view 进入的收拢动画）；`release` 后 `is_pressing` 保持到过渡完成才随 `on_click` 一起清除；`open` 后需等落位才有 `on_open_end`。
 
 ---
 
