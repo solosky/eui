@@ -350,11 +350,34 @@ void eui_view_dispatcher_tick(eui_view_dispatcher_t *vd);
 
 ### SceneManager
 
+场景管理器持有**导航栈**：`switch()` 把栈重置为单个根场景，`push()` 在栈顶压入一层（attached 模式下经 dispatcher 的 overlay 栈上屏），`pop()` 弹出一层并对露出的场景回调 `on_resume`。
+
 ```c
 int  eui_scene_manager_register(eui_scene_manager_t *sm,
                                  const eui_scene_t *scenes, uint8_t count);
-void eui_scene_manager_switch(eui_scene_manager_t *sm, uint32_t scene_id);
-void eui_scene_manager_back(eui_scene_manager_t *sm);
+void eui_scene_manager_attach(eui_scene_manager_t *sm, struct eui_view_dispatcher_t *vd);
+
+/* 导航 */
+void eui_scene_manager_switch(eui_scene_manager_t *sm, uint32_t scene_id);  /* 清栈 → 单根场景 */
+int  eui_scene_manager_push(eui_scene_manager_t *sm, uint32_t scene_id);    /* 0 成功 / -1 栈满 */
+int  eui_scene_manager_pop(eui_scene_manager_t *sm);                        /* 0 成功 / -1 已在根 */
+void eui_scene_manager_back(eui_scene_manager_t *sm);                       /* pop() 别名 */
+
+/* 栈查询 */
+uint8_t eui_scene_manager_depth(const eui_scene_manager_t *sm);             /* >1 即有 overlay 层 */
+uint32_t eui_scene_manager_current_id(const eui_scene_manager_t *sm);       /* 栈顶场景 id，空为 (uint32_t)-1 */
+const eui_scene_t *eui_scene_manager_scene_at(const eui_scene_manager_t *sm, uint8_t level);
+```
+
+用法示例（根场景 + 压入子菜单 + 返回）：
+
+```c
+eui_scene_manager_register(&sm, scenes, scene_count);
+eui_scene_manager_attach(&sm, &dispatcher);
+eui_scene_manager_switch(&sm, SCENE_HOME);        /* 栈 = [HOME] */
+eui_scene_manager_push(&sm, SCENE_SUBMENU);       /* 栈 = [HOME, SUBMENU] */
+if (eui_scene_manager_depth(&sm) > 1)
+    eui_scene_manager_pop(&sm);                   /* 回到 HOME，HOME.on_resume 触发 */
 ```
 
 ---

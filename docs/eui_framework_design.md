@@ -551,12 +551,13 @@ ViewDispatcher 的行为遵循以下规则：
 
 ### 7.4 SceneManager — 场景管理器
 
-SceneManager 在 ViewDispatcher 之上提供**基于场景 ID 的高级导航**。一个"场景"是一个 View 加上其关联的数据模型和进入/退出行为。SceneManager 维护场景转换图，支持"切换到场景X"的声明式导航。
+SceneManager 在 ViewDispatcher 之上提供**基于场景 ID 的导航栈**。一个"场景"是一个 View 加上其关联的数据模型和进入/退出行为。管理器内部维护一个栈：`stack[0]` 是根场景，`push()` 在栈顶压入一层（attached 模式下经 dispatcher 的 overlay 栈上屏），`pop()` 弹出一层并重新露出下层，`switch()` 清栈并把目标场景立为唯一根场景。叠加式菜单/对话框/子页面全部建模为场景，由 SceneManager 持有层级，应用无需自维护并行的导航簿记。
 
 ```c
 typedef void (*eui_scene_on_enter_t)(void *context);
 typedef void (*eui_scene_on_exit_t)(void *context);
 typedef bool (*eui_scene_on_event_t)(void *context, uint32_t event);
+typedef void (*eui_scene_on_resume_t)(void *context);
 
 typedef struct {
     uint32_t scene_id;
@@ -564,17 +565,33 @@ typedef struct {
     eui_scene_on_enter_t on_enter;
     eui_scene_on_exit_t on_exit;
     eui_scene_on_event_t on_event;
+    void *context;
+    eui_scene_on_resume_t on_resume;   /* pop 重新露出本场景时回调 */
 } eui_scene_t;
 
 /* 场景管理器 API */
-int eui_scene_manager_register(eui_scene_manager_t *sm, const eui_scene_t *scenes, 
+int eui_scene_manager_register(eui_scene_manager_t *sm, const eui_scene_t *scenes,
                                  uint8_t count);
-void eui_scene_manager_switch(eui_scene_manager_t *sm, uint32_t scene_id);
-void eui_scene_manager_back(eui_scene_manager_t *sm);
+void eui_scene_manager_attach(eui_scene_manager_t *sm, struct eui_view_dispatcher_t *vd);
+void eui_scene_manager_switch(eui_scene_manager_t *sm, uint32_t scene_id);  /* 清栈 → 单根 */
+int  eui_scene_manager_push(eui_scene_manager_t *sm, uint32_t scene_id);
+int  eui_scene_manager_pop(eui_scene_manager_t *sm);
+void eui_scene_manager_back(eui_scene_manager_t *sm);                       /* pop() 别名 */
+
+/* 栈查询 */
+uint8_t eui_scene_manager_depth(const eui_scene_manager_t *sm);
+uint32_t eui_scene_manager_current_id(const eui_scene_manager_t *sm);
+const eui_scene_t *eui_scene_manager_scene_at(const eui_scene_manager_t *sm, uint8_t level);
 ```
 
+导航操作与生命周期回调的时序（attached 模式，场景回调包裹视图事件）：
+- `switch(id)`：自顶向下拆除栈上层级（每层先 `on_exit` 再经 `pop_overlay` 发视图 EXIT/ENTER），然后根场景 `on_exit` → 新场景 `on_enter` → dispatcher `switch_to`（发 EXIT/ENTER 并立即绘制）；栈变为 `[id]`
+- `push(id)`：下层 `on_exit` → 新层 `on_enter` → dispatcher `push_overlay`（下层视图 EXIT、新层视图 ENTER）；目标场景的视图即一个 overlay，容量受 `EUI_MAX_OVERLAYS` 约束，超限返回 -1
+- `pop()`：顶层 `on_exit` → dispatcher `pop_overlay`（顶层视图 EXIT、露出层视图 ENTER）→ **露出场景的 `on_resume`**——在这里重放入场动画或刷新内容，无需完整重进
+- 深度为 1（仅根场景）时 `pop()` 是无操作；`depth() > 1` 即存在叠加层，可用于"模态是否激活"类判断
+
 Scene 的 `on_enter` / `on_exit` 与 View 的事件处理器的交互遵循生命周期包装模式：
-- 切换到新场景时，先发送 `EUI_VIEW_EVT_ENTER` 到 View，再调用 Scene 的 `on_enter`
+- 切换到新场景时，attached 模式下 Scene 的 `on_enter` 先于 dispatcher 的视图激活运行（场景状态在首次绘制前就绪），视图 `EUI_VIEW_EVT_ENTER` 由 dispatcher 发出；standalone 模式（未 attach dispatcher）则先发视图 `ENTER` 再调 `on_enter`
 - 离开场景时，先调用 Scene 的 `on_exit`，再发送 `EUI_VIEW_EVT_EXIT` 到 View
 - Scene 的 `on_event` 用于处理跨场景的自定义事件（如 SceneManager 级别的广播），与 View 的 `EUI_VIEW_EVT_INPUT` 职责不同
 
