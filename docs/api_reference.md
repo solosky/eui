@@ -17,7 +17,7 @@ int eui_init(const eui_config_t *config);
 | `config->mem_pool_buffer` | `uint8_t*` | TLSF 内存池缓冲区指针 |
 | `config->mem_pool_size` | `size_t` | 内存池大小（字节） |
 | `config->display` | `eui_display_hal_t*` | 显示 HAL 接口 |
-| `config->input` | `eui_input_hal_t*` | 输入 HAL 接口 |
+| `config->input` | `eui_input_drv_t*` | 输入 HAL 接口 |
 | `config->fps_target` | `uint16_t` | 目标帧率，默认 30 |
 | `config->max_views` | `uint8_t` | 最大 View 数，默认 8 |
 | `config->max_widgets` | `uint8_t` | 最大 Widget 数，默认 32 |
@@ -235,14 +235,24 @@ typedef struct {
 
 ```c
 typedef enum {
-    EUI_KEY_UP, EUI_KEY_DOWN, EUI_KEY_LEFT, EUI_KEY_RIGHT,
-    EUI_KEY_OK, EUI_KEY_BACK
-} eui_key_t;
+    EUI_EVT_KEY_PRESS = 0,     /* 按键按下（原始） */
+    EUI_EVT_KEY_RELEASE = 1,   /* 按键释放（原始） */
+    EUI_EVT_KEY_REPEAT = 2,    /* 按键自动重复（原始） */
+    EUI_EVT_ENCODER_CW = 3,    /* 编码器顺时针，正 delta（原始） */
+    EUI_EVT_ENCODER_CCW = 4,   /* 编码器逆时针，负 delta（原始） */
+    EUI_EVT_ENCODER_CLICK = 5, /* 编码器按键 click（原始） */
+    EUI_EVT_TOUCH_DOWN = 6,    /* 触摸按下（原始） */
+    EUI_EVT_TOUCH_UP = 7,      /* 触摸抬起（原始） */
+    EUI_EVT_TOUCH_MOVE = 8,    /* 触摸移动（原始） */
+    EUI_EVT_KEY_CLICK = 9,     /* press→release 且未触发 hold（装配手势） */
+    EUI_EVT_KEY_HOLD = 10,     /* 按住 >=500ms，吞掉本次 click（装配手势） */
+    EUI_EVT_ENC_STEP = 11,     /* 编码器步进，CW 为正（装配手势） */
+} eui_event_type_t;
 
 typedef struct {
     eui_event_type_t type;
     union {
-        eui_key_t key;                   // KEY 事件
+        uint8_t   key_id;                // KEY 事件：无语义按键编号（项目自定分配）
         int16_t   enc_delta;             // ENCODER 事件
         struct { int16_t x, y; } touch;  // TOUCH 事件
     } data;
@@ -255,10 +265,12 @@ typedef struct {
     int  (*poll)(eui_event_t *event, void *user_data);
     void (*set_callback)(void (*cb)(const eui_event_t *), void *user_data);
     void *user_data;
-} eui_input_hal_t;
+} eui_input_drv_t;
 ```
 
-事件类型：`EUI_EVT_KEY_PRESS` / `KEY_RELEASE` / `KEY_REPEAT` / `ENCODER_CW` / `ENCODER_CCW` / `TOUCH_DOWN` / `TOUCH_UP` / `TOUCH_MOVE`
+`key_id` 为无语义 `uint8_t` 编号，分配归项目（如 0=确认键、1=侧键）；eui 不定义任何语义映射，驱动 keymap 与项目层各自把物理按键绑定到编号。
+
+事件分两类：**原始事件**（`EUI_EVT_KEY_PRESS` / `KEY_RELEASE` / `KEY_REPEAT` / `ENCODER_CW` / `ENCODER_CCW` / `ENCODER_CLICK` / `TOUCH_DOWN` / `TOUCH_UP` / `TOUCH_MOVE`）由驱动产出，是手势装配器的输入；**装配手势事件**（`EUI_EVT_KEY_CLICK` / `EUI_EVT_KEY_HOLD`，`data.key_id`；`EUI_EVT_ENC_STEP`，`data.enc_delta`）由 core 内置的手势装配器从原始事件流组装，View 一般只消费这三类（见 [eui_input_edge](#eui_input_edge--手势装配器)）。
 
 ---
 
@@ -510,39 +522,53 @@ MotionC 预定义缓动函数（30个）：`mc_ease_linear`, `mc_ease_cubic_in`,
 
 不属于 Widget 树的独立 UI 组件：直接在 View 的绘制回调里消费，只依赖画布与 motionc。
 
-### eui_input_edge — 输入边沿锁存
+### eui_input_edge — 手势装配器
 
-面向"编码器 + OK 键 + 侧键"设备，把 eui 事件流整理成应用层一次消费的边沿锁存。
+把驱动产出的原始输入事件流（`KEY_PRESS/RELEASE`、`ENCODER_CW/CCW` 等）装配成通用手势事件。eui core 持有唯一实例（内嵌于 view dispatcher，可用 `eui_get_input_edge()` 取到）：`eui_tick` 每帧把 input manager 的去抖原始事件喂入装配器、推进 hold 计时，再把组装完成的手势事件推给当前 View 的 INPUT 回调。app 一般不直接操作该模块——在 View 里消费手势事件即可：
 
 ```c
-#include "eui/eui_input_edge.h"
+#define MY_KEY_OK   0u    /* 编号分配归项目，eui 不定义语义 */
+#define MY_KEY_SIDE 1u
 
-eui_input_edge_t in;                 /* 全零即合法初始态；init 只是显式归零 */
-eui_input_edge_init(&in);
-
-/* View 输入回调里喂事件 */
-bool my_view_input(eui_view_event_t *e, void *ctx) {
-    if (e->type == EUI_VIEW_EVT_INPUT)
-        eui_input_edge_on_event(&in, e->event.input);
+/* View 输入回调里消费装配好的手势事件 */
+bool my_view_handler(eui_view_event_t *e, void *ctx) {
+    if (e->type == EUI_VIEW_EVT_INPUT) {
+        const eui_event_t *evt = e->event.input;
+        switch (evt->type) {
+        case EUI_EVT_KEY_CLICK:              /* press→release 且未长按 */
+            if (evt->data.key_id == MY_KEY_OK)   { /* 确认 */ }
+            if (evt->data.key_id == MY_KEY_SIDE) { /* 侧键短按 */ }
+            break;
+        case EUI_EVT_KEY_HOLD:               /* 按住 >=500ms，吞掉本次 click */
+            if (evt->data.key_id == MY_KEY_OK)   { /* 长按 */ }
+            break;
+        case EUI_EVT_ENC_STEP:               /* 编码器步进，CW 为正 */
+            if (evt->data.enc_delta > 0)         { /* 顺时针 */ }
+            break;
+        default: break;
+        }
+    }
     return false;
-}
-
-/* 每帧先推进 hold 计时，再一次性读取边沿（读取即清零） */
-void my_view_frame(uint32_t now_ms) {
-    eui_input_edge_tick(&in, now_ms);
-
-    if (eui_input_edge_encoder_count(&in) != last_count) { /* 旋转 */ }
-    if (eui_input_edge_ok_was_pressed(&in))   { /* 按下：挤压动画 */ }
-    if (eui_input_edge_ok_was_hold(&in))      { /* 长按（>=500ms） */ }
-    if (eui_input_edge_side_was_clicked(&in)) { /* 侧键短按 */ }
 }
 ```
 
 语义：
 
-- **hold 500ms**（`EUI_INPUT_EDGE_DEFAULT_HOLD_MS`）：按住过阈值产生一次 `*_was_hold`，并**吞掉**未消费的 OK press 边沿——同一次按压 hold 与短按互斥；侧键 hold 后释放不再产生 click。
-- **方向键折算**：UP/RIGHT 计入 +1，DOWN/LEFT 计入 -1，与编码器共用虚拟计数。契约：`ENCODER_CCW` 事件须携带负 `enc_delta`，非法 CCW（delta >= 0）被忽略。
-- **防幽灵边沿**：进入/返回视图时调用 `eui_input_edge_reset_edges(&in)`，清掉视图未激活期间积累的边沿与"已释放待转 click"的未决状态；仍按住的键保留按下态与 hold 计时。
+- **key_id 无语义**：`uint8_t` 编号，分配归项目；装配器对各 key_id 一视同仁，物理按键 → 编号的映射在驱动 keymap / 项目层完成。
+- **hold 500ms**（`EUI_INPUT_EDGE_DEFAULT_HOLD_MS`）：按住过阈值产生一次 `EUI_EVT_KEY_HOLD`，并**吞掉**本次 click——同一次按压 hold 与 click 互斥。press/release 原样透传（`EUI_EVT_KEY_PRESS`/`KEY_RELEASE`），选择器类交互需要 press/release 时序。
+- **编码器**：`ENCODER_CW`/`ENCODER_CCW` 组装为 `EUI_EVT_ENC_STEP`（CW 为正）；方向键折算编码器归驱动层键位绑定（见移植指南）。契约：`ENCODER_CCW` 事件须携带负 `enc_delta`，非法 CCW（delta >= 0）被忽略。
+- **视图切换**：core 在切视图时自动 `eui_input_edge_flush()`，清掉未派发事件与瞬时边沿；仍按住的键保留按下态与 hold 计时。
+
+拉取式一次性边沿 API 仍保留（消费即清零；key_id 越界返回 false）——仅供 eui 单测/兼容，app 一般走事件：
+
+```c
+bool eui_input_edge_was_pressed (eui_input_edge_t *in, uint8_t key_id);
+bool eui_input_edge_was_released(eui_input_edge_t *in, uint8_t key_id);
+bool eui_input_edge_was_clicked (eui_input_edge_t *in, uint8_t key_id);
+bool eui_input_edge_was_hold    (eui_input_edge_t *in, uint8_t key_id);
+/* 电平查询，不清锁存；key_id 越界视作已释放 */
+bool eui_input_edge_is_released (const eui_input_edge_t *in, uint8_t key_id);
+```
 
 ### eui_selector — 动效选项轮播
 

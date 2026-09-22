@@ -55,17 +55,20 @@ static eui_display_hal_t display = {
 };
 
 /* ===== 输入 HAL ===== */
+/* 按键编号由项目自定义（示例：0=确认键），eui 不定义语义 */
+#define MY_KEY_OK 0u
+
 static int keypad_poll(eui_event_t *evt, void *ud) {
     /* 扫描按键，有事件返回 1，无事件返回 0 */
     if (ok_button_pressed()) {
         evt->type = EUI_EVT_KEY_PRESS;
-        evt->data.key = EUI_KEY_OK;
+        evt->data.key_id = MY_KEY_OK;
         return 1;
     }
     return 0;
 }
 
-static eui_input_hal_t input = {
+static eui_input_drv_t input = {
     .poll = keypad_poll,
 };
 
@@ -249,7 +252,8 @@ static void counter_draw(eui_widget_t *w, eui_canvas_t *c) {
 }
 
 static bool counter_input(eui_widget_t *w, const eui_event_t *evt) {
-    if (evt->type == EUI_EVT_KEY_PRESS && evt->data.key == EUI_KEY_OK) {
+    /* 编号由项目自定义（示例：0=确认键）；装配手势事件 KEY_CLICK 由 core 自动产出 */
+    if (evt->type == EUI_EVT_KEY_CLICK && evt->data.key_id == MY_KEY_OK) {
         ((counter_t*)w)->count++;
         w->style |= EUI_STYLE_DIRTY;
         return true;

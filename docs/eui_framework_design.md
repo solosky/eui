@@ -391,35 +391,33 @@ typedef struct {
 输入 HAL 采用与显示 HAL 类似的回调结构，统一抽象按键、旋转编码器和触摸屏三种输入源。
 
 ```c
-/* 输入事件类型 */
+/* 输入事件类型：原始 HAL 事件之外，手势装配器追加三类装配事件 */
 typedef enum {
-    EUI_EVT_KEY_PRESS,           /* 按键按下 */
-    EUI_EVT_KEY_RELEASE,         /* 按键释放 */
-    EUI_EVT_KEY_REPEAT,          /* 按键长按重复 */
-    EUI_EVT_ENCODER_CW,          /* 编码器顺时针 */
-    EUI_EVT_ENCODER_CCW,         /* 编码器逆时针 */
-    EUI_EVT_ENCODER_CLICK,       /* 编码器按下 */
-    EUI_EVT_TOUCH_DOWN,          /* 触摸屏按下 */
-    EUI_EVT_TOUCH_UP,            /* 触摸屏释放 */
-    EUI_EVT_TOUCH_MOVE,          /* 触摸屏拖动 */
+    EUI_EVT_KEY_PRESS,           /* 按键按下（原始） */
+    EUI_EVT_KEY_RELEASE,         /* 按键释放（原始） */
+    EUI_EVT_KEY_REPEAT,          /* 按键长按重复（原始） */
+    EUI_EVT_ENCODER_CW,          /* 编码器顺时针（原始） */
+    EUI_EVT_ENCODER_CCW,         /* 编码器逆时针（原始） */
+    EUI_EVT_ENCODER_CLICK,       /* 编码器按下（原始） */
+    EUI_EVT_TOUCH_DOWN,          /* 触摸屏按下（原始） */
+    EUI_EVT_TOUCH_UP,            /* 触摸屏释放（原始） */
+    EUI_EVT_TOUCH_MOVE,          /* 触摸屏拖动（原始） */
+    EUI_EVT_KEY_CLICK = 9,       /* press→release 且未长按（装配） */
+    EUI_EVT_KEY_HOLD,            /* 按住 >=500ms，吞掉本次 click（装配） */
+    EUI_EVT_ENC_STEP,            /* 编码器步进，CW 为正（装配） */
 } eui_event_type_t;
 
-/* 按键定义 */
-typedef enum {
-    EUI_KEY_UP = 0,
-    EUI_KEY_DOWN,
-    EUI_KEY_LEFT,
-    EUI_KEY_RIGHT,
-    EUI_KEY_OK,
-    EUI_KEY_BACK,
-    EUI_KEY_COUNT
-} eui_key_t;
+/* 按键定义：key_id 为无语义 uint8 编号，分配归项目（eui 不定义语义） */
+#define MY_KEY_UP    0u   /* 示例编号方案，项目自定义 */
+#define MY_KEY_DOWN  1u
+#define MY_KEY_OK    4u
+#define MY_KEY_BACK  5u
 
 /* 输入事件 */
 typedef struct {
     eui_event_type_t type;
     union {
-        eui_key_t key;           /* KEY 事件 */
+        uint8_t key_id;          /* KEY 事件：无语义按键编号 */
         int16_t enc_delta;       /* ENCODER 事件 */
         struct { int16_t x, y; } touch;  /* TOUCH 事件 */
     } data;
@@ -438,7 +436,7 @@ typedef struct {
     void (*set_callback)(void (*cb)(const eui_event_t *evt), void *user_data);
     
     void *user_data;
-} eui_input_hal_t;
+} eui_input_drv_t;
 ```
 
 ### 6.2 输入处理流水线
@@ -455,17 +453,17 @@ typedef struct {
 
 **阶段四：事件分发** — `ViewDispatcher` 从队列中取出事件，转发给当前活动 View 的事件处理器。View 内部按照**焦点链（Focus Chain）**将事件传递给当前获得焦点的 Widget。焦点链通过 Widget 树的**前序遍历**确定顺序，只有 `focus_policy == EUI_FOCUS_STRONG` 的控件可获得焦点。方向键（上下/左右）沿前序序列前后移动焦点。容器 Widget（如 ScrollContainer）本身不获取焦点，而是将输入转发给当前焦点子控件；如果子控件不处理事件（返回 `false`），事件沿 Widget 树向上冒泡，直到被处理或到达根节点。
 
-### 6.3 应用层边沿锁存（eui_input_edge）
+### 6.3 手势装配器（eui_input_edge）
 
-框架层只负责把硬件状态整理成 `eui_event_t` 事件流；对"编码器 + OK 键 + 侧键"这类设备，应用层还需要一层**边沿语义**：`eui/eui_input_edge.h` 提供的状态机把事件流整理成一次消费的锁存边沿（press/release/hold/click）与虚拟编码器计数。
+原始事件流之外，框架内置一层**手势语义**：`eui/eui_input_edge.h` 提供的手势装配器把去抖后的原始事件（press/release、`ENCODER_CW/CCW`）组装成通用手势事件——`EUI_EVT_KEY_CLICK`（press→release 且未长按）、`EUI_EVT_KEY_HOLD`（按住过阈值）与 `EUI_EVT_ENC_STEP`（编码器步进）。装配器唯一实例内嵌于 view dispatcher：`eui_tick` 每帧喂入原始事件、推进 hold 计时，再把手势事件推给当前 View 的 INPUT 回调；可用 `eui_get_input_edge()` 取到实例。
 
-- **边沿一次性**：`ok_was_pressed()` / `ok_was_hold()` / `side_was_clicked()` 等读取即清零，视图每帧至多响应一次；`ok_is_released()` 是电平查询、不清锁存。
-- **hold 与短按互斥**：按住超过 500 ms 产生一次 hold 边沿并吞掉未消费的 press 边沿；侧键 hold 后释放不再转 click。语义对齐 M5Stack 系 `Button_Class`。
-- **方向键折算编码器**：UP/RIGHT 计 +1、DOWN/LEFT 计 -1，与 `ENCODER_CW/CCW` 共用同一虚拟计数；`ENCODER_CCW` 契约要求携带负 `enc_delta`，非法 CCW 被忽略。
-- **防幽灵边沿**：进入/返回视图时调 `reset_edges()`，清除视图未激活期间积累的锁存与"已释放待转 click"的未决状态（仍按住的键保留原始按下态，与 Button_Class 持续跟踪原始状态一致）。
+- **key_id 无语义**：`uint8_t` 编号，分配归项目；装配器对各 key_id 一视同仁，物理按键 → 编号的映射在驱动 keymap / 项目层完成。
+- **hold 与 click 互斥**：按住超过 500 ms 产生一次 `KEY_HOLD` 并吞掉本次 click；press/release 原样透传（选择器类交互需要 press/release 时序）。语义对齐 M5Stack 系 `Button_Class`。
+- **编码器**：`ENCODER_CW/CCW` 组装为 `ENC_STEP`（CW 为正）；方向键折算编码器归驱动层键位绑定。`ENCODER_CCW` 契约要求携带负 `enc_delta`，非法 CCW 被忽略。
+- **防幽灵事件**：视图切换时 core 自动调 `eui_input_edge_flush()`，清除未派发事件与瞬时边沿（仍按住的键保留原始按下态与 hold 计时）。
 - **零初始化兼容**：全零结构体即合法状态（hold 阈值是编译期常量），`init` 只是显式归零。
 
-用法（每帧 tick 一次再读边沿、进入视图时 reset）见 `docs/api_reference.md` 的"应用组件"一节。
+app 一般直接在 View INPUT 回调里消费手势事件（用法见 `docs/api_reference.md` 的"应用组件"一节）；拉取式一次性边沿查询（`was_clicked(in, key_id)` 等，消费即清零）仅供 eui 单测/兼容。
 
 ---
 
@@ -902,7 +900,7 @@ typedef struct {
     uint8_t *mem_pool_buffer;             /* TLSF 内存池缓冲区 */
     size_t mem_pool_size;                 /* 内存池大小（如 8192） */
     eui_display_hal_t *display;          /* 显示 HAL */
-    eui_input_hal_t *input;              /* 输入 HAL */
+    eui_input_drv_t *input;              /* 输入 HAL */
     uint16_t fps_target;                 /* 目标帧率（默认 30） */
     uint8_t max_views;                   /* 最大 View 数（默认 8） */
     uint8_t max_animations;              /* 最大并发动画数（默认 8） */
@@ -971,18 +969,21 @@ static eui_display_hal_t display_hal = {
 };
 
 /* ===== 2. 实现输入 HAL ===== */
+/* 按键编号由项目自定义（示例：4=确认键），eui 不定义语义 */
+#define MY_KEY_OK 4u
+
 static int keypad_poll(eui_event_t *evt, void *ud) {
     /* 扫描矩阵键盘，填充事件 */
     if (key_was_pressed(KEY_OK)) {
         evt->type = EUI_EVT_KEY_PRESS;
-        evt->data.key = EUI_KEY_OK;
+        evt->data.key_id = MY_KEY_OK;
         return 1;
     }
     /* ... 其他按键 ... */
     return 0;  /* 无事件 */
 }
 
-static eui_input_hal_t input_hal = {
+static eui_input_drv_t input_hal = {
     .init = keypad_init,
     .poll = keypad_poll,
 };
@@ -1079,7 +1080,8 @@ static void counter_draw(eui_widget_t *w, eui_canvas_t *c) {
 
 static bool counter_input(eui_widget_t *w, const eui_event_t *evt) {
     eui_counter_t *cnt = (eui_counter_t *)w;
-    if (evt->type == EUI_EVT_KEY_PRESS && evt->data.key == EUI_KEY_OK) {
+    /* MY_KEY_OK 为项目自定义编号；KEY_CLICK 由 core 手势装配器产出 */
+    if (evt->type == EUI_EVT_KEY_CLICK && evt->data.key_id == MY_KEY_OK) {
         cnt->count += cnt->step;
         w->style |= EUI_STYLE_DIRTY;   /* 标记需要重绘 */
         return true;                    /* 事件已处理 */
@@ -1110,17 +1112,17 @@ eui_widget_t* eui_counter_create(int16_t x, int16_t y, int16_t step) {
 }
 ```
 
-### 12.3 边沿输入 + 动效选择器 + 旋转位图（自绘 View 组合）
+### 12.3 手势事件 + 动效选择器 + 旋转位图（自绘 View 组合）
 
-自绘 View（不走 Widget 树）里使用 `eui_input_edge`、`eui_selector` 与 `eui_canvas_draw_bitmap_rot_keyed` 的典型组合——一个横向图标轮播页：
+自绘 View（不走 Widget 树）里消费 core 手势事件、配合 `eui_selector` 与 `eui_canvas_draw_bitmap_rot_keyed` 的典型组合——一个横向图标轮播页：
 
 ```c
-#include "eui/eui_input_edge.h"
 #include "eui/eui_selector.h"
+
+#define MY_KEY_SIDE 1u   /* 项目自定义编号：1=侧键 */
 
 typedef struct {
     eui_view_t view;
-    eui_input_edge_t in;        /* 全零即合法初始态 */
     eui_selector_t sel;
     int spinner_deg;            /* 每帧 +2° 的旋转图标角度 */
 } home_view_t;
@@ -1132,19 +1134,21 @@ static const eui_selector_option_t k_opts[2] = {   /* 生命周期须覆盖使�
 
 static void home_read_input(eui_selector_t *s) {
     home_view_t *home = (home_view_t *)s->user_data;
-    if (eui_input_edge_side_was_clicked(&home->in)) s->config.move_in_loop = true,
-                                                    eui_selector_go_next(s);
+    /* 节流回调内拉取手势事件（亦可只在 INPUT 分支消费，见下） */
+    eui_input_edge_t *in = eui_get_input_edge();
+    eui_event_t evt;
+    while (eui_input_edge_pop_event(in, &evt)) {
+        if (evt.type == EUI_EVT_KEY_CLICK && evt.data.key_id == MY_KEY_SIDE)
+            s->config.move_in_loop = true,
+            eui_selector_go_next(s);
+    }
 }
 
 static bool home_handler(eui_view_event_t *e, void *ctx) {
     home_view_t *home = (home_view_t *)ctx;
 
-    if (e->type == EUI_VIEW_EVT_ENTER) {
-        eui_input_edge_reset_edges(&home->in);      /* 防幽灵边沿 */
-        return true;
-    }
     if (e->type == EUI_VIEW_EVT_INPUT) {
-        eui_input_edge_on_event(&home->in, e->event.input); /* 喂边沿状态机 */
+        home_read_input(&home->sel);   /* 或直接在此消费 e->event.input 的手势事件 */
         return true;
     }
     if (e->type == EUI_VIEW_EVT_DRAW) {
@@ -1167,7 +1171,7 @@ static bool home_handler(eui_view_event_t *e, void *ctx) {
 }
 ```
 
-要点：`tick` 交给 `eui_selector_update` 内部的节流回调链推进（视图每帧一次 `update`）；进入视图先 `reset_edges`；旋转位图的 `(x, y)` 传**未旋转**摆放位置。
+要点：`tick` 交给 `eui_selector_update` 内部的节流回调链推进（视图每帧一次 `update`）；手势事件由 core 装配并推送（切视图时自动 flush，无需手动清边沿）；旋转位图的 `(x, y)` 传**未旋转**摆放位置。
 
 ---
 
@@ -1213,7 +1217,7 @@ static bool home_handler(eui_view_event_t *e, void *ctx) {
 |------|---------|----------|
 | 0 | **（推荐）先基于 raylib 模拟层在桌面调通 UI 逻辑** | 1 小时 |
 | 1 | 实现 `eui_display_hal_t`（至少 `init` + `draw_pixel` 或 `write_buffer`） | 2~4 小时 |
-| 2 | 实现 `eui_input_hal_t`（至少 `poll`） | 1~2 小时 |
+| 2 | 实现 `eui_input_drv_t`（至少 `poll`） | 1~2 小时 |
 | 3 | 配置 `eui_config.h`（颜色深度、缓冲模式、池大小） | 30 分钟 |
 | 4 | 提供字体资源（可选，可用框架内置字体） | 1 小时 |
 | 5 | 编写 `eui_tick()` 的调用循环（RTOS 任务或裸机主循环） | 30 分钟 |
@@ -1275,7 +1279,7 @@ EUI 框架的目标平台是资源受限的 MCU，但其 HAL 抽象层（Display
 raylib 是一个跨平台的 C99 游戏开发库，提供窗口管理、2D 渲染和输入处理能力，恰好匹配 EUI 的 HAL 接口需求：
 
 - **显示模拟**：raylib 的 `RenderTexture` 或 `Image` 充当 EUI 的帧缓冲区，通过 `UpdateTexture()` 将 Canvas 输出刷新到屏幕窗口。支持运行时调整窗口大小以模拟不同分辨率。
-- **输入模拟**：键盘映射为 MCU 按键（方向键 → EUI_KEY_UP/DOWN/LEFT/RIGHT，Enter → EUI_KEY_OK，Esc → EUI_KEY_BACK）。鼠标滚轮可模拟旋转编码器。
+- **输入模拟**：键盘按 keymap 条目（`eui_raylib_keymap_entry_t`）映射为无语义 key_id（默认 keymap：方向键 → 编号 0..3 并折算编码器 ±1，Enter → 编号 4，Esc → 编号 5）。鼠标滚轮可模拟旋转编码器。
 - **无额外依赖**：raylib 自身依赖极少（仅需 OpenGL / GLFW），EU I 的 raylib HAL 实现仅 ~200 行代码。
 
 ```c
@@ -1286,7 +1290,7 @@ raylib 是一个跨平台的 C99 游戏开发库，提供窗口管理、2D 渲�
 int main(void) {
     /* 创建 raylib 模拟的 128x64 OLED 显示 */
     eui_display_hal_t *display = eui_drv_raylib_create_display(128, 64, 1);
-    eui_input_hal_t *input = eui_drv_raylib_create_input();
+    eui_input_drv_t *input = eui_drv_raylib_create_input();
 
     eui_config_t cfg = { .display = display, .input = input, /* ... */ };
     eui_init(&cfg);

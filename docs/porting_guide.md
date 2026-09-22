@@ -101,7 +101,13 @@ eui_display_hal_t st7735_hal = {
 
 ### 按键示例
 
+按键编号（`key_id`）由**项目自定义**，eui 不定义语义。先在项目里给物理按键分配编号，再在驱动的 poll 里发出：
+
 ```c
+/* 项目层定义编号（示例）：0=上键，4=确认键 */
+#define MY_KEY_UP  0u
+#define MY_KEY_OK  4u
+
 static int keypad_poll(eui_event_t *evt, void *ud) {
     (void)ud;
 
@@ -110,12 +116,12 @@ static int keypad_poll(eui_event_t *evt, void *ud) {
 
     if (pressed & KEY_UP) {
         evt->type = EUI_EVT_KEY_PRESS;
-        evt->data.key = EUI_KEY_UP;
+        evt->data.key_id = MY_KEY_UP;
         return 1;
     }
     if (pressed & KEY_OK) {
         evt->type = EUI_EVT_KEY_PRESS;
-        evt->data.key = EUI_KEY_OK;
+        evt->data.key_id = MY_KEY_OK;
         return 1;
     }
     /* ... 其他按键 ... */
@@ -123,11 +129,13 @@ static int keypad_poll(eui_event_t *evt, void *ud) {
     return 0;  /* 无事件 */
 }
 
-eui_input_hal_t keypad_hal = {
+eui_input_drv_t keypad_hal = {
     .poll      = keypad_poll,
     .user_data = NULL,
 };
 ```
+
+也可以直接用内置驱动 + 键位映射表，见下文 [使用 GPIO 按键驱动](#使用-gpio-按键驱动) 与 raylib 的 `eui_raylib_keymap_entry_t`。
 
 ### 旋转编码器示例
 
@@ -149,14 +157,22 @@ static int encoder_poll(eui_event_t *evt, void *ud) {
 
 ### 按键映射
 
-| EUI Key | 用途 |
-|---------|------|
-| `EUI_KEY_UP` | 列表上移 / 焦点前进 |
-| `EUI_KEY_DOWN` | 列表下移 / 焦点后退 |
-| `EUI_KEY_LEFT` | 焦点左移 / Slider 减 |
-| `EUI_KEY_RIGHT` | 焦点右移 / Slider 增 |
-| `EUI_KEY_OK` | 确认选择 |
-| `EUI_KEY_BACK` | 返回上级菜单 |
+eui **不定义语义按键**：`key_id` 只是无语义 `uint8_t` 编号（0 .. 编号上限-1，上限见构建配置），“哪个编号是确认键、哪个是侧键”完全由项目决定（如 0=确认键、1=侧键）。编号 → 角色的绑定有两处，须保持一致：
+
+1. **驱动 keymap**（物理按键 → 编号）：raylib 用 `eui_raylib_keymap_entry_t`（`raylib_key` / `mouse_btn` / `key_id` / `enc_delta`），GPIO 按键驱动用 `eui_drv_buttons_map_t` 的 `uint8_t key` 字段。桌面模拟的默认 keymap 沿用历史绑定：编号 0..5 依次为 上/下/左/右/确认/返回，方向键折算编码器（±1），鼠标左/右键为确认/返回。
+2. **widget 导航键位**（编号 → 导航角色）：widget 库默认按 `{up=0, down=1, left=2, right=3, ok=4, back=5}` 解释编号；项目若采用别的编号方案，挂 widget 前必须先 `eui_widget_set_nav_keys()` 显式改绑，否则语义静默错位（不用 widget 库则无需关心）。
+
+```c
+/* 示例：项目自定义编号方案（0=确认键、1=侧键），同步改绑 widget 导航 */
+#define MY_KEY_OK   0u
+#define MY_KEY_SIDE 1u
+
+eui_widget_nav_keys_t nav = {
+    .up = 2, .down = 3, .left = 4, .right = 5,
+    .ok = MY_KEY_OK, .back = MY_KEY_SIDE,
+};
+eui_widget_set_nav_keys(&nav);
+```
 
 ---
 
@@ -308,18 +324,24 @@ eui_display_hal_t *display = eui_drv_ssd1306_create(&disp_cfg);
 ```c
 #include "eui/driver/eui_drv_buttons.h"
 
+/* 项目自定义编号（示例）：0=确认键、1=侧键；eui 不定义编号语义 */
+#define MY_KEY_OK   0u
+#define MY_KEY_SIDE 1u
+
 const eui_drv_buttons_map_t map[] = {
-    { .pin_id = 0, .key = EUI_KEY_UP },
-    { .pin_id = 1, .key = EUI_KEY_DOWN },
-    { .pin_id = 2, .key = EUI_KEY_OK },
+    { .pin_id = 0, .key = MY_KEY_OK },
+    { .pin_id = 1, .key = MY_KEY_SIDE },
+    { .pin_id = 2, .key = 2 },
 };
 
 eui_drv_buttons_config_t btn_cfg = {
     .gpio = { .read_pin = my_gpio_read, .delay_us = my_delay_us },
     .map = map, .count = 3,
 };
-eui_input_hal_t *input = eui_drv_buttons_create(&btn_cfg);
+eui_input_drv_t *input = eui_drv_buttons_create(&btn_cfg);
 ```
+
+按键按下/释放经 `map[].key` 指定的 `key_id` 原样发出（`EUI_EVT_KEY_PRESS`/`EUI_EVT_KEY_RELEASE`），再由 core 手势装配器组装为 click/hold 手势事件。
 
 ### 可用的内置驱动
 
