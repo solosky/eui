@@ -4,7 +4,6 @@
 void eui_input_edge_init(eui_input_edge_t *in)
 {
     memset(in, 0, sizeof(*in));
-    in->hold_ms = EUI_INPUT_EDGE_DEFAULT_HOLD_MS;
 }
 
 void eui_input_edge_on_event(eui_input_edge_t *in, const eui_event_t *evt)
@@ -58,13 +57,13 @@ void eui_input_edge_tick(eui_input_edge_t *in, uint32_t now_ms)
     /* hold 触发时吞掉尚未消费的 press 边沿，保证同一次按压 hold 与
      * 短按互斥（侧键侧等价抑制见 release-before-hold 的 click 转换）。 */
     if (in->ok_pressed && !in->ok_hold_fired &&
-        now_ms - in->ok_press_ms >= in->hold_ms) {
+        now_ms - in->ok_press_ms >= EUI_INPUT_EDGE_DEFAULT_HOLD_MS) {
         in->ok_hold_fired = true;
         in->ok_hold_edge = true;
         in->ok_press_edge = false;
     }
     if (in->side_pressed && !in->side_hold_fired &&
-        now_ms - in->side_press_ms >= in->hold_ms) {
+        now_ms - in->side_press_ms >= EUI_INPUT_EDGE_DEFAULT_HOLD_MS) {
         in->side_hold_fired = true;
         in->side_hold_edge = true;
     }

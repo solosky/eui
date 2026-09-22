@@ -32,11 +32,13 @@ typedef struct eui_input_edge {
     uint32_t side_press_ms;
     bool side_hold_fired;
     bool side_click_edge, side_hold_edge;
-    uint16_t hold_ms;                        /**< 长按阈值，init 置 500 */
 } eui_input_edge_t;
 
 /**
- * @brief Initialize the edge-latch state machine (hold_ms = 500).
+ * @brief Initialize the edge-latch state machine (all zero).
+ *
+ * 零值全零结构体也是合法状态（hold 阈值是编译期常量），init 只是
+ * 显式归零的便利函数。
  */
 void eui_input_edge_init(eui_input_edge_t *in);
 
