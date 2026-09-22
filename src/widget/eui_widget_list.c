@@ -93,7 +93,7 @@ static bool list_input(eui_widget_t *self, const eui_event_t *evt) {
     if (visible == 0) visible = 1;
 
     if (evt->type == EUI_EVT_KEY_PRESS) {
-        if (evt->data.key == EUI_KEY_DOWN) {
+        if (evt->data.key_id == eui_widget_nav_keys()->down) {
             if (l->selected_index < l->item_count - 1) {
                 uint8_t old = l->selected_index;
                 l->selected_index++;
@@ -103,7 +103,7 @@ static bool list_input(eui_widget_t *self, const eui_event_t *evt) {
             }
             return true;
         }
-        if (evt->data.key == EUI_KEY_UP) {
+        if (evt->data.key_id == eui_widget_nav_keys()->up) {
             if (l->selected_index > 0) {
                 uint8_t old = l->selected_index;
                 l->selected_index--;
@@ -113,12 +113,12 @@ static bool list_input(eui_widget_t *self, const eui_event_t *evt) {
             }
             return true;
         }
-        if (evt->data.key == EUI_KEY_OK) {
+        if (evt->data.key_id == eui_widget_nav_keys()->ok) {
             if (l->callback) l->callback(l->selected_index, l->callback_ctx);
             return true;
         }
     }
-    if (evt->type == EUI_EVT_ENCODER_CW) {
+    if (evt->type == EUI_EVT_ENC_STEP && evt->data.enc_delta > 0) {
         if (l->selected_index < l->item_count - 1) {
             uint8_t old = l->selected_index;
             l->selected_index++;
@@ -128,7 +128,7 @@ static bool list_input(eui_widget_t *self, const eui_event_t *evt) {
         }
         return true;
     }
-    if (evt->type == EUI_EVT_ENCODER_CCW) {
+    if (evt->type == EUI_EVT_ENC_STEP && evt->data.enc_delta < 0) {
         if (l->selected_index > 0) {
             uint8_t old = l->selected_index;
             l->selected_index--;

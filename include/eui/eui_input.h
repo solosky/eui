@@ -26,7 +26,7 @@ typedef struct {
         bool     pressed;
         bool     long_press_fired;
         uint32_t next_repeat_ms;
-    } key_state[EUI_KEY_COUNT];
+    } key_state[EUI_KEY_ID_MAX];
 } eui_input_manager_t;
 
 /**

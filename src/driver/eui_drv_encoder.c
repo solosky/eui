@@ -41,10 +41,12 @@ static int encoder_poll(eui_event_t *evt, void *ud) {
 
     if (dir == 1) {
         evt->type = EUI_EVT_ENCODER_CW;
+        evt->data.enc_delta = 1;   /* 装配器契约：CW 带正 delta */
         return 1;
     }
     if (dir == -1) {
         evt->type = EUI_EVT_ENCODER_CCW;
+        evt->data.enc_delta = -1;  /* 装配器契约：CCW 带负 delta */
         return 1;
     }
 

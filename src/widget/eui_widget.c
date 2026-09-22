@@ -4,6 +4,11 @@
 
 static bool eui_widget_event_bridge(eui_view_event_t *evt, void *ctx);
 
+static eui_widget_nav_keys_t s_nav_keys = { 0, 1, 2, 3, 4, 5 };
+
+void eui_widget_set_nav_keys(const eui_widget_nav_keys_t *keys) { if (keys) s_nav_keys = *keys; }
+const eui_widget_nav_keys_t *eui_widget_nav_keys(void) { return &s_nav_keys; }
+
 void eui_widget_init(eui_widget_t *w, const eui_widget_vtable_t *vt,
                      int16_t x, int16_t y, uint16_t ww, uint16_t hh) {
     memset(w, 0, sizeof(*w));

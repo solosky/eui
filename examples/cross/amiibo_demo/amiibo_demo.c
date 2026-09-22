@@ -137,18 +137,19 @@ static void carousel_draw(carousel_t *c, eui_canvas_t *canvas, eui_rect_t area) 
 
 static bool carousel_input(carousel_t *c, const eui_event_t *e) {
     if (e->type != EUI_EVT_KEY_PRESS) return false;
+    const eui_widget_nav_keys_t *nk = eui_widget_nav_keys();
     if (c->dir == CAROUSEL_HORIZONTAL) {
-        if (e->data.key == EUI_KEY_LEFT && c->selected > 0) {
+        if (e->data.key_id == nk->left && c->selected > 0) {
             carousel_select(c, c->selected - 1); return true;
         }
-        if (e->data.key == EUI_KEY_RIGHT && c->selected < (int8_t)(c->count - 1)) {
+        if (e->data.key_id == nk->right && c->selected < (int8_t)(c->count - 1)) {
             carousel_select(c, c->selected + 1); return true;
         }
     } else {
-        if (e->data.key == EUI_KEY_UP && c->selected > 0) {
+        if (e->data.key_id == nk->up && c->selected > 0) {
             carousel_select(c, c->selected - 1); return true;
         }
-        if (e->data.key == EUI_KEY_DOWN && c->selected < (int8_t)(c->count - 1)) {
+        if (e->data.key_id == nk->down && c->selected < (int8_t)(c->count - 1)) {
             carousel_select(c, c->selected + 1); return true;
         }
     }
@@ -243,7 +244,7 @@ static bool app_list_handler(eui_view_event_t *evt, void *context) {
         if (carousel_input(&g_app_carousel, e)) {
             eui_view_mark_dirty(view); return true;
         }
-        if (e->type == EUI_EVT_KEY_PRESS && e->data.key == EUI_KEY_OK) {
+        if (e->type == EUI_EVT_KEY_PRESS && e->data.key_id == eui_widget_nav_keys()->ok) {
             switch (g_app_carousel.selected) {
                 case 0: navigate_to(SCENE_AMIIBO_LIST, EUI_ANIM_SLIDE_LEFT); break;
                 case 1: navigate_to(SCENE_NFC, EUI_ANIM_SLIDE_LEFT); break;
@@ -279,13 +280,13 @@ static bool amiibo_list_handler(eui_view_event_t *evt, void *context) {
         if (carousel_input(&g_amiibo_carousel, e)) {
             eui_view_mark_dirty(view); return true;
         }
-        if (e->type == EUI_EVT_KEY_PRESS && e->data.key == EUI_KEY_OK) {
+        if (e->type == EUI_EVT_KEY_PRESS && e->data.key_id == eui_widget_nav_keys()->ok) {
             g_detail_index = (int8_t)g_amiibo_carousel.selected;
             g_detail_scroll = 0;
             navigate_to(SCENE_AMIIBO_DETAIL, EUI_ANIM_SLIDE_LEFT);
             return true;
         }
-        if (e->type == EUI_EVT_KEY_PRESS && e->data.key == EUI_KEY_BACK) {
+        if (e->type == EUI_EVT_KEY_PRESS && e->data.key_id == eui_widget_nav_keys()->back) {
             navigate_to(SCENE_APP_LIST, EUI_ANIM_SLIDE_RIGHT);
             return true;
         }
@@ -340,16 +341,16 @@ static bool detail_handler(eui_view_event_t *evt, void *context) {
     case EUI_VIEW_EVT_INPUT: {
         const eui_event_t *e = evt->event.input.input;
         if (e->type == EUI_EVT_KEY_PRESS) {
-            if (e->data.key == EUI_KEY_BACK) {
+            if (e->data.key_id == eui_widget_nav_keys()->back) {
                 navigate_to(SCENE_AMIIBO_LIST, EUI_ANIM_SLIDE_RIGHT);
                 return true;
             }
-            if (e->data.key == EUI_KEY_UP && g_detail_scroll > 0) {
+            if (e->data.key_id == eui_widget_nav_keys()->up && g_detail_scroll > 0) {
                 g_detail_scroll -= 12;
                 if (g_detail_scroll < 0) g_detail_scroll = 0;
                 eui_view_mark_dirty(view); return true;
             }
-            if (e->data.key == EUI_KEY_DOWN && g_detail_scroll < g_detail_max_scroll) {
+            if (e->data.key_id == eui_widget_nav_keys()->down && g_detail_scroll < g_detail_max_scroll) {
                 g_detail_scroll += 12;
                 eui_view_mark_dirty(view); return true;
             }
@@ -378,7 +379,7 @@ static bool placeholder_handler(eui_view_event_t *evt, void *context) {
     }
     case EUI_VIEW_EVT_INPUT: {
         const eui_event_t *e = evt->event.input.input;
-        if (e->type == EUI_EVT_KEY_PRESS && e->data.key == EUI_KEY_BACK) {
+        if (e->type == EUI_EVT_KEY_PRESS && e->data.key_id == eui_widget_nav_keys()->back) {
             navigate_to(SCENE_APP_LIST, EUI_ANIM_SLIDE_RIGHT);
             return true;
         }

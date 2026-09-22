@@ -27,24 +27,24 @@ static bool slider_input(eui_widget_t *self, const eui_event_t *evt) {
     eui_slider_t *s = (eui_slider_t*)self;
 
     if (evt->type == EUI_EVT_KEY_PRESS) {
-        if (evt->data.key == EUI_KEY_RIGHT && s->value < s->max) {
+        if (evt->data.key_id == eui_widget_nav_keys()->right && s->value < s->max) {
             s->value++;
             self->style |= EUI_STYLE_DIRTY;
             return true;
         }
-        if (evt->data.key == EUI_KEY_LEFT && s->value > s->min) {
+        if (evt->data.key_id == eui_widget_nav_keys()->left && s->value > s->min) {
             s->value--;
             self->style |= EUI_STYLE_DIRTY;
             return true;
         }
     }
 
-    if (evt->type == EUI_EVT_ENCODER_CW && s->value < s->max) {
+    if (evt->type == EUI_EVT_ENC_STEP && evt->data.enc_delta > 0 && s->value < s->max) {
         s->value++;
         self->style |= EUI_STYLE_DIRTY;
         return true;
     }
-    if (evt->type == EUI_EVT_ENCODER_CCW && s->value > s->min) {
+    if (evt->type == EUI_EVT_ENC_STEP && evt->data.enc_delta < 0 && s->value > s->min) {
         s->value--;
         self->style |= EUI_STYLE_DIRTY;
         return true;

@@ -54,11 +54,14 @@ void eui_tick(void) {
     /* Step 2: Poll input */
     eui_input_update(&g_eui.input_mgr, now);
 
-    /* Step 3: Process input events */
-    eui_event_t evt;
-    while (eui_input_get_event(&g_eui.input_mgr, &evt)) {
-        eui_view_dispatcher_send_input(&g_eui.vd, &evt);
-    }
+    /* Step 3: raw → 手势装配 → 路由 */
+    eui_event_t raw;
+    while (eui_input_get_event(&g_eui.input_mgr, &raw))
+        eui_input_edge_on_event(&g_eui.vd.edge, &raw);
+    eui_input_edge_tick(&g_eui.vd.edge, now);
+    eui_event_t gesture;
+    while (eui_input_edge_pop_event(&g_eui.vd.edge, &gesture))
+        eui_view_dispatcher_send_input(&g_eui.vd, &gesture);
 
     /* Step 4: Render */
     eui_view_dispatcher_tick(&g_eui.vd);
@@ -68,6 +71,10 @@ bool eui_is_running(void) { return g_eui.initialized; }
 
 eui_view_dispatcher_t* eui_get_view_dispatcher(void) {
     return &g_eui.vd;
+}
+
+eui_input_edge_t* eui_get_input_edge(void) {
+    return &g_eui.vd.edge;
 }
 
 eui_display_drv_t* eui_get_display(void) {

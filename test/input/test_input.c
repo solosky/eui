@@ -29,8 +29,8 @@ static void test_debounce(void) {
     eui_input_init(&mgr, &mock_hal);
 
     /* Load mock: two rapid PRESS events within debounce window */
-    mock_events[0] = (eui_event_t){ .type = EUI_EVT_KEY_PRESS, .data.key = EUI_KEY_OK, .timestamp = 0 };
-    mock_events[1] = (eui_event_t){ .type = EUI_EVT_KEY_PRESS, .data.key = EUI_KEY_OK, .timestamp = 5 };
+    mock_events[0] = (eui_event_t){ .type = EUI_EVT_KEY_PRESS, .data.key_id = 4, .timestamp = 0 };
+    mock_events[1] = (eui_event_t){ .type = EUI_EVT_KEY_PRESS, .data.key_id = 4, .timestamp = 5 };
     mock_count = 2;
     mock_index = 0;
 
@@ -53,7 +53,7 @@ static void test_long_press(void) {
     eui_input_init(&mgr, &mock_hal);
 
     /* Load mock: one press event */
-    mock_events[0] = (eui_event_t){ .type = EUI_EVT_KEY_PRESS, .data.key = EUI_KEY_OK, .timestamp = 0 };
+    mock_events[0] = (eui_event_t){ .type = EUI_EVT_KEY_PRESS, .data.key_id = 4, .timestamp = 0 };
     mock_count = 1;
     mock_index = 0;
 
@@ -79,8 +79,8 @@ static void test_key_release(void) {
     eui_input_manager_t mgr;
     eui_input_init(&mgr, &mock_hal);
 
-    mock_events[0] = (eui_event_t){ .type = EUI_EVT_KEY_PRESS, .data.key = EUI_KEY_OK, .timestamp = 0 };
-    mock_events[1] = (eui_event_t){ .type = EUI_EVT_KEY_RELEASE, .data.key = EUI_KEY_OK, .timestamp = 300 };
+    mock_events[0] = (eui_event_t){ .type = EUI_EVT_KEY_PRESS, .data.key_id = 4, .timestamp = 0 };
+    mock_events[1] = (eui_event_t){ .type = EUI_EVT_KEY_RELEASE, .data.key_id = 4, .timestamp = 300 };
     mock_count = 2;
     mock_index = 0;
 

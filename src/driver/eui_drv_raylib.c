@@ -275,6 +275,9 @@ const uint8_t* eui_drv_raylib_get_rgba_buffer(uint16_t *out_width, uint16_t *out
 
 typedef struct {
     eui_input_drv_t base;
+    const eui_raylib_keymap_entry_t *entries; /**< 调用者保证存活 */
+    int entry_count;
+    bool *prev;                    /**< 每条目的上一次按下电平锁存 */
 } raylib_input_t;
 
 static int input_init(void *ud) {
@@ -287,36 +290,31 @@ static int input_deinit(void *ud) {
     return 0;
 }
 
-static int input_poll(eui_event_t *evt, void *ud) {
-    (void)ud;
-
-    static int prev_states[EUI_KEY_COUNT] = {0};
-    int keys[EUI_KEY_COUNT] = {
-        KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_ENTER, KEY_BACKSPACE
-    };
-    int pressed[EUI_KEY_COUNT];
-
-    for (int k = 0; k < EUI_KEY_COUNT; k++)
-        pressed[k] = IsKeyDown(keys[k]);
-
-    /* Mouse: left = OK, right = BACK (parallel with keyboard) */
-    pressed[EUI_KEY_OK]   |= IsMouseButtonDown(MOUSE_BUTTON_LEFT);
-    pressed[EUI_KEY_BACK] |= IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
-    pressed[EUI_KEY_BACK] |= IsKeyDown(KEY_ESCAPE);
-
-    for (int k = 0; k < EUI_KEY_COUNT; k++) {
-        if (pressed[k] && !prev_states[k]) {
-            evt->type = EUI_EVT_KEY_PRESS;
-            evt->data.key = (eui_key_t)k;
-            evt->timestamp = (uint32_t)(GetTime() * 1000);
-            prev_states[k] = 1;
+static int rl_input_poll(eui_event_t *evt, void *ud) {
+    raylib_input_t *ri = (raylib_input_t *)ud;
+    uint32_t now = (uint32_t)(GetTime() * 1000.0);
+    for (int i = 0; i < ri->entry_count; i++) {
+        const eui_raylib_keymap_entry_t *e = &ri->entries[i];
+        bool down = (e->raylib_key >= 0) ? IsKeyDown(e->raylib_key)
+                                         : IsMouseButtonDown(e->mouse_btn);
+        if (down && !ri->prev[i]) {
+            ri->prev[i] = true;
+            if (e->enc_delta != 0) {
+                evt->type = (e->enc_delta > 0) ? EUI_EVT_ENCODER_CW : EUI_EVT_ENCODER_CCW;
+                evt->data.enc_delta = e->enc_delta;
+            } else {
+                evt->type = EUI_EVT_KEY_PRESS;
+                evt->data.key_id = e->key_id;
+            }
+            evt->timestamp = now;
             return 1;
         }
-        if (!pressed[k] && prev_states[k]) {
+        if (!down && ri->prev[i]) {
+            ri->prev[i] = false;
+            if (e->enc_delta != 0) continue;   /* 折算条目无 release */
             evt->type = EUI_EVT_KEY_RELEASE;
-            evt->data.key = (eui_key_t)k;
-            evt->timestamp = (uint32_t)(GetTime() * 1000);
-            prev_states[k] = 0;
+            evt->data.key_id = e->key_id;
+            evt->timestamp = now;
             return 1;
         }
     }
@@ -324,8 +322,8 @@ static int input_poll(eui_event_t *evt, void *ud) {
     int wheel = GetMouseWheelMove();
     if (wheel != 0) {
         evt->type = wheel > 0 ? EUI_EVT_ENCODER_CW : EUI_EVT_ENCODER_CCW;
-        evt->data.enc_delta = wheel;
-        evt->timestamp = (uint32_t)(GetTime() * 1000);
+        evt->data.enc_delta = (int16_t)wheel;
+        evt->timestamp = now;
         return 1;
     }
 
@@ -337,18 +335,48 @@ static void input_set_callback(void (*cb)(const eui_event_t *evt), void *user_da
     (void)user_data;
 }
 
-eui_input_drv_t* eui_drv_raylib_create_input(void) {
+static const eui_raylib_keymap_entry_t k_default_keymap[] = {
+    { KEY_UP,        -1,                  0, +1 },
+    { KEY_DOWN,      -1,                  0, -1 },
+    { KEY_LEFT,      -1,                  0, -1 },
+    { KEY_RIGHT,     -1,                  0, +1 },
+    { KEY_ENTER,     -1,                  4,  0 },
+    { KEY_BACKSPACE, -1,                  5,  0 },
+    { KEY_ESCAPE,    -1,                  5,  0 },
+    { -1, MOUSE_BUTTON_LEFT,              4,  0 },
+    { -1, MOUSE_BUTTON_RIGHT,             5,  0 },
+};
+
+eui_input_drv_t *eui_drv_raylib_create_input_keymap(const eui_raylib_keymap_entry_t *entries, int count) {
+    if (!entries || count <= 0) return NULL;
     raylib_input_t *inp = eui_malloc(sizeof(raylib_input_t));
     if (!inp) return NULL;
     memset(inp, 0, sizeof(*inp));
+    inp->prev = eui_malloc((size_t)count * sizeof(bool));
+    if (!inp->prev) {
+        eui_free(inp);
+        return NULL;
+    }
+    memset(inp->prev, 0, (size_t)count * sizeof(bool));
+    inp->entries = entries;
+    inp->entry_count = count;
     inp->base.init = input_init;
     inp->base.deinit = input_deinit;
-    inp->base.poll = input_poll;
+    inp->base.poll = rl_input_poll;
     inp->base.set_callback = input_set_callback;
     inp->base.user_data = inp;
     return &inp->base;
 }
 
+eui_input_drv_t* eui_drv_raylib_create_input(void) {
+    return eui_drv_raylib_create_input_keymap(k_default_keymap,
+                                              (int)(sizeof(k_default_keymap) / sizeof(k_default_keymap[0])));
+}
+
 void eui_drv_raylib_destroy_input(eui_input_drv_t *hal) {
-    if (hal) eui_free(hal->user_data);
+    if (hal) {
+        raylib_input_t *inp = (raylib_input_t *)hal->user_data;
+        if (inp && inp->prev) eui_free(inp->prev);
+        eui_free(hal->user_data);
+    }
 }

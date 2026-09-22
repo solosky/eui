@@ -55,12 +55,12 @@ static void button_draw(eui_widget_t *self, eui_canvas_t *canvas) {
 
 static bool button_input(eui_widget_t *self, const eui_event_t *evt) {
     eui_button_t *b = (eui_button_t*)self;
-    if (evt->type == EUI_EVT_KEY_PRESS && evt->data.key == EUI_KEY_OK) {
+    if (evt->type == EUI_EVT_KEY_PRESS && evt->data.key_id == eui_widget_nav_keys()->ok) {
         self->style |= EUI_STYLE_PRESSED;
         self->style |= EUI_STYLE_DIRTY;
         return true;
     }
-    if (evt->type == EUI_EVT_KEY_RELEASE && evt->data.key == EUI_KEY_OK) {
+    if (evt->type == EUI_EVT_KEY_RELEASE && evt->data.key_id == eui_widget_nav_keys()->ok) {
         self->style &= ~EUI_STYLE_PRESSED;
         self->style |= EUI_STYLE_DIRTY;
         if (b->callback) b->callback(b->callback_ctx);

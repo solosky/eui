@@ -29,6 +29,25 @@ typedef struct eui_widget_t eui_widget_t;
 typedef struct eui_widget_vtable eui_widget_vtable_t;
 
 /**
+ * @brief widget 导航键位（key_id 为项目自定编号；默认 {0,1,2,3,4,5} 保持历史行为）。
+ */
+typedef struct {
+    uint8_t up, down, left, right, ok, back;
+} eui_widget_nav_keys_t;
+
+/**
+ * @brief Set the global widget navigation key binding.
+ * @param keys  Pointer to the new binding (NULL is ignored).
+ */
+void eui_widget_set_nav_keys(const eui_widget_nav_keys_t *keys);
+
+/**
+ * @brief Get the global widget navigation key binding.
+ * @return Pointer to the current binding (never NULL).
+ */
+const eui_widget_nav_keys_t *eui_widget_nav_keys(void);
+
+/**
  * @brief Virtual function table for widgets.
  *
  * Widget subclasses override these methods to customize behavior.

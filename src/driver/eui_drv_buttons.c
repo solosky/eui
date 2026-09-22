@@ -34,13 +34,13 @@ static int buttons_poll(eui_event_t *evt, void *ud) {
         bool is_pressed  = (curr & mask) != 0;
         if (is_pressed && !was_pressed) {
             evt->type = EUI_EVT_KEY_PRESS;
-            evt->data.key = b->map[i].key;
+            evt->data.key_id = b->map[i].key;
             b->prev_state = curr;
             return 1;
         }
         if (!is_pressed && was_pressed) {
             evt->type = EUI_EVT_KEY_RELEASE;
-            evt->data.key = b->map[i].key;
+            evt->data.key_id = b->map[i].key;
             b->prev_state = curr;
             return 1;
         }

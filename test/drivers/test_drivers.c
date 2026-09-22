@@ -193,8 +193,8 @@ static void mock_btn_delay_us(uint32_t us, void *ud) { (void)us; (void)ud; }
 static void test_buttons_press_release(void) {
     TEST("buttons poll detects press and release");
     const eui_drv_buttons_map_t map[] = {
-        { .pin_id = 0, .key = EUI_KEY_OK },
-        { .pin_id = 1, .key = EUI_KEY_BACK },
+        { .pin_id = 0, .key = 4 },   /* OK */
+        { .pin_id = 1, .key = 5 },   /* BACK */
     };
     eui_drv_buttons_config_t cfg = {
         .gpio = { .read_pin = mock_btn_read_pin, .delay_us = mock_btn_delay_us, .user_data = NULL },
@@ -209,7 +209,7 @@ static void test_buttons_press_release(void) {
     eui_event_t evt;
     int ret = hal->poll(&evt, hal->user_data);
     if (ret != 1) FAIL("expected event on press");
-    if (evt.type != EUI_EVT_KEY_PRESS || evt.data.key != EUI_KEY_OK) FAIL("expected OK press");
+    if (evt.type != EUI_EVT_KEY_PRESS || evt.data.key_id != 4) FAIL("expected OK press");
 
     ret = hal->poll(&evt, hal->user_data);
     if (ret != 0) FAIL("expected no event on unchanged state");
@@ -217,7 +217,7 @@ static void test_buttons_press_release(void) {
     test_btn_pin_state = 0x00;
     ret = hal->poll(&evt, hal->user_data);
     if (ret != 1) FAIL("expected event on release");
-    if (evt.type != EUI_EVT_KEY_RELEASE || evt.data.key != EUI_KEY_OK) FAIL("expected OK release");
+    if (evt.type != EUI_EVT_KEY_RELEASE || evt.data.key_id != 4) FAIL("expected OK release");
 
     eui_drv_buttons_destroy(hal);
     PASS();
@@ -226,8 +226,8 @@ static void test_buttons_press_release(void) {
 static void test_buttons_press_back(void) {
     TEST("buttons poll detects BACK key");
     const eui_drv_buttons_map_t map[] = {
-        { .pin_id = 0, .key = EUI_KEY_UP },
-        { .pin_id = 1, .key = EUI_KEY_BACK },
+        { .pin_id = 0, .key = 0 },   /* UP */
+        { .pin_id = 1, .key = 5 },   /* BACK */
     };
     eui_drv_buttons_config_t cfg = {
         .gpio = { .read_pin = mock_btn_read_pin, .delay_us = mock_btn_delay_us, .user_data = NULL },
@@ -240,7 +240,7 @@ static void test_buttons_press_back(void) {
     eui_event_t evt;
     int ret = hal->poll(&evt, hal->user_data);
     if (ret != 1) FAIL("expected event");
-    if (evt.data.key != EUI_KEY_BACK) FAIL("expected BACK key");
+    if (evt.data.key_id != 5) FAIL("expected BACK key");
 
     eui_drv_buttons_destroy(hal);
     PASS();

@@ -74,19 +74,19 @@ static bool menu_input(eui_widget_t *self, const eui_event_t *evt) {
     if (visible == 0) visible = 1;
 
     if (evt->type == EUI_EVT_KEY_PRESS) {
-        if (evt->data.key == EUI_KEY_DOWN) {
+        if (evt->data.key_id == eui_widget_nav_keys()->down) {
             if (active->selected_index < active->item_count - 1) active->selected_index++;
             if (active->selected_index >= active->scroll_offset + visible)
                 active->scroll_offset++;
             return true;
         }
-        if (evt->data.key == EUI_KEY_UP) {
+        if (evt->data.key_id == eui_widget_nav_keys()->up) {
             if (active->selected_index > 0) active->selected_index--;
             if (active->selected_index < active->scroll_offset)
                 active->scroll_offset = active->selected_index;
             return true;
         }
-        if (evt->data.key == EUI_KEY_OK) {
+        if (evt->data.key_id == eui_widget_nav_keys()->ok) {
             eui_menu_item_t *item = &active->items[active->selected_index];
             if (item->submenu) {
                 m->active_submenu = item->submenu;
@@ -95,19 +95,19 @@ static bool menu_input(eui_widget_t *self, const eui_event_t *evt) {
             if (item->callback) item->callback(item->callback_ctx);
             return true;
         }
-        if (evt->data.key == EUI_KEY_BACK) {
+        if (evt->data.key_id == eui_widget_nav_keys()->back) {
             if (m->active_submenu) {
                 m->active_submenu = NULL;
                 return true;
             }
         }
     }
-    if (evt->type == EUI_EVT_ENCODER_CW) {
+    if (evt->type == EUI_EVT_ENC_STEP && evt->data.enc_delta > 0) {
         if (active->selected_index < active->item_count - 1) active->selected_index++;
         if (active->selected_index >= active->scroll_offset + visible) active->scroll_offset++;
         return true;
     }
-    if (evt->type == EUI_EVT_ENCODER_CCW) {
+    if (evt->type == EUI_EVT_ENC_STEP && evt->data.enc_delta < 0) {
         if (active->selected_index > 0) active->selected_index--;
         if (active->selected_index < active->scroll_offset) active->scroll_offset = active->selected_index;
         return true;

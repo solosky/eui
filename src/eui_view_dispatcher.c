@@ -5,6 +5,7 @@
 
 void eui_view_dispatcher_init(eui_view_dispatcher_t *vd, eui_canvas_t *canvas, uint32_t (*get_tick_ms)(void)) {
     memset(vd, 0, sizeof(*vd));
+    eui_input_edge_init(&vd->edge);
     vd->canvas = canvas;
     vd->get_tick_ms = get_tick_ms;
     vd->running = false;
@@ -63,10 +64,12 @@ void eui_view_dispatcher_switch_to(eui_view_dispatcher_t *vd, uint32_t view_id, 
         vd->transition_prev_view = old_view;
         vd->transition_start_ms = vd->get_tick_ms ? vd->get_tick_ms() : 0;
         vd->current_view_idx = (uint8_t)found_idx;
+        eui_input_edge_flush(&vd->edge);   /* 视图切换：弃掉未派发手势，防幽灵输入 */
         eui_view_send_enter(vd->views[vd->current_view_idx].view);
     } else {
         if (old_view) eui_view_send_exit(old_view);
         vd->current_view_idx = (uint8_t)found_idx;
+        eui_input_edge_flush(&vd->edge);   /* 视图切换：弃掉未派发手势，防幽灵输入 */
         eui_view_send_enter(vd->views[vd->current_view_idx].view);
         eui_view_send_draw(vd->views[vd->current_view_idx].view, vd->canvas);
     }
@@ -84,6 +87,7 @@ int eui_view_dispatcher_push_overlay(eui_view_dispatcher_t *vd, eui_view_t *over
     vd->overlays[vd->overlay_count] = overlay;
     vd->overlay_count++;
 
+    eui_input_edge_flush(&vd->edge);   /* 视图切换：弃掉未派发手势，防幽灵输入 */
     eui_view_send_enter(overlay);
     return 0;
 }
@@ -99,6 +103,7 @@ void eui_view_dispatcher_pop_overlay(eui_view_dispatcher_t *vd, eui_anim_type_t 
 
     eui_view_t *new_active = eui_view_dispatcher_get_active(vd);
     if (new_active) {
+        eui_input_edge_flush(&vd->edge);   /* 视图切换：弃掉未派发手势，防幽灵输入 */
         eui_view_send_enter(new_active);
         if (vd->overlay_count == 0) {
             eui_view_send_draw(new_active, vd->canvas);

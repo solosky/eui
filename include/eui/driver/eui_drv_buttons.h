@@ -11,7 +11,7 @@ extern "C" {
 
 typedef struct {
     uint8_t   pin_id;
-    eui_key_t key;
+    uint8_t   key;     /**< Neutral key id emitted on press/release (project-defined). */
 } eui_drv_buttons_map_t;
 
 typedef struct {

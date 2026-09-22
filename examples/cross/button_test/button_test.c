@@ -23,15 +23,15 @@ static void container_draw(eui_widget_t *w, eui_canvas_t *c) {
 
 static bool container_input(eui_widget_t *w, const eui_event_t *evt) {
     if (evt->type == EUI_EVT_KEY_PRESS) {
-        if (evt->data.key == EUI_KEY_RIGHT) { eui_widget_focus_next(w); return true; }
-        if (evt->data.key == EUI_KEY_LEFT)  { eui_widget_focus_prev(w); return true; }
-        if (evt->data.key == EUI_KEY_OK) {
+        if (evt->data.key_id == eui_widget_nav_keys()->right) { eui_widget_focus_next(w); return true; }
+        if (evt->data.key_id == eui_widget_nav_keys()->left)  { eui_widget_focus_prev(w); return true; }
+        if (evt->data.key_id == eui_widget_nav_keys()->ok) {
             eui_widget_t *focused = eui_widget_get_focus(w);
             if (focused && focused->vt && focused->vt->input)
                 return focused->vt->input(focused, evt);
         }
     }
-    if (evt->type == EUI_EVT_KEY_RELEASE && evt->data.key == EUI_KEY_OK) {
+    if (evt->type == EUI_EVT_KEY_RELEASE && evt->data.key_id == eui_widget_nav_keys()->ok) {
         eui_widget_t *focused = eui_widget_get_focus(w);
         if (focused && focused->vt && focused->vt->input)
             return focused->vt->input(focused, evt);

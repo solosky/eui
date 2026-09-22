@@ -29,23 +29,23 @@ static void scroll_draw(eui_widget_t *self, eui_canvas_t *canvas) {
 static bool scroll_input(eui_widget_t *self, const eui_event_t *evt) {
     eui_scroll_t *s = (eui_scroll_t*)self;
 
-    if (evt->type == EUI_EVT_ENCODER_CW) {
+    if (evt->type == EUI_EVT_ENC_STEP && evt->data.enc_delta > 0) {
         s->scroll_y += 8;
         self->style |= EUI_STYLE_DIRTY;
         return true;
     }
-    if (evt->type == EUI_EVT_ENCODER_CCW) {
+    if (evt->type == EUI_EVT_ENC_STEP && evt->data.enc_delta < 0) {
         s->scroll_y -= 8;
         self->style |= EUI_STYLE_DIRTY;
         return true;
     }
     if (evt->type == EUI_EVT_KEY_PRESS) {
-        if (evt->data.key == EUI_KEY_DOWN) {
+        if (evt->data.key_id == eui_widget_nav_keys()->down) {
             s->scroll_y += 8;
             self->style |= EUI_STYLE_DIRTY;
             return true;
         }
-        if (evt->data.key == EUI_KEY_UP) {
+        if (evt->data.key_id == eui_widget_nav_keys()->up) {
             s->scroll_y -= 8;
             self->style |= EUI_STYLE_DIRTY;
             return true;

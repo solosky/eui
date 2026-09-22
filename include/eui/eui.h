@@ -9,6 +9,7 @@
 #include "eui/eui_input_drv.h"
 #include "eui/eui_event.h"
 #include "eui/eui_input.h"
+#include "eui/eui_input_edge.h"
 #include "eui/eui_canvas.h"
 #include "eui/eui_font.h"
 #include "eui/eui_view.h"
@@ -133,6 +134,13 @@ uint32_t eui_get_tick_ms(void);
  * @return Pointer to the library's internal eui_view_dispatcher_t.
  */
 eui_view_dispatcher_t* eui_get_view_dispatcher(void);
+
+/**
+ * @brief core 唯一手势装配器（测试/特殊管线直接喂原始事件用）。
+ *
+ * @return Pointer to the library's internal eui_input_edge_t.
+ */
+eui_input_edge_t *eui_get_input_edge(void);
 
 /**
  * @brief Get the display driver instance passed to eui_init().

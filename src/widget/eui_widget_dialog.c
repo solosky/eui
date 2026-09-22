@@ -51,15 +51,15 @@ static bool dialog_input(eui_widget_t *self, const eui_event_t *evt) {
     eui_dialog_t *d = (eui_dialog_t*)self;
 
     if (evt->type == EUI_EVT_KEY_PRESS) {
-        if (evt->data.key == EUI_KEY_LEFT && d->focused_button > 0) {
+        if (evt->data.key_id == eui_widget_nav_keys()->left && d->focused_button > 0) {
             d->focused_button--;
             self->style |= EUI_STYLE_DIRTY;
         }
-        if (evt->data.key == EUI_KEY_RIGHT && d->focused_button < d->button_count - 1) {
+        if (evt->data.key_id == eui_widget_nav_keys()->right && d->focused_button < d->button_count - 1) {
             d->focused_button++;
             self->style |= EUI_STYLE_DIRTY;
         }
-        if (evt->data.key == EUI_KEY_OK) {
+        if (evt->data.key_id == eui_widget_nav_keys()->ok) {
             eui_dialog_result_t result = d->buttons[d->focused_button].result;
             if (d->vd) {
                 eui_view_dispatcher_pop_overlay(d->vd, EUI_ANIM_NONE);

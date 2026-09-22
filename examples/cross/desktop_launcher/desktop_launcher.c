@@ -487,23 +487,19 @@ static bool desktop_view_handler(eui_view_event_t *evt, void *context) {
         const eui_event_t *e = evt->event.input.input;
         if (e->type == EUI_EVT_KEY_PRESS) {
             int8_t old = g_selected;
-            switch (e->data.key) {
-            case EUI_KEY_UP:
+            const eui_widget_nav_keys_t *nk = eui_widget_nav_keys();
+            if (e->data.key_id == nk->up) {
                 if (g_selected >= GRID_COLS) g_selected -= GRID_COLS;
-                break;
-            case EUI_KEY_DOWN:
+            } else if (e->data.key_id == nk->down) {
                 if (g_selected < APP_COUNT - GRID_COLS) g_selected += GRID_COLS;
-                break;
-            case EUI_KEY_LEFT:
+            } else if (e->data.key_id == nk->left) {
                 if (g_selected % GRID_COLS > 0) g_selected--;
-                break;
-            case EUI_KEY_RIGHT:
+            } else if (e->data.key_id == nk->right) {
                 if (g_selected % GRID_COLS < GRID_COLS - 1 && g_selected < APP_COUNT - 1) g_selected++;
-                break;
-            case EUI_KEY_OK:
+            } else if (e->data.key_id == nk->ok) {
                 eui_view_dispatcher_switch_to(g_vd, 2, EUI_ANIM_SLIDE_LEFT);
                 return true;
-            default:
+            } else {
                 return false;
             }
             if (g_selected != old) {
@@ -539,7 +535,7 @@ static bool app_view_handler(eui_view_event_t *evt, void *context) {
     }
     case EUI_VIEW_EVT_INPUT: {
         const eui_event_t *e = evt->event.input.input;
-        if (e->type == EUI_EVT_KEY_PRESS && e->data.key == EUI_KEY_BACK) {
+        if (e->type == EUI_EVT_KEY_PRESS && e->data.key_id == eui_widget_nav_keys()->back) {
             eui_view_dispatcher_switch_to(g_vd, 1, EUI_ANIM_SLIDE_RIGHT);
             return true;
         }

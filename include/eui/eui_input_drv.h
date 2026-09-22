@@ -4,43 +4,44 @@
 #include <stdint.h>
 
 /**
- * @brief Low-level input event types reported by the HAL.
+ * @brief Input event types.
+ *
+ * EUI_EVT_KEY_PRESS / _RELEASE / _REPEAT / EUI_EVT_ENCODER_* /
+ * EUI_EVT_TOUCH_* are raw HAL events (assembler input).  The gesture
+ * assembler in eui_input_edge turns raw streams into the assembled
+ * gesture events EUI_EVT_KEY_CLICK / EUI_EVT_KEY_HOLD /
+ * EUI_EVT_ENC_STEP, which views normally receive.
+ *
+ * Existing members keep their historical numeric values (the values are
+ * part of the library ABI); new gesture types are appended.
  */
 typedef enum {
-    EUI_EVT_KEY_PRESS,     /**< A key was pressed. */
-    EUI_EVT_KEY_RELEASE,   /**< A key was released. */
-    EUI_EVT_KEY_REPEAT,    /**< A key auto-repeat event. */
-    EUI_EVT_ENCODER_CW,    /**< Rotary encoder turned clockwise. */
-    EUI_EVT_ENCODER_CCW,   /**< Rotary encoder turned counter-clockwise. */
-    EUI_EVT_ENCODER_CLICK, /**< Rotary encoder button click. */
-    EUI_EVT_TOUCH_DOWN,    /**< Touch press detected. */
-    EUI_EVT_TOUCH_UP,      /**< Touch release detected. */
-    EUI_EVT_TOUCH_MOVE,    /**< Touch position changed. */
+    EUI_EVT_KEY_PRESS = 0,     /**< A key was pressed (raw). */
+    EUI_EVT_KEY_RELEASE = 1,   /**< A key was released (raw). */
+    EUI_EVT_KEY_REPEAT = 2,    /**< A key auto-repeat event (raw). */
+    EUI_EVT_ENCODER_CW = 3,    /**< Rotary encoder turned clockwise, positive delta (raw). */
+    EUI_EVT_ENCODER_CCW = 4,   /**< Rotary encoder turned counter-clockwise, negative delta (raw). */
+    EUI_EVT_ENCODER_CLICK = 5, /**< Rotary encoder button click (raw). */
+    EUI_EVT_TOUCH_DOWN = 6,    /**< Touch press detected (raw). */
+    EUI_EVT_TOUCH_UP = 7,      /**< Touch release detected (raw). */
+    EUI_EVT_TOUCH_MOVE = 8,    /**< Touch position changed (raw). */
+    EUI_EVT_KEY_CLICK = 9,     /**< data.key_id: press->release without hold (assembled). */
+    EUI_EVT_KEY_HOLD = 10,     /**< data.key_id: press held >= 500ms; swallows the click (assembled). */
+    EUI_EVT_ENC_STEP = 11,     /**< data.enc_delta: encoder step, CW positive (assembled). */
 } eui_event_type_t;
-
-/**
- * @brief Standard key identifiers.
- */
-typedef enum {
-    EUI_KEY_UP = 0,   /**< Up / previous. */
-    EUI_KEY_DOWN,     /**< Down / next. */
-    EUI_KEY_LEFT,     /**< Left / decrease. */
-    EUI_KEY_RIGHT,    /**< Right / increase. */
-    EUI_KEY_OK,       /**< OK / confirm / select. */
-    EUI_KEY_BACK,     /**< Back / cancel / return. */
-    EUI_KEY_COUNT     /**< Internal: number of key IDs (not a key). */
-} eui_key_t;
 
 /**
  * @brief Unified input event structure.
  *
  * Carries one HAL-level input event with a timestamp.
  * The @p data union contains event-type-specific payload.
+ * Key ids are neutral uint8_t numbers assigned by the project
+ * (widget defaults and driver keymaps map them to roles).
  */
 typedef struct {
     eui_event_type_t type; /**< Event type. */
     union {
-        eui_key_t key;             /**< Key identifier (key events). */
+        uint8_t   key_id;          /**< Neutral key id, project-defined (key events). */
         int16_t   enc_delta;       /**< Encoder step count (encoder events). */
         struct { int16_t x, y; } touch; /**< Touch coordinates (touch events). */
     } data;

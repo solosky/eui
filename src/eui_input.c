@@ -6,8 +6,8 @@ static void process_raw_event(eui_input_manager_t *mgr, const eui_event_t *raw, 
     switch (raw->type) {
     case EUI_EVT_KEY_PRESS:
     case EUI_EVT_KEY_RELEASE: {
-        int key_index = raw->data.key;
-        if (key_index < 0 || key_index >= EUI_KEY_COUNT) return;
+        uint8_t key_index = raw->data.key_id;
+        if (key_index >= EUI_KEY_ID_MAX) return;
 
         if (raw->type == EUI_EVT_KEY_PRESS) {
             if ((now_ms - mgr->key_state[key_index].last_change_ms) < mgr->debounce_ms) {
@@ -50,7 +50,7 @@ void eui_input_init(eui_input_manager_t *mgr, eui_input_drv_t *hal)
     eui_event_queue_init(&mgr->queue);
 
     /* Pre-bias last_change_ms so first press passes debounce check */
-    for (int i = 0; i < EUI_KEY_COUNT; i++) {
+    for (int i = 0; i < EUI_KEY_ID_MAX; i++) {
         mgr->key_state[i].last_change_ms = 0xFFFFFFFFu - mgr->debounce_ms;
     }
 }
@@ -79,16 +79,16 @@ void eui_input_update(eui_input_manager_t *mgr, uint32_t now_ms)
     }
 
     /* Check for long-press / repeat */
-    for (int i = 0; i < EUI_KEY_COUNT; i++) {
+    for (int i = 0; i < EUI_KEY_ID_MAX; i++) {
         if (!mgr->key_state[i].pressed) continue;
 
         if (!mgr->key_state[i].long_press_fired && now_ms >= mgr->key_state[i].next_repeat_ms) {
-            eui_event_t rep = { .type = EUI_EVT_KEY_REPEAT, .data = { .key = (eui_key_t)i }, .timestamp = now_ms };
+            eui_event_t rep = { .type = EUI_EVT_KEY_REPEAT, .data = { .key_id = (uint8_t)i }, .timestamp = now_ms };
             eui_event_queue_push(&mgr->queue, &rep);
             mgr->key_state[i].long_press_fired = true;
             mgr->key_state[i].next_repeat_ms = now_ms + mgr->repeat_interval_ms;
         } else if (mgr->key_state[i].long_press_fired && now_ms >= mgr->key_state[i].next_repeat_ms) {
-            eui_event_t rep = { .type = EUI_EVT_KEY_REPEAT, .data = { .key = (eui_key_t)i }, .timestamp = now_ms };
+            eui_event_t rep = { .type = EUI_EVT_KEY_REPEAT, .data = { .key_id = (uint8_t)i }, .timestamp = now_ms };
             eui_event_queue_push(&mgr->queue, &rep);
             mgr->key_state[i].next_repeat_ms = now_ms + mgr->repeat_interval_ms;
         }

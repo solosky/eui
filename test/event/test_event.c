@@ -8,13 +8,13 @@ static void test_push_pop(void) {
     eui_event_queue_t q;
     eui_event_queue_init(&q);
 
-    eui_event_t in = { .type = EUI_EVT_KEY_PRESS, .data.key = EUI_KEY_OK, .timestamp = 100 };
+    eui_event_t in = { .type = EUI_EVT_KEY_PRESS, .data.key_id = 4, .timestamp = 100 };
     eui_event_t out;
 
     if (!eui_event_queue_push(&q, &in)) FAIL("push failed");
     if (!eui_event_queue_pop(&q, &out)) FAIL("pop failed");
     if (out.type != in.type) FAIL("type mismatch");
-    if (out.data.key != in.data.key) FAIL("key mismatch");
+    if (out.data.key_id != in.data.key_id) FAIL("key mismatch");
     if (out.timestamp != in.timestamp) FAIL("timestamp mismatch");
 
     PASS();
@@ -25,7 +25,7 @@ static void test_full_queue(void) {
     eui_event_queue_t q;
     eui_event_queue_init(&q);
 
-    eui_event_t evt = { .type = EUI_EVT_KEY_PRESS, .data.key = EUI_KEY_OK, .timestamp = 0 };
+    eui_event_t evt = { .type = EUI_EVT_KEY_PRESS, .data.key_id = 4, .timestamp = 0 };
 
     /* Fill the queue */
     for (int i = 0; i < EUI_EVENT_QUEUE_SIZE; i++) {
@@ -53,7 +53,7 @@ static void test_overwrite_mode(void) {
     eui_event_queue_init(&q);
     q.overwrite = true;
 
-    eui_event_t evt = { .type = EUI_EVT_KEY_PRESS, .data.key = EUI_KEY_OK, .timestamp = 0 };
+    eui_event_t evt = { .type = EUI_EVT_KEY_PRESS, .data.key_id = 4, .timestamp = 0 };
 
     /* Fill queue */
     for (int i = 0; i < EUI_EVENT_QUEUE_SIZE; i++) {

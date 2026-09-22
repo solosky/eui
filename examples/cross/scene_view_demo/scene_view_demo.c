@@ -87,13 +87,13 @@ static bool main_view_handler(eui_view_event_t *evt, void *context) {
     case EUI_VIEW_EVT_INPUT: {
         const eui_event_t *e = evt->event.input.input;
         if (e->type == EUI_EVT_KEY_PRESS) {
-            if (e->data.key == EUI_KEY_UP && g_menu_sel > 0) {
+            if (e->data.key_id == eui_widget_nav_keys()->up && g_menu_sel > 0) {
                 g_menu_sel--; eui_view_mark_dirty(view); return true;
             }
-            if (e->data.key == EUI_KEY_DOWN && g_menu_sel < MENU_COUNT - 1) {
+            if (e->data.key_id == eui_widget_nav_keys()->down && g_menu_sel < MENU_COUNT - 1) {
                 g_menu_sel++; eui_view_mark_dirty(view); return true;
             }
-            if (e->data.key == EUI_KEY_OK) {
+            if (e->data.key_id == eui_widget_nav_keys()->ok) {
                 menu_item_t *item = &g_menu_items[g_menu_sel];
                 navigate_to(item->scene_id, item->anim);
                 return true;
@@ -133,7 +133,7 @@ static bool detail_view_handler(eui_view_event_t *evt, void *context) {
     case EUI_VIEW_EVT_INPUT: {
         const eui_event_t *e = evt->event.input.input;
         if (e->type == EUI_EVT_KEY_PRESS &&
-            (e->data.key == EUI_KEY_BACK || e->data.key == EUI_KEY_OK)) {
+            (e->data.key_id == eui_widget_nav_keys()->back || e->data.key_id == eui_widget_nav_keys()->ok)) {
             navigate_to(SCENE_MAIN, data->anim_out);
             return true;
         }

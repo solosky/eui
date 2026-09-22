@@ -4,6 +4,7 @@
 #include "eui_view.h"
 #include "eui_types.h"
 #include "eui/eui_config.h"
+#include "eui/eui_input_edge.h"
 #include <stdint.h>
 
 /**
@@ -24,6 +25,7 @@ typedef struct eui_view_dispatcher_t {
     uint8_t overlay_count;
     bool running;
     eui_canvas_t *canvas;
+    eui_input_edge_t edge;   /**< core 手势装配器（eui_tick 泵入，切换时 flush） */
 
     /* Transition animation state */
     bool transitioning;

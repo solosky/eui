@@ -20,7 +20,7 @@ static void counter_draw(eui_widget_t *w, eui_canvas_t *c) {
 }
 
 static bool counter_input(eui_widget_t *w, const eui_event_t *evt) {
-    if (evt->type == EUI_EVT_KEY_PRESS && evt->data.key == EUI_KEY_OK) {
+    if (evt->type == EUI_EVT_KEY_PRESS && evt->data.key_id == eui_widget_nav_keys()->ok) {
         ((counter_t*)w)->count++;
         return true;
     }

@@ -13,7 +13,7 @@ void eui_web_push_key_event(int type, int key) {
     int next = (g_head + 1) % WEB_EVENT_Q_SIZE;
     if (next == g_tail) return;
     g_events[g_head].type      = (eui_event_type_t)type;
-    g_events[g_head].data.key  = (eui_key_t)key;
+    g_events[g_head].data.key_id  = (uint8_t)key;
     g_events[g_head].timestamp = 0;
     g_head = next;
 }
