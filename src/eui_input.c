@@ -1,8 +1,16 @@
 #include "eui/eui_input.h"
 #include <string.h>
 
-static void process_raw_event(eui_input_manager_t *mgr, const eui_event_t *raw, uint32_t now_ms)
+static void process_raw_event(eui_input_manager_t *mgr, const eui_event_t *drv_evt, uint32_t now_ms)
 {
+    /* 时间戳归一化到 eui tick 时钟：部分驱动（ESP32 buttons/encoder、web）
+     * 不写 timestamp，事件载体可能是未初始化栈内存或恒 0；手势装配器的
+     * hold 计时依赖确定时间源。驱动时钟与 eui 时钟同源（raylib 桌面）
+     * 时本覆盖无害。 */
+    eui_event_t normalized = *drv_evt;
+    normalized.timestamp = now_ms;
+    const eui_event_t *raw = &normalized;
+
     switch (raw->type) {
     case EUI_EVT_KEY_PRESS:
     case EUI_EVT_KEY_RELEASE: {

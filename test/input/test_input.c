@@ -100,12 +100,38 @@ static void test_key_release(void) {
     PASS();
 }
 
+static void test_timestamp_normalization(void) {
+    TEST("raw event timestamps are normalized to the eui tick clock");
+    eui_input_manager_t mgr;
+    eui_input_init(&mgr, &mock_hal);
+
+    /* 驱动不上报时间戳（ESP32 buttons/encoder 不写 timestamp，载体为
+     * 未初始化栈内存；web 恒 0）：入队事件必须盖 now_ms 戳 */
+    mock_events[0] = (eui_event_t){ .type = EUI_EVT_KEY_PRESS, .data.key_id = 4 };
+    mock_events[1] = (eui_event_t){ .type = EUI_EVT_KEY_RELEASE, .data.key_id = 4 };
+    mock_count = 2;
+    mock_index = 0;
+
+    eui_input_update(&mgr, 7777);
+
+    eui_event_t out;
+    int count = 0;
+    while (eui_input_get_event(&mgr, &out)) {
+        if (out.timestamp != 7777) FAIL("queued event timestamp != now_ms");
+        count++;
+    }
+    if (count != 2) FAIL("expected 2 events");
+
+    PASS();
+}
+
 int main(void) {
     printf("=== Input Manager Tests ===\n");
 
     test_debounce();
     test_long_press();
     test_key_release();
+    test_timestamp_normalization();
 
     return eui_test_summary();
 }
