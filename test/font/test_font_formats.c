@@ -132,6 +132,48 @@ static void test_vlw_str_width(void)
     PASS();
 }
 
+/* 回归：VLW 串宽必须按 UTF-8 码点查表。此前按字节累加，CJK 文本
+ * 逐字节查表落空得 0，菜单选择器选项宽/标题居中全部失效
+ * （VAMeter 思源黑体 VLW 菜单选中框缩成一小条）。现场构造含
+ * 中(U+4E2D, xAdvance 24) 的最小 VLW 验证。 */
+static void test_vlw_cjk_str_width(void)
+{
+    static uint8_t buf[24 + 2 * 28];
+    static const eui_font_t f = {
+        .format = EUI_FONT_FORMAT_VLW, .line_height = 24, .baseline = 20,
+        .data = buf,
+    };
+    /* big-endian int32 写入助手 */
+    #define PUT32(off, v) do { \
+        buf[off] = (uint8_t)((v) >> 24); buf[off+1] = (uint8_t)((v) >> 16); \
+        buf[off+2] = (uint8_t)((v) >> 8); buf[off+3] = (uint8_t)(v); \
+    } while (0)
+    PUT32(0, 2);      /* glyph count */
+    PUT32(4, 11);     /* version */
+    PUT32(8, 24);     /* size */
+    PUT32(12, 0);
+    PUT32(16, 20);    /* ascent */
+    PUT32(20, 4);     /* descent */
+    /* glyph 0: 'A' h0 w0 adv8（宽度测量只读头部，无需位图） */
+    PUT32(24, 'A');  PUT32(28, 0);  PUT32(32, 0);  PUT32(36, 8);
+    PUT32(40, 0);    PUT32(44, 0);  PUT32(48, 0);
+    /* glyph 1: 中 U+4E2D adv24 */
+    PUT32(52, 0x4E2D); PUT32(56, 0); PUT32(60, 0); PUT32(64, 24);
+    PUT32(68, 0);      PUT32(72, 0); PUT32(76, 0);
+    #undef PUT32
+
+    eui_font_t f2 = f;
+    eui_font_vlw_init(&f2, buf);
+    TEST("VLW str width decodes UTF-8 (CJK glyph found)");
+    if (eui_font_get_str_width(&f2, "\xE4\xB8\xAD") != 24)
+        FAIL("expected width 24 for U+4E2D");
+    if (eui_font_get_str_width(&f2, "A\xE4\xB8\xAD") != 32)
+        FAIL("expected width 32 for 'A'+U+4E2D (8+24)");
+    if (eui_font_get_str_width(&f2, "A") != 8)
+        FAIL("expected width 8 for ASCII-only");
+    PASS();
+}
+
 static void test_vlw_height(void)
 {
     TEST("VLW font height");
@@ -513,6 +555,7 @@ int main(void)
     test_flags();
     test_vlw_char_width();
     test_vlw_str_width();
+    test_vlw_cjk_str_width();
     test_vlw_height();
     test_vlw_baseline();
     test_vlw_out_of_range();
