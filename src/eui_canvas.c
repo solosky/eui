@@ -424,6 +424,22 @@ void eui_canvas_fill_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t w
     }
 }
 
+void eui_canvas_fill_rect_alpha(eui_canvas_t *canvas, int16_t x, int16_t y,
+                                uint16_t w, uint16_t h, eui_color_t color,
+                                uint8_t alpha)
+{
+    /* 逐像素走 px_blend：cov==0 不写、cov==255 快路 px_set、clip 与越界
+     * 语义全部由 px_set/px_get 继承；低色深退化为灰度混合 + 抖动量化。 */
+    if (!canvas || w == 0 || h == 0 || alpha == 0) return;
+    int16_t ex = x + (int16_t)w;
+    int16_t ey = y + (int16_t)h;
+    for (int16_t yi = y; yi < ey; yi++) {
+        for (int16_t xi = x; xi < ex; xi++) {
+            eui_canvas_px_blend(canvas, xi, yi, color, alpha);
+        }
+    }
+}
+
 void eui_canvas_draw_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t w, uint16_t h)
 {
     if (!canvas || w == 0 || h == 0) return;

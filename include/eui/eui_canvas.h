@@ -196,6 +196,29 @@ void eui_canvas_draw_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t w
 void eui_canvas_fill_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t w, uint16_t h);
 
 /**
+ * @brief Draw a filled rectangle blended over the existing canvas content.
+ *
+ * Unlike eui_canvas_fill_rect() this primitive reads the destination
+ * pixels and blends `color` over them.  `alpha` shares the 0..255 ink
+ * coverage scale of the AA rasterizer: 0 writes nothing, 255 is
+ * equivalent to eui_canvas_fill_rect(), intermediate values mix with
+ * the content already in the canvas (16bpp blends per channel; lower
+ * color depths blend in gray and re-quantize, with ordered dithering
+ * on 1/2 bpp).  Clipping and bounds behave as in every drawing call.
+ *
+ * @param canvas  Pointer to the canvas.
+ * @param x       Left edge.
+ * @param y       Top edge.
+ * @param w       Width.
+ * @param h       Height.
+ * @param color   Foreground color to blend over the content.
+ * @param alpha   Ink coverage 0..255 (0 = no-op, 255 = opaque fill).
+ */
+void eui_canvas_fill_rect_alpha(eui_canvas_t *canvas, int16_t x, int16_t y,
+                                uint16_t w, uint16_t h, eui_color_t color,
+                                uint8_t alpha);
+
+/**
  * @brief Draw a circle outline.
  *
  * @param canvas  Pointer to the canvas.
