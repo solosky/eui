@@ -8,6 +8,7 @@
 #include "eui/eui_display_drv.h"
 #include "eui/eui_input_drv.h"
 #include "eui/eui_event.h"
+#include "eui/eui_post.h"
 #include "eui/eui_input.h"
 #include "eui/eui_input_edge.h"
 #include "eui/eui_canvas.h"

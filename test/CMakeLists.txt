@@ -13,6 +13,7 @@ endfunction()
 # ---- Common / Foundation ----
 eui_add_test(test_allocator     allocator/test_allocator.c)
 eui_add_test(test_event         event/test_event.c)
+eui_add_test(test_post          post/test_post.c)
 eui_add_test(test_scene         scene/test_scene.c)
 eui_add_test(test_scene_events  scene/test_scene_events.c)
 eui_add_test(test_input         input/test_input.c)

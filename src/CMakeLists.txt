@@ -3,6 +3,7 @@ add_library(eui STATIC
     eui_allocator.c
     eui_str.c
     eui_event.c
+    eui_post.c
     eui_input.c
     eui_canvas.c
     eui_canvas_aa.c

@@ -3,6 +3,7 @@
 #include "eui/eui_input.h"
 #include "eui/eui_view_dispatcher.h"
 #include "eui/eui_anim.h"
+#include "eui/eui_post.h"
 #include <string.h>
 
 static struct {
@@ -31,6 +32,7 @@ int eui_init(const eui_config_t *config) {
     eui_input_init(&g_eui.input_mgr, config->input);
     eui_view_dispatcher_init(&g_eui.vd, g_eui.canvas, eui_get_tick_ms);
     eui_anim_init();
+    eui_post_reset();
     g_eui.last_tick_ms = 0;
     g_eui.active_vd = NULL;
     g_eui.chrome_vd = NULL;
@@ -41,6 +43,7 @@ int eui_init(const eui_config_t *config) {
 void eui_deinit(void) {
     if (g_eui.canvas) eui_canvas_destroy(g_eui.canvas);
     g_eui.canvas = NULL;
+    eui_post_reset();   /* 清空未执行条目（不执行回调） */
     g_eui.active_vd = NULL;
     g_eui.chrome_vd = NULL;
     g_eui.initialized = false;
@@ -84,6 +87,11 @@ void eui_tick(void) {
             eui_canvas_commit(g_eui.chrome_vd->canvas);
         }
     }
+
+    /* Step 6: post 队列排空（帧尾延迟执行）——渲染与 chrome 均已 commit，
+     * 本步回调若绘制则只写 canvas、不 commit（下一帧 Step 4 提交），与
+     * 「宿主在 eui_tick() 返回后派发」的提交边界一致。 */
+    eui_post_drain();
 }
 
 bool eui_is_running(void) { return g_eui.initialized; }

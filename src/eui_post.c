@@ -1,0 +1,69 @@
+#include "eui/eui_post.h"
+#include "eui/eui_config.h"
+#include "eui/eui.h"
+
+typedef struct {
+    eui_post_fn_t fn;
+    void         *user_data;
+    const void   *owner;
+} eui_post_entry_t;
+
+static struct {
+    eui_post_entry_t q[EUI_POST_QUEUE_SIZE];
+    uint8_t  head;      /* 出队索引 */
+    uint8_t  tail;      /* 入队索引 */
+    uint8_t  count;
+    uint32_t dropped;
+} s_post;
+
+bool eui_post(eui_post_fn_t fn, void *user_data, const void *owner)
+{
+    if (fn == NULL || !eui_is_running())
+        return false;
+    if (s_post.count >= EUI_POST_QUEUE_SIZE) {
+        s_post.dropped++;
+        return false;
+    }
+    s_post.q[s_post.tail].fn = fn;
+    s_post.q[s_post.tail].user_data = user_data;
+    s_post.q[s_post.tail].owner = owner;
+    s_post.tail = (uint8_t)((s_post.tail + 1) % EUI_POST_QUEUE_SIZE);
+    s_post.count++;
+    return true;
+}
+
+void eui_post_drain(void)
+{
+    int budget = EUI_POST_DRAIN_MAX;
+    /* 先出队再执行：回调内的 eui_post / eui_post_cancel 不会破坏本次迭代，
+     * 因为每轮都重新读取 head / count（排空到空）。 */
+    while (s_post.count > 0 && budget-- > 0) {
+        eui_post_entry_t e = s_post.q[s_post.head];
+        s_post.head = (uint8_t)((s_post.head + 1) % EUI_POST_QUEUE_SIZE);
+        s_post.count--;
+        e.fn(e.user_data);
+    }
+}
+
+void eui_post_cancel(const void *owner)
+{
+    /* Task 2 实现；本任务先留空壳保证链接通过 */
+    (void)owner;
+}
+
+uint8_t eui_post_count(void)
+{
+    return s_post.count;
+}
+
+uint32_t eui_post_dropped(void)
+{
+    return s_post.dropped;
+}
+
+void eui_post_reset(void)
+{
+    s_post.head = 0;
+    s_post.tail = 0;
+    s_post.count = 0;
+}
