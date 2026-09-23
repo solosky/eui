@@ -53,6 +53,7 @@ eui_add_test(test_selector          selector/test_selector.c)
 
 # ---- View ----
 eui_add_test(test_view              view/test_view.c)
+eui_add_test(test_dispatcher_active view/test_dispatcher_active.c)
 eui_add_test(test_widget            view/test_widget.c)
 eui_add_test(test_view_transition   view/test_view_transition.c)
 eui_add_test(test_view_transition_render view/test_view_transition_render.c

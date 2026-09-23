@@ -11,6 +11,8 @@ static struct {
     eui_canvas_t *canvas;
     eui_input_manager_t input_mgr;
     eui_view_dispatcher_t vd;
+    eui_view_dispatcher_t *active_vd;   /* NULL = 用内部 vd */
+    eui_view_dispatcher_t *chrome_vd;   /* 预留：chrome 层 dispatcher，当前恒为 NULL */
     uint32_t last_tick_ms;
     uint32_t (*tick_fn)(void);
 } g_eui;
@@ -30,6 +32,8 @@ int eui_init(const eui_config_t *config) {
     eui_view_dispatcher_init(&g_eui.vd, g_eui.canvas, eui_get_tick_ms);
     eui_anim_init();
     g_eui.last_tick_ms = 0;
+    g_eui.active_vd = NULL;
+    g_eui.chrome_vd = NULL;
     g_eui.initialized = true;
     return 0;
 }
@@ -37,6 +41,8 @@ int eui_init(const eui_config_t *config) {
 void eui_deinit(void) {
     if (g_eui.canvas) eui_canvas_destroy(g_eui.canvas);
     g_eui.canvas = NULL;
+    g_eui.active_vd = NULL;
+    g_eui.chrome_vd = NULL;
     g_eui.initialized = false;
 }
 
@@ -54,17 +60,20 @@ void eui_tick(void) {
     /* Step 2: Poll input */
     eui_input_update(&g_eui.input_mgr, now);
 
+    /* 活动 dispatcher：未注册时回退内部 vd */
+    eui_view_dispatcher_t *vd = g_eui.active_vd ? g_eui.active_vd : &g_eui.vd;
+
     /* Step 3: raw → 手势装配 → 路由 */
     eui_event_t raw;
     while (eui_input_get_event(&g_eui.input_mgr, &raw))
-        eui_input_edge_on_event(&g_eui.vd.edge, &raw);
-    eui_input_edge_tick(&g_eui.vd.edge, now);
+        eui_input_edge_on_event(&vd->edge, &raw);
+    eui_input_edge_tick(&vd->edge, now);
     eui_event_t gesture;
-    while (eui_input_edge_pop_event(&g_eui.vd.edge, &gesture))
-        eui_view_dispatcher_send_input(&g_eui.vd, &gesture);
+    while (eui_input_edge_pop_event(&vd->edge, &gesture))
+        eui_view_dispatcher_send_input(vd, &gesture);
 
     /* Step 4: Render */
-    eui_view_dispatcher_tick(&g_eui.vd);
+    eui_view_dispatcher_tick(vd);
 }
 
 bool eui_is_running(void) { return g_eui.initialized; }
@@ -74,7 +83,19 @@ eui_view_dispatcher_t* eui_get_view_dispatcher(void) {
 }
 
 eui_input_edge_t* eui_get_input_edge(void) {
-    return &g_eui.vd.edge;
+    return &(g_eui.active_vd ? g_eui.active_vd : &g_eui.vd)->edge;
+}
+
+void eui_set_active_dispatcher(eui_view_dispatcher_t *vd) {
+    g_eui.active_vd = vd;
+}
+
+eui_view_dispatcher_t* eui_get_active_dispatcher(void) {
+    return g_eui.active_vd ? g_eui.active_vd : &g_eui.vd;
+}
+
+eui_canvas_t* eui_get_canvas(void) {
+    return g_eui.canvas;
 }
 
 eui_display_drv_t* eui_get_display(void) {

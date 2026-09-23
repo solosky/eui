@@ -143,6 +143,39 @@ eui_view_dispatcher_t* eui_get_view_dispatcher(void);
 eui_input_edge_t *eui_get_input_edge(void);
 
 /**
+ * @brief Register an "active" view dispatcher that overrides the internal one.
+ *
+ * Once set, eui_tick() routes input and renders through this dispatcher
+ * instead of the library's internal one, and eui_get_input_edge() returns
+ * its gesture edge.  Passing NULL restores the default behavior (internal
+ * dispatcher).
+ *
+ * @param vd  Pointer to a caller-owned, fully initialized dispatcher, or NULL.
+ *
+ * @see eui_get_active_dispatcher()
+ */
+void eui_set_active_dispatcher(eui_view_dispatcher_t *vd);
+
+/**
+ * @brief Get the currently active view dispatcher.
+ *
+ * @return The dispatcher registered with eui_set_active_dispatcher(), or the
+ *         library's internal dispatcher when no active one is registered.
+ */
+eui_view_dispatcher_t* eui_get_active_dispatcher(void);
+
+/**
+ * @brief Get the global canvas owned by the library.
+ *
+ * The canvas is owned by EUI: it is created in eui_init() and destroyed in
+ * eui_deinit().  Callers must not destroy it; external dispatchers may bind
+ * to it for rendering.
+ *
+ * @return Pointer to the global canvas, or NULL if eui_init() has not been called.
+ */
+eui_canvas_t* eui_get_canvas(void);
+
+/**
  * @brief Get the display driver instance passed to eui_init().
  *
  * @return Pointer to the display driver, or NULL if eui_init() has not been called.
