@@ -2,6 +2,26 @@
 #include "eui/eui_font_u8g2_internal.h"
 #include <stddef.h>
 
+/* UTF-8 → 码点（与 eui_canvas.c 的绘制路径同一解码规则）：
+ * str_width 必须按码点查表，字节遍历会把多字节序列拆成必 miss 的
+ * continuation 字节（历史缺陷：CJK 串宽度恒 0）。 */
+static uint32_t u8g2_utf8_decode_next(const char **s) {
+    const uint8_t *p = (const uint8_t *)(*s);
+    uint32_t cp;
+    if ((p[0] & 0x80) == 0) {
+        cp = p[0]; *s += 1;
+    } else if ((p[0] & 0xE0) == 0xC0 && (p[1] & 0xC0) == 0x80) {
+        cp = ((p[0] & 0x1F) << 6) | (p[1] & 0x3F); *s += 2;
+    } else if ((p[0] & 0xF0) == 0xE0 && (p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80) {
+        cp = ((p[0] & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F); *s += 3;
+    } else if ((p[0] & 0xF8) == 0xF0 && (p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80 && (p[3] & 0xC0) == 0x80) {
+        cp = ((p[0] & 0x07) << 18) | ((p[1] & 0x3F) << 12) | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F); *s += 4;
+    } else {
+        cp = p[0]; *s += 1;
+    }
+    return cp;
+}
+
 #define HDR_GLYPH_CNT       0
 #define HDR_BBX_MODE        1
 #define HDR_BITS_PER_0      2
@@ -287,7 +307,12 @@ uint16_t eui_font_u8g2_get_str_width(const eui_font_t *font, const char *str)
 {
     uint16_t w = 0;
     if (!font || !str) return 0;
-    while (*str) { w += eui_font_u8g2_get_char_width(font, *str); str++; }
+    while (*str) {
+        uint32_t cp = u8g2_utf8_decode_next(&str);
+        u8g2_glyph_t g = {0};
+        find_glyph_from_encoding(font, (uint16_t)cp, &g);
+        w += g.x_advance;
+    }
     return w;
 }
 

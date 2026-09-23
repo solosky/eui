@@ -49,6 +49,7 @@ eui_add_test(test_font_multiline        font/test_font_multiline.c)
 eui_add_test(test_font_wqy13_render     font/test_font_wqy13_render.c)
 eui_add_test(test_font_real_u8g2_render font/test_font_real_u8g2_render.c)
 eui_add_test(test_font_vlw_render     font/test_font_vlw_render.c)
+eui_add_test(test_u8g2_utf8             font/test_u8g2_utf8.c)
 
 # ---- Selector ----
 eui_add_test(test_selector          selector/test_selector.c)

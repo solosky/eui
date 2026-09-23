@@ -484,6 +484,7 @@ static void draw_u8g2_glyph(eui_canvas_t *canvas, const eui_font_t *font,
         if (adv_out) *adv_out = 0;
         return;
     }
+    /* y = 行盒顶部（与 VLW/BDF 同语义）：字形顶 = y + baseline - (height+y_offset) */
     for (uint8_t row = 0; row < g.height; row++) {
         for (uint8_t col = 0; col < g.width; col++) {
             uint16_t px = (uint16_t)row * g.width + col;
@@ -491,7 +492,7 @@ static void draw_u8g2_glyph(eui_canvas_t *canvas, const eui_font_t *font,
                                    g.width, g.height)) {
                 eui_canvas_px_set(canvas,
                                  x + col + g.x_offset,
-                                 (int16_t)(y - g.height - g.y_offset + row),
+                                 (int16_t)(y + font->baseline - g.height - g.y_offset + row),
                                  canvas->fg_color);
             }
         }
@@ -510,6 +511,7 @@ static void draw_u8g2_glyph_by_index(eui_canvas_t *canvas,
         if (adv_out) *adv_out = 0;
         return;
     }
+    /* y = 行盒顶部（同 draw_u8g2_glyph，与 VLW/BDF 同语义） */
     for (uint8_t row = 0; row < g.height; row++) {
         for (uint8_t col = 0; col < g.width; col++) {
             uint16_t px = (uint16_t)row * g.width + col;
@@ -517,7 +519,7 @@ static void draw_u8g2_glyph_by_index(eui_canvas_t *canvas,
                                    g.width, g.height)) {
                 eui_canvas_px_set(canvas,
                                  x + col + g.x_offset,
-                                 (int16_t)(y - g.height - g.y_offset + row),
+                                 (int16_t)(y + font->baseline - g.height - g.y_offset + row),
                                  canvas->fg_color);
             }
         }

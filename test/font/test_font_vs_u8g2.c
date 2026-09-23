@@ -205,7 +205,9 @@ static int test_canvas_compare(const scenario_t *sc)
     else
         u8g2_DrawStr(&u8g2_cv, 0, (u8g2_uint_t)baseline, sc->str);
 
-    /* eui: render */
+    /* eui: render —— canvas 契约 y=行盒顶部；参考 u8g2 y=基线。
+     * 本测试验证的是字形解码与参考实现逐像素一致，故 eui 侧上移
+     * font->baseline 使两者落在同一像素行（锚定契约差异见 test_u8g2_utf8）。 */
     memset(eui_cv_buf, 0, sizeof(eui_cv_buf));
     eui_canvas_t *cv = eui_canvas_create(&eui_cv_display);
     if (!cv) return -1;
@@ -213,7 +215,7 @@ static int test_canvas_compare(const scenario_t *sc)
     eui_canvas_set_color(cv, EUI_COLOR_WHITE);
     eui_canvas_set_bg_color(cv, EUI_COLOR_BLACK);
     eui_canvas_clear(cv);
-    eui_canvas_draw_str(cv, 0, (int16_t)baseline, sc->str);
+    eui_canvas_draw_str(cv, 0, (int16_t)(baseline - eui_f->baseline), sc->str);
     eui_canvas_commit(cv);
     eui_canvas_destroy(cv);
 
@@ -238,8 +240,9 @@ static int test_canvas_compare(const scenario_t *sc)
         u8g2_uint_t uw = sc->use_utf8 ?
             u8g2_GetUTF8Width(&u8g2_cv, sc->str) : u8g2_GetStrWidth(&u8g2_cv, sc->str);
         if ((uint16_t)uw != eui_w) {
-            printf("  info: width differs (eui=%d u8g2=%d) — expected, eui str_width not UTF-8 aware\n",
+            printf("  FAIL: width differs (eui=%d u8g2=%d)\n",
                    eui_w, (int)uw);
+            mismatches++;
         }
     }
 

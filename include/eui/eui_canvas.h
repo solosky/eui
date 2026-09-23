@@ -319,9 +319,11 @@ void eui_canvas_set_font(eui_canvas_t *canvas, const eui_font_t *font);
  * The text is drawn using the current foreground color and active font.
  *
  * @param canvas  Pointer to the canvas.
- * @param x       X-coordinate of the text baseline start.
- * @param y       Y-coordinate of the text baseline.
- * @param str     Null-terminated string to draw.
+ * @param x       X-coordinate of the line box left edge.
+ * @param y       Y-coordinate of the line box top (all font formats —
+ *                VLW, BDF, U8G2 — anchor glyphs below this row).
+ * @param str     Null-terminated string to draw (UTF-8; multibyte
+ *                codepoints are decoded for every format).
  * @return The pixel width consumed by the string (for cursor advancement).
  */
 uint16_t eui_canvas_draw_str(eui_canvas_t *canvas, int16_t x, int16_t y, const char *str);
