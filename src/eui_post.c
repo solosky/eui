@@ -2,6 +2,13 @@
 #include "eui/eui_config.h"
 #include "eui/eui.h"
 
+/* 容量上限：head/tail/count 均为 uint8_t，EUI_POST_QUEUE_SIZE 超过 255 会让
+ * 「队满」判断（count >= EUI_POST_QUEUE_SIZE）永远不成立，条目被静默覆盖且
+ * 不计入 dropped。 */
+#if EUI_POST_QUEUE_SIZE > 255
+#error "EUI_POST_QUEUE_SIZE must be <= 255"
+#endif
+
 typedef struct {
     eui_post_fn_t fn;
     void         *user_data;

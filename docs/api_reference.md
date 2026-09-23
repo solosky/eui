@@ -36,6 +36,8 @@ void eui_tick(void);
 
 帧尾延迟执行：投递回调，在 `eui_tick()` 渲染完成后的帧尾（Step 6，chrome 层之后）执行。
 
+> **注意（临时）：`eui_post_cancel()` 当前尚未实现，为占位空实现** —— 调用它不会清掉任何条目，也不会报错；`owner` 归属机制待后续提交补齐。在此之前请不要照抄下面的清理模式（否则被取消的条目仍会执行，可能造成 use-after-free）。下面的 `eui_post_cancel` 示例行同样暂时只是占位。
+
 ```c
 #include <eui/eui_post.h>
 
@@ -43,13 +45,13 @@ static void on_next_frame(void *ud) { /* 帧尾执行 */ }
 
 eui_post(on_next_frame, NULL, NULL);          /* 匿名条目，执行一次 */
 eui_post(on_next_frame, ctx, app_handle);      /* 归属 app_handle，可整体取消 */
-eui_post_cancel(app_handle);                   /* 清掉该归属未执行的条目 */
+eui_post_cancel(app_handle);                   /* 清掉该归属未执行的条目 —— 尚未实现，见上方注意 */
 ```
 
 - 投递序即执行序；**排空到空** —— 回调内继续 `eui_post` 的条目同帧执行（每帧上限 `EUI_POST_DRAIN_MAX`，余量顺延下一帧）。
 - 帧尾回调内的绘制只写 canvas、不 commit：本帧上屏内容仍由渲染与 chrome 层决定。
-- 队列容量 `EUI_POST_QUEUE_SIZE`，满时投递返回 false，失败次数见 `eui_post_dropped()`。
-- 投递方负责保证执行时 `fn` / `user_data` 有效；对象销毁前用 `eui_post_cancel(owner)` 清理（`owner == NULL` 的匿名条目不可取消）。
+- 队列容量 `EUI_POST_QUEUE_SIZE`（上限 255，超出为编译期错误），满时投递返回 false，失败次数见 `eui_post_dropped()`。
+- 投递方负责保证执行时 `fn` / `user_data` 有效；对象销毁前用 `eui_post_cancel(owner)` 清理（`owner == NULL` 的匿名条目不可取消）—— **但 `eui_post_cancel()` 当前尚未实现，请不要依赖这一条**。
 - 单线程：必须与 `eui_tick()` 同线程调用。
 
 ### eui_deinit
