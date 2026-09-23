@@ -54,8 +54,25 @@ void eui_post_drain(void)
 
 void eui_post_cancel(const void *owner)
 {
-    /* Task 2 实现；本任务先留空壳保证链接通过 */
-    (void)owner;
+    if (owner == NULL)
+        return;                     /* 匿名条目不可批量取消 */
+
+    /* 稳定压紧：读游标 r 从原 head 前进，写游标 w 只落后于 r（w <= r），
+     * 因此只覆盖已读过的槽位，未读条目不会被破坏；相对顺序保持。 */
+    uint8_t r = s_post.head;
+    uint8_t w = s_post.head;
+    uint8_t kept = 0;
+    for (uint8_t i = 0; i < s_post.count; i++) {
+        eui_post_entry_t e = s_post.q[r];
+        r = (uint8_t)((r + 1) % EUI_POST_QUEUE_SIZE);
+        if (e.owner == owner)
+            continue;               /* 丢弃 */
+        s_post.q[w] = e;
+        w = (uint8_t)((w + 1) % EUI_POST_QUEUE_SIZE);
+        kept++;
+    }
+    s_post.count = kept;
+    s_post.tail = w;                /* head 不变：条目仍自原 head 起连续存放 */
 }
 
 uint8_t eui_post_count(void)

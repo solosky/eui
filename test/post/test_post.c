@@ -48,6 +48,15 @@ static int late_seen_draws;   /* 该回调观察到的 DRAW 次数 */
 static void same_tick_cb(void *ud) { (void)ud; sametick_ran++; }
 static void late_cb(void *ud) { (void)ud; late_ran++; late_seen_draws = g_dv->draws; }
 
+/* X：执行时取消挂在 &dv 上的其余条目，然后自己记账（值 200）。
+ * dv 在 main 内为局部量，此处经 g_dv 取同一地址。 */
+static void cancel_others_cb(void *ud)
+{
+    (void)ud;
+    eui_post_cancel((const void *)g_dv);
+    order[order_n++] = 200;
+}
+
 static bool dv_handler(eui_view_event_t *event, void *context)
 {
     draw_view_t *dv = (draw_view_t *)context;
@@ -130,6 +139,75 @@ int main(void)
     assert(dv.draws == draws_before + 1);
     assert(eui_post_count() == 0);
     assert(eui_post_dropped() == 0);
+
+    /* 6) owner 取消：仅清匹配条目，其余保持相对顺序 */
+    order_n = 0;
+    assert(eui_post(rec_cb, (void *)(intptr_t)1, (const void *)&dv));
+    assert(eui_post(rec_cb, (void *)(intptr_t)2, NULL));
+    assert(eui_post(rec_cb, (void *)(intptr_t)3, (const void *)&dv));
+    assert(eui_post_count() == 3);
+    eui_post_cancel((const void *)&dv);
+    assert(eui_post_count() == 1);
+    fake_ms += 16;
+    eui_tick();
+    assert(order_n == 1 && order[0] == 2);
+
+    /* 7) cancel(NULL) 是 no-op：匿名条目全部保留 */
+    order_n = 0;
+    assert(eui_post(rec_cb, (void *)(intptr_t)7, NULL));
+    assert(eui_post(rec_cb, (void *)(intptr_t)8, NULL));
+    eui_post_cancel(NULL);
+    assert(eui_post_count() == 2);
+    fake_ms += 16;
+    eui_tick();
+    assert(order_n == 2 && order[0] == 7 && order[1] == 8);
+
+    /* 8) 队列满：投满后下一条失败并计数；已入队条目全部执行 */
+    order_n = 0;
+    int accepted = 0;
+    while (eui_post(rec_cb, (void *)(intptr_t)0, NULL))
+        accepted++;
+    assert(accepted == EUI_POST_QUEUE_SIZE);
+    assert(eui_post_count() == EUI_POST_QUEUE_SIZE);
+    assert(eui_post_dropped() == 1);
+    fake_ms += 16;
+    eui_tick();
+    assert(order_n == EUI_POST_QUEUE_SIZE);
+    assert(eui_post_count() == 0);
+
+    /* 9) 每帧预算：超预算的链式投递顺延到下一帧，不丢弃
+     *    （注意：链式回调每次只续投 1 条，队列占用恒为 1 —— 「余量」体现在
+     *    chain_left 的剩余执行次数上，而不是队列长度） */
+    chain_ran = 0;
+    chain_left = EUI_POST_DRAIN_MAX + 5;
+    assert(eui_post(chain_cb, NULL, NULL));
+    fake_ms += 16;
+    eui_tick();
+    assert(chain_ran == EUI_POST_DRAIN_MAX);   /* 本帧恰好执行预算数 */
+    assert(eui_post_count() == 1);             /* 余下的执行次数以 1 条待执行链的形式顺延 */
+    fake_ms += 16;
+    eui_tick();
+    assert(chain_ran == EUI_POST_DRAIN_MAX + 5);   /* 顺延部分未丢失，全部执行完 */
+    assert(eui_post_count() == 0);
+
+    /* 10) 回调内取消其他条目（重入稳定性）：X 执行时清掉同 owner 的 Y */
+    order_n = 0;
+    assert(eui_post(cancel_others_cb, NULL, (const void *)&dv));   /* X：owner 无关 */
+    assert(eui_post(rec_cb, (void *)(intptr_t)100, (const void *)&dv));  /* Y：待取消 */
+    fake_ms += 16;
+    eui_tick();
+    assert(order_n == 1 && order[0] == 200);   /* 见 cancel_others_cb 实现 */
+
+    /* 11) deinit 清空且不执行；再次 init 后残留不得执行 */
+    order_n = 0;
+    assert(eui_post(rec_cb, (void *)(intptr_t)9, NULL));
+    assert(eui_post_count() == 1);
+    eui_deinit();
+    assert(eui_post_count() == 0);
+    assert(!eui_post(rec_cb, (void *)(intptr_t)10, NULL));   /* 未初始化：拒绝 */
+    assert(eui_init(&cfg) == 0);
+    eui_tick();
+    assert(order_n == 0);
 
     printf("test_post passed\n");
     return 0;

@@ -22,7 +22,6 @@
  *
  * 生命周期契约：投递方保证执行时 fn 与 user_data 有效。跨帧存活的条目
  * 必须在对象销毁前 eui_post_cancel(owner) —— owner 是工具，不是自动内存管理。
- * （注：eui_post_cancel() 当前尚未实现，见其声明处的临时说明。）
  *
  * 线程模型：单线程。eui_post() 必须与 eui_tick() 同线程调用。
  */
@@ -35,8 +34,8 @@ typedef void (*eui_post_fn_t)(void *user_data);
  *
  * @param fn        回调（NULL 时拒绝投递）
  * @param user_data 回调上下文
- * @param owner     归属标记（可为 NULL = 不可取消）；同一 owner 的条目可被
- *                  eui_post_cancel() 一次清掉
+ * @param owner     归属标记（可为 NULL：匿名条目不参与批量取消）；同一 owner
+ *                  的未执行条目可被 eui_post_cancel() 一次清掉
  * @return true 投递成功；false = fn 为 NULL / eui 未初始化或已 deinit / 队列满
  *         （仅「队列满」计入 eui_post_dropped()）
  */
@@ -46,10 +45,6 @@ bool eui_post(eui_post_fn_t fn, void *user_data, const void *owner);
  * @brief 清掉所有未执行的、owner 匹配的条目（保持其余条目相对顺序）。
  *
  * owner 为 NULL 时是 no-op（防止误清全部匿名条目）。可在回调内安全调用。
- *
- * @warning **当前提交尚未实现（占位空实现）**：调用不会清掉任何条目，也永不
- *          报错。待后续提交补齐 owner 归属机制；在此之前，不要在对象销毁前
- *          依赖本函数，也不要照抄上面的生命周期契约里的清理写法。
  *
  * @param owner 归属标记
  */
