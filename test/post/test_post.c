@@ -175,7 +175,8 @@ int main(void)
     eui_tick();
     assert(order_n == 2 && order[0] == 7 && order[1] == 8);
 
-    /* 8) 队列满：投满后下一条失败并计数；已入队条目全部执行 */
+    /* 8) 队列满：投满后下一条失败并计数；已入队条目全部执行
+     *    （假定 EUI_POST_DRAIN_MAX >= EUI_POST_QUEUE_SIZE：一次 tick 即可排空） */
     order_n = 0;
     int accepted = 0;
     while (eui_post(rec_cb, (void *)(intptr_t)0, NULL))

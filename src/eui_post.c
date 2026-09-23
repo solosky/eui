@@ -9,6 +9,12 @@
 #error "EUI_POST_QUEUE_SIZE must be <= 255"
 #endif
 
+/* 预算下界：EUI_POST_DRAIN_MAX = 0 时 eui_post_drain() 一条都不执行，队列
+ * 永不排空——投递方的自愈重投也会持续撞上「队列满」，导航/切换永久停摆。 */
+#if EUI_POST_DRAIN_MAX < 1
+#error "EUI_POST_DRAIN_MAX must be >= 1"
+#endif
+
 typedef struct {
     eui_post_fn_t fn;
     void         *user_data;
