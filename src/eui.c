@@ -74,6 +74,16 @@ void eui_tick(void) {
 
     /* Step 4: Render */
     eui_view_dispatcher_tick(vd);
+
+    /* Step 5: chrome 层（系统 status bar）——不清屏、最后画、浮于主视图与
+     * 过渡动画之上；chrome 的 input edge 永不泵（不可点）。 */
+    if (g_eui.chrome_vd) {
+        eui_view_t *cv = eui_view_dispatcher_get_active(g_eui.chrome_vd);
+        if (cv) {
+            eui_view_send_draw(cv, g_eui.chrome_vd->canvas);
+            eui_canvas_commit(g_eui.chrome_vd->canvas);
+        }
+    }
 }
 
 bool eui_is_running(void) { return g_eui.initialized; }
@@ -96,6 +106,10 @@ eui_view_dispatcher_t* eui_get_active_dispatcher(void) {
 
 eui_canvas_t* eui_get_canvas(void) {
     return g_eui.canvas;
+}
+
+void eui_set_chrome_dispatcher(eui_view_dispatcher_t *vd) {
+    g_eui.chrome_vd = vd;   /* NULL = 隐藏 chrome 层 */
 }
 
 eui_display_drv_t* eui_get_display(void) {

@@ -151,6 +151,9 @@ eui_input_edge_t *eui_get_input_edge(void);
  * dispatcher).
  *
  * @param vd  Pointer to a caller-owned, fully initialized dispatcher, or NULL.
+ *            The registered dispatcher's lifetime must cover the registration
+ *            period; unregister it (pass NULL) before it goes out of scope,
+ *            otherwise a dangling pointer is left behind.
  *
  * @see eui_get_active_dispatcher()
  */
@@ -174,6 +177,20 @@ eui_view_dispatcher_t* eui_get_active_dispatcher(void);
  * @return Pointer to the global canvas, or NULL if eui_init() has not been called.
  */
 eui_canvas_t* eui_get_canvas(void);
+
+/**
+ * @brief Register a chrome-layer view dispatcher (e.g. the system status bar).
+ *
+ * Once set, eui_tick() draws the chrome dispatcher's active view at the very
+ * end of the frame, after the main view (and any transition animation), so it
+ * floats above them.  The chrome layer never receives input events.
+ * Passing NULL hides the chrome layer.
+ *
+ * @param vd  Pointer to a caller-owned, fully initialized dispatcher, or NULL.
+ *
+ * @see eui_set_active_dispatcher()
+ */
+void eui_set_chrome_dispatcher(eui_view_dispatcher_t *vd);
 
 /**
  * @brief Get the display driver instance passed to eui_init().
