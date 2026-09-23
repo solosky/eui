@@ -10,6 +10,8 @@
 #define EUI_MAX_OVERLAYS      4
 #define EUI_SCENE_MAX         24
 #define EUI_KEY_ID_MAX        8
+#define EUI_POST_QUEUE_SIZE   16
+#define EUI_POST_DRAIN_MAX    64
 #define EUI_MAX_WIDGET_CHILDREN  8
 #define EUI_CANVAS_STATE_STACK   4
 
