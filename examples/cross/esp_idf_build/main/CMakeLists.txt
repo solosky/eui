@@ -23,6 +23,7 @@ endif()
 
 idf_component_register(
     SRCS
+        "eui_idf_config_asserts.c"
         "../../../../port/esp-idf/eui_port_bootstrap.c"
         "../../${EUI_EXAMPLE}/${EUI_EXAMPLE}.c"
     INCLUDE_DIRS
