@@ -27,6 +27,7 @@ add_library(eui STATIC
     eui_scene.c
     eui_anim.c
     eui_input_edge.c
+    eui_input_mux.c
     eui_selector.c
     driver/eui_drv_ssd1306.c
     driver/eui_drv_sh1106.c

@@ -71,6 +71,9 @@ eui_add_test(test_drivers drivers/test_drivers.c)
 # ---- 配置映射（IDF 路径的 eui_config.h；测试用相对路径直接包含该头） ----
 eui_add_test(test_config_mapping config/test_config_mapping.c)
 
+# ---- 输入多路合成 ----
+eui_add_test(test_input_mux      input/test_input_mux.c)
+
 # ---- u8g2 reference comparison tests ----
 set(U8G2_DIR "${CMAKE_SOURCE_DIR}/../u8g2" CACHE PATH "u8g2 source directory")
 
