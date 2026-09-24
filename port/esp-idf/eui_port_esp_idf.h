@@ -65,6 +65,73 @@ int eui_port_esp_idf_last_error(void);
 eui_hal_encoder_t *eui_port_esp_idf_encoder_create(int pin_a, int pin_b, bool pull_up);
 void eui_port_esp_idf_encoder_destroy(eui_hal_encoder_t *hal);
 
+/* ---- 板级装配（brick 契约） ----
+ * 顺序是硬约束：池 → transport → driver → eui_init → tick 回调 →
+ * display->init。core 不会调用 display->init()，由 board_init 调。 */
+
+typedef struct {
+    int      spi_host;      /* SPI2_HOST / SPI3_HOST */
+    int      pin_mosi, pin_sclk, pin_cs, pin_dc, pin_rst, pin_bl; /* bl 仅记录，由 brick 自配 PWM */
+    uint16_t width, height;
+    uint8_t  col_offset, row_offset, madctl;
+    bool     invert;
+    bool     little_endian; /* ESP32 原生 uint16 布局用 true（RAMCTL bit3） */
+    int      freq_hz;       /* 80MHz 高刷 / 40MHz 常规 */
+    bool     hw_cs;         /* true = CS 交给 SPI 外设按事务拉低 */
+} eui_port_esp_idf_display_t;
+
+typedef struct {
+    int      i2c_port;
+    int      pin_sda, pin_scl;
+    uint32_t freq;          /* 通常 400000 */
+    uint8_t  addr;          /* SSD1306 常见 0x3C */
+    uint16_t timeout_ms;    /* 单次传输超时，通常 100 */
+} eui_port_esp_idf_i2c_t;
+
+typedef enum {
+    EUI_PORT_DISP_ST7789 = 0,   /* SPI，16bpp FULL（RGB565） */
+    EUI_PORT_DISP_SSD1306,      /* I2C，1bpp（页缓冲由驱动处理） */
+} eui_port_disp_kind_t;
+
+typedef struct {
+    eui_port_disp_kind_t kind;
+    union {
+        eui_port_esp_idf_display_t st7789;
+        struct {
+            eui_port_esp_idf_i2c_t i2c;
+            uint16_t width, height;
+            uint8_t  addr;
+        } ssd1306;
+    };
+} eui_port_esp_idf_panel_t;
+
+typedef struct {
+    int      enc_pin_a, enc_pin_b;   /* < 0 = 不接编码器 */
+    int      btn_pin[4];
+    uint8_t  btn_key[4];             /* 语义键号（如 0=OK 1=BACK），由项目定义 */
+    uint8_t  btn_count;
+    bool     active_low;             /* 上拉接地按键用 true */
+} eui_port_esp_idf_input_t;
+
+typedef struct {
+    eui_port_esp_idf_panel_t   panel;    /* 面板类型 + 引脚/时序 */
+    eui_port_esp_idf_input_t   input;
+    uint16_t fps;                    /* 0 = delay_frame 不做节拍 */
+    uint8_t *mem_pool;               /* 必须 DMA 可达的内部 RAM（SPI DMA 读不了 PSRAM） */
+    size_t   mem_pool_size;
+} eui_port_esp_idf_board_t;
+
+/** 按契约完成装配。失败返回负值（已打印原因），成功返回 0；
+ *  调用后即可 build UI 并进入 eui_tick() 循环。 */
+int  eui_port_esp_idf_board_init(const eui_port_esp_idf_board_t *board);
+
+/** 拆解装配（eui_deinit → driver → transport，反序释放）。 */
+void eui_port_esp_idf_board_deinit(void);
+
+/** 帧节拍：按 eui_get_fps() 与上一帧实际耗时补偿，取代硬编码 vTaskDelay(16)；
+ *  fps == 0 时不做节拍。 */
+void eui_port_esp_idf_delay_frame(void);
+
 #ifdef __cplusplus
 }
 #endif

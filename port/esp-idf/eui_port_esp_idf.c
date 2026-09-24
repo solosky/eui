@@ -467,3 +467,205 @@ void eui_port_esp_idf_encoder_destroy(eui_hal_encoder_t *hal)
     }
     eui_free(hal);
 }
+
+/* === Board bring-up（brick 契约） === */
+
+#include "esp_timer.h"
+#include "eui/eui.h"
+#include "eui/driver/eui_drv_st7789.h"
+#include "eui/driver/eui_drv_ssd1306.h"
+#include "eui/driver/eui_drv_buttons.h"
+#include "eui/driver/eui_drv_encoder_hw.h"
+#include "eui/eui_input_mux.h"
+
+#define EUI_PORT_TAG "eui_port"
+
+static struct {
+    eui_display_drv_t  *display;
+    eui_hal_spi_t      *spi;
+    eui_hal_i2c_t      *i2c;
+    eui_input_drv_t    *encoder;
+    eui_hal_encoder_t  *encoder_hal;
+    eui_input_drv_t    *buttons;
+    eui_hal_gpio_t     *gpio;
+    eui_input_drv_t    *mux;          /* 单输入时等于该子驱动指针（不重复释放） */
+    bool                mux_owned;    /* mux 由本模块创建时才负责销毁 */
+    uint32_t            frame_start_us;
+} g_board;
+
+static eui_drv_buttons_map_t s_btn_map[4];   /* buttons 驱动借用，须常驻 */
+
+static uint32_t port_tick_ms(void)
+{
+    return (uint32_t)(esp_timer_get_time() / 1000);
+}
+
+int eui_port_esp_idf_board_init(const eui_port_esp_idf_board_t *board)
+{
+    if (!board || !board->mem_pool || board->mem_pool_size == 0) {
+        ESP_LOGE(EUI_PORT_TAG, "board_init: mem_pool required");
+        return -1;
+    }
+    size_t canvas = 0;
+    if (board->panel.kind == EUI_PORT_DISP_ST7789) {
+        canvas = (size_t)board->panel.st7789.width * board->panel.st7789.height * 2u;
+        if (canvas > board->mem_pool_size) {
+            ESP_LOGE(EUI_PORT_TAG, "board_init: pool %u < canvas %u (w*h*2)",
+                     (unsigned)board->mem_pool_size, (unsigned)canvas);
+            return -1;
+        }
+        esp_idf_spi_config_t spi_cfg = {
+            .host = (spi_host_device_t)board->panel.st7789.spi_host,
+            .mosi = (gpio_num_t)board->panel.st7789.pin_mosi,
+            .sclk = (gpio_num_t)board->panel.st7789.pin_sclk,
+            .cs   = (gpio_num_t)board->panel.st7789.pin_cs,
+            .dc   = (gpio_num_t)board->panel.st7789.pin_dc,
+            .rst  = (gpio_num_t)board->panel.st7789.pin_rst,
+            .freq = board->panel.st7789.freq_hz,
+            .queue_size = 1,
+            .max_transfer_sz = (int)canvas,      /* 整帧一次事务 */
+            .hw_cs = board->panel.st7789.hw_cs,
+        };
+        g_board.spi = eui_port_esp_idf_spi_create(&spi_cfg);
+        if (!g_board.spi) { ESP_LOGE(EUI_PORT_TAG, "spi create failed"); return -1; }
+
+        eui_drv_st7789_config_t dcfg = {
+            .spi = *g_board.spi,                 /* 驱动按值持有副本；transport 必须活得比驱动久 */
+            .width = board->panel.st7789.width,
+            .height = board->panel.st7789.height,
+            .col_offset = board->panel.st7789.col_offset,
+            .row_offset = board->panel.st7789.row_offset,
+            .madctl = board->panel.st7789.madctl,
+            .invert = board->panel.st7789.invert,
+            .little_endian = board->panel.st7789.little_endian,
+        };
+        g_board.display = eui_drv_st7789_create(&dcfg);
+    } else {
+        const uint16_t w = board->panel.ssd1306.width;
+        const uint16_t h = board->panel.ssd1306.height;
+        canvas = (size_t)w * h / 8u;             /* 1bpp */
+        if (canvas > board->mem_pool_size) {
+            ESP_LOGE(EUI_PORT_TAG, "board_init: pool %u < canvas %u (w*h/8)",
+                     (unsigned)board->mem_pool_size, (unsigned)canvas);
+            return -1;
+        }
+        esp_idf_i2c_config_t i2c_cfg = {
+            .port = (i2c_port_t)board->panel.ssd1306.i2c.i2c_port,
+            .sda  = (gpio_num_t)board->panel.ssd1306.i2c.pin_sda,
+            .scl  = (gpio_num_t)board->panel.ssd1306.i2c.pin_scl,
+            .freq = board->panel.ssd1306.i2c.freq,
+            .addr = board->panel.ssd1306.addr,
+            .timeout_ms = board->panel.ssd1306.i2c.timeout_ms,
+        };
+        g_board.i2c = eui_port_esp_idf_i2c_create(&i2c_cfg);
+        if (!g_board.i2c) { ESP_LOGE(EUI_PORT_TAG, "i2c create failed"); return -1; }
+
+        eui_drv_ssd1306_config_t dcfg = {
+            .i2c = *g_board.i2c,
+            .width = w,
+            .height = h,
+            .i2c_addr = board->panel.ssd1306.addr,
+        };
+        g_board.display = eui_drv_ssd1306_create(&dcfg);
+    }
+    if (!g_board.display) { ESP_LOGE(EUI_PORT_TAG, "display create failed"); return -1; }
+
+    /* 输入：编码器（可选）+ 按键（可选），多路经 mux 合成 */
+    eui_input_drv_t *subs[2] = { NULL, NULL };
+    int sub_count = 0;
+    if (board->input.enc_pin_a >= 0 && board->input.enc_pin_b >= 0) {
+        g_board.encoder_hal = eui_port_esp_idf_encoder_create(
+            board->input.enc_pin_a, board->input.enc_pin_b, true);
+        if (!g_board.encoder_hal) { ESP_LOGE(EUI_PORT_TAG, "pcnt create failed"); return -1; }
+        eui_drv_encoder_hw_config_t ecfg = { .hw = *g_board.encoder_hal };
+        g_board.encoder = eui_drv_encoder_hw_create(&ecfg);
+        if (!g_board.encoder) { ESP_LOGE(EUI_PORT_TAG, "encoder drv failed"); return -1; }
+        subs[sub_count++] = g_board.encoder;
+    }
+    if (board->input.btn_count > 0) {
+        uint32_t mask = 0;
+        for (uint8_t i = 0; i < board->input.btn_count && i < 4; i++) {
+            s_btn_map[i].pin_id = (uint8_t)board->input.btn_pin[i];
+            s_btn_map[i].key    = board->input.btn_key[i];
+            mask |= 1u << board->input.btn_pin[i];
+        }
+        esp_idf_gpio_config_t gcfg = {
+            .pin_mask = mask,
+            .pull_up = true,
+            .active_low = board->input.active_low,
+        };
+        g_board.gpio = eui_port_esp_idf_gpio_create(&gcfg);
+        if (!g_board.gpio) { ESP_LOGE(EUI_PORT_TAG, "gpio create failed"); return -1; }
+        eui_drv_buttons_config_t bcfg = {
+            .gpio = *g_board.gpio, .map = s_btn_map, .count = board->input.btn_count,
+        };
+        g_board.buttons = eui_drv_buttons_create(&bcfg);
+        if (!g_board.buttons) { ESP_LOGE(EUI_PORT_TAG, "buttons drv failed"); return -1; }
+        subs[sub_count++] = g_board.buttons;
+    }
+    if (sub_count == 0) { ESP_LOGE(EUI_PORT_TAG, "no input configured"); return -1; }
+    if (sub_count == 1) {
+        g_board.mux = subs[0];
+        g_board.mux_owned = false;
+    } else {
+        eui_input_mux_config_t mcfg = { .drivers = subs, .count = (uint8_t)sub_count };
+        g_board.mux = eui_input_mux_create(&mcfg);
+        g_board.mux_owned = (g_board.mux != NULL);
+        if (!g_board.mux) { ESP_LOGE(EUI_PORT_TAG, "input mux failed"); return -1; }
+    }
+
+    eui_config_t ecfg = {
+        .mem_pool_buffer = board->mem_pool,
+        .mem_pool_size = board->mem_pool_size,
+        .display = g_board.display,
+        .input = g_board.mux,
+        .fps_target = board->fps,
+    };
+    if (eui_init(&ecfg) != 0) {                  /* 返回码不能丢 */
+        ESP_LOGE(EUI_PORT_TAG, "eui_init failed (pool %u bytes)", (unsigned)board->mem_pool_size);
+        return -1;
+    }
+    eui_set_tick_callback(port_tick_ms);
+    if (g_board.display->init(g_board.display->user_data) != 0) {
+        ESP_LOGE(EUI_PORT_TAG, "display init failed");
+        return -1;
+    }
+
+    eui_allocator_stats_t st = { 0 };
+    eui_allocator_get_stats(&st);
+    ESP_LOGI(EUI_PORT_TAG, "bringup ok: pool %u used %u peak %u; canvas needs %u",
+             (unsigned)st.total, (unsigned)st.used, (unsigned)st.peak, (unsigned)canvas);
+    g_board.frame_start_us = (uint32_t)esp_timer_get_time();
+    return 0;
+}
+
+void eui_port_esp_idf_delay_frame(void)
+{
+    uint16_t fps = eui_get_fps();
+    if (fps == 0) return;
+    uint32_t budget_us = 1000000u / fps;
+    uint32_t elapsed = (uint32_t)esp_timer_get_time() - g_board.frame_start_us;
+    if (elapsed < budget_us) {
+        /* 补不上就下一帧多休，不做追帧（追帧会让动画时间轴抖动） */
+        uint32_t remain = budget_us - elapsed;
+        vTaskDelay(pdMS_TO_TICKS(remain / 1000) + 1);
+    }
+    g_board.frame_start_us = (uint32_t)esp_timer_get_time();
+}
+
+void eui_port_esp_idf_board_deinit(void)
+{
+    eui_deinit();
+    if (g_board.mux_owned && g_board.mux) eui_input_mux_destroy(g_board.mux);
+    if (g_board.buttons) eui_drv_buttons_destroy(g_board.buttons);
+    if (g_board.encoder) eui_drv_encoder_hw_destroy(g_board.encoder);
+    if (g_board.encoder_hal) eui_port_esp_idf_encoder_destroy(g_board.encoder_hal);
+    if (g_board.gpio) eui_port_esp_idf_gpio_destroy(g_board.gpio);
+    if (g_board.display) {
+        if (g_board.spi) eui_drv_st7789_destroy(g_board.display);
+        else             eui_drv_ssd1306_destroy(g_board.display);
+    }
+    if (g_board.spi) eui_port_esp_idf_spi_destroy(g_board.spi);
+    if (g_board.i2c) eui_port_esp_idf_i2c_destroy(g_board.i2c);
+    memset(&g_board, 0, sizeof(g_board));
+}
