@@ -4,9 +4,23 @@
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
 #include "esp_rom_gpio.h"
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
+
+/* 传输接口是 void 返回，错误只能记在侧通道：brick 可在关键路径后查询 */
+static int g_last_error;
+
+static void port_note_result(esp_err_t err, const char *what)
+{
+    g_last_error = (int)err;
+    if (err != ESP_OK) {
+        ESP_LOGE("eui_port", "%s failed: %s", what, esp_err_to_name(err));
+    }
+}
+
+int eui_port_esp_idf_last_error(void) { return g_last_error; }
 
 /* === I2C Implementation === */
 
@@ -112,6 +126,9 @@ typedef struct {
     gpio_num_t          dc_pin;
     gpio_num_t          cs_pin;
     gpio_num_t          rst_pin;
+    bool                cs_owned_by_hw;  /* CS 由 SPI 外设按事务控制时，HAL 不再插手 */
+    spi_host_device_t   host;
+    bool                bus_initialized; /* 总线所有权在 transport，destroy 时归还 */
 } spi_priv_t;
 
 static void esp_spi_write_cmd(uint8_t cmd, void *user_data)
@@ -123,7 +140,7 @@ static void esp_spi_write_cmd(uint8_t cmd, void *user_data)
         .length = 8,
         .tx_buffer = &cmd,
     };
-    spi_device_polling_transmit(priv->handle, &trans);
+    port_note_result(spi_device_polling_transmit(priv->handle, &trans), "spi write_cmd");
 }
 
 static void esp_spi_write_data(const uint8_t *buf, uint32_t len, void *user_data)
@@ -135,7 +152,10 @@ static void esp_spi_write_data(const uint8_t *buf, uint32_t len, void *user_data
         .length = len * 8,
         .tx_buffer = buf,
     };
-    spi_device_polling_transmit(priv->handle, &trans);
+    /* 整帧 115200 字节也走这里：DMA 开启且 max_transfer_sz 覆盖整帧时
+     * IDF 内部按 DMA 缓冲分片，整条事务期间 CS 保持拉低（一次 RAMWR
+     * 连续写的要求），返回即发送完成。 */
+    port_note_result(spi_device_polling_transmit(priv->handle, &trans), "spi write_data");
 }
 
 static void esp_spi_read_data(uint8_t *buf, uint32_t len, void *user_data)
@@ -147,7 +167,7 @@ static void esp_spi_read_data(uint8_t *buf, uint32_t len, void *user_data)
         .length = len * 8,
         .rx_buffer = buf,
     };
-    spi_device_polling_transmit(priv->handle, &trans);
+    port_note_result(spi_device_polling_transmit(priv->handle, &trans), "spi read_data");
 }
 
 static void esp_spi_set_dc(bool data_mode, void *user_data)
@@ -159,6 +179,9 @@ static void esp_spi_set_dc(bool data_mode, void *user_data)
 static void esp_spi_set_cs(bool active, void *user_data)
 {
     spi_priv_t *priv = (spi_priv_t *)user_data;
+    /* 硬件 CS 模式下该引脚由 SPI 外设按事务拉低/释放，HAL 层不再插手
+     * （ST7789 驱动只在 init 里调一次 set_cs(false)）。 */
+    if (priv->cs_owned_by_hw) return;
     if (priv->cs_pin != GPIO_NUM_NC) {
         gpio_set_level(priv->cs_pin, active ? 0 : 1);
     }
@@ -186,25 +209,35 @@ eui_hal_spi_t* eui_port_esp_idf_spi_create(const esp_idf_spi_config_t *cfg)
         .sclk_io_num = cfg->sclk,
         .quadwp_io_num = GPIO_NUM_NC,
         .quadhd_io_num = GPIO_NUM_NC,
-        .max_transfer_sz = 4092,
+        /* 整帧刷屏的关键：0 表示沿用安全默认 4092，整帧（240x240x16bpp
+         * = 115200 字节）必须显式给出。 */
+        .max_transfer_sz = cfg->max_transfer_sz > 0 ? cfg->max_transfer_sz : 4092,
     };
 
-    if (spi_bus_initialize(cfg->host, &bus_cfg, SPI_DMA_DISABLED) != ESP_OK) return NULL;
+    /* DMA 必须开：SPI_DMA_DISABLED 下 IDF 把单次事务限制在 64 字节
+     * （SPI_LL_CPU_MAX_BIT_LEN = 512bit），一帧被切成无数段且曾因返回码
+     * 被忽略而表现为「帧静默丢失」。 */
+    if (spi_bus_initialize(cfg->host, &bus_cfg, SPI_DMA_CH_AUTO) != ESP_OK) return NULL;
 
     spi_device_interface_config_t dev_cfg = {
         .clock_speed_hz = cfg->freq,
         .mode = 0,
-        .spics_io_num = GPIO_NUM_NC,
+        /* hw_cs：外设持有 CS 并在整条事务期间保持拉低 */
+        .spics_io_num = cfg->hw_cs ? cfg->cs : GPIO_NUM_NC,
         .queue_size = cfg->queue_size,
     };
 
     spi_device_handle_t handle;
-    if (spi_bus_add_device(cfg->host, &dev_cfg, &handle) != ESP_OK) return NULL;
+    if (spi_bus_add_device(cfg->host, &dev_cfg, &handle) != ESP_OK) {
+        spi_bus_free(cfg->host);
+        return NULL;
+    }
 
     if (cfg->dc != GPIO_NUM_NC) {
         gpio_set_direction(cfg->dc, GPIO_MODE_OUTPUT);
     }
-    if (cfg->cs != GPIO_NUM_NC) {
+    if (!cfg->hw_cs && cfg->cs != GPIO_NUM_NC) {
+        /* 软件 CS 才由这里配置成输出；硬件 CS 的引脚归 SPI 外设 */
         gpio_set_direction(cfg->cs, GPIO_MODE_OUTPUT);
         gpio_set_level(cfg->cs, 1);
     }
@@ -216,6 +249,7 @@ eui_hal_spi_t* eui_port_esp_idf_spi_create(const esp_idf_spi_config_t *cfg)
     spi_priv_t *priv = eui_malloc(sizeof(spi_priv_t));
     if (!priv) {
         spi_bus_remove_device(handle);
+        spi_bus_free(cfg->host);
         return NULL;
     }
     memset(priv, 0, sizeof(*priv));
@@ -223,10 +257,14 @@ eui_hal_spi_t* eui_port_esp_idf_spi_create(const esp_idf_spi_config_t *cfg)
     priv->dc_pin = cfg->dc;
     priv->cs_pin = cfg->cs;
     priv->rst_pin = cfg->rst;
+    priv->cs_owned_by_hw = cfg->hw_cs;
+    priv->host = cfg->host;
+    priv->bus_initialized = true;
 
     eui_hal_spi_t *hal = eui_malloc(sizeof(eui_hal_spi_t));
     if (!hal) {
         spi_bus_remove_device(handle);
+        spi_bus_free(cfg->host);
         eui_free(priv);
         return NULL;
     }
@@ -249,7 +287,9 @@ void eui_port_esp_idf_spi_destroy(eui_hal_spi_t *hal)
 
     spi_priv_t *priv = (spi_priv_t *)hal->user_data;
     if (priv) {
-        spi_bus_remove_device(priv->handle);
+        if (priv->handle) spi_bus_remove_device(priv->handle);
+        /* 不归还总线会让同一 host 再次 create 失败 */
+        if (priv->bus_initialized) spi_bus_free(priv->host);
         eui_free(priv);
     }
     eui_free(hal);

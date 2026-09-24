@@ -32,6 +32,11 @@ typedef struct {
     gpio_num_t        rst;
     int               freq;
     int               queue_size;
+    int               max_transfer_sz; /**< 单次传输上限（字节）；<=0 = IDF 默认 4092。
+                                            整帧刷屏需 >= width*height*2 */
+    bool              hw_cs;           /**< true = CS 交给 SPI 外设按事务拉低（整条
+                                            事务保持选中，一次 RAMWR 连续写的要求）；
+                                            false = 由 HAL 的 set_cs 手工控制 */
 } esp_idf_spi_config_t;
 
 typedef struct {
@@ -47,6 +52,10 @@ void eui_port_esp_idf_spi_destroy(eui_hal_spi_t *hal);
 
 eui_hal_gpio_t* eui_port_esp_idf_gpio_create(const esp_idf_gpio_config_t *cfg);
 void eui_port_esp_idf_gpio_destroy(eui_hal_gpio_t *hal);
+
+/** 最近一次 SPI/I2C 传输的错误码（0 = 无错）。传输接口是 void 返回，
+ *  brick 可在关键路径（如首帧提交）后查询本值做自诊断。 */
+int eui_port_esp_idf_last_error(void);
 
 #ifdef __cplusplus
 }
