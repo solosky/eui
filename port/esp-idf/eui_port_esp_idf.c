@@ -22,7 +22,11 @@ static void port_note_result(esp_err_t err, const char *what)
 
 int eui_port_esp_idf_last_error(void) { return g_last_error; }
 
-/* === I2C Implementation === */
+/* === I2C Implementation ===
+ * 仍用 legacy 驱动（i2c_param_config + i2c_cmd_link）：IDF 5.1.5 还没有
+ * i2c_master 新 API（i2c_new_master_bus/i2c_master_transmit 为 5.2 引入），
+ * 而 VAMeter 的 arduino-esp32 组件硬性要求 5.1.x。工程升 IDF >= 5.2 时
+ * 迁移到 i2c_master 并删除本段（legacy 驱动 6.x 移除）。 */
 
 typedef struct {
     i2c_port_t  port;
