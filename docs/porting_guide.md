@@ -356,3 +356,23 @@ eui_input_drv_t *input = eui_drv_buttons_create(&btn_cfg);
 | XPT2046 触摸屏 | `eui/driver/eui_drv_xpt2046.h` | Input |
 
 传输层定义见 `eui/hal/eui_hal_types.h`。
+
+## ESP-IDF 目标补充
+
+在 IDF 上跑 eui 与宿主 CMake 的差异集中在这几条（完整 brick 契约见
+`port/esp-idf/README.md`，可照抄工程见 `examples/esp-idf/st7789_240x240/`）：
+
+- **帧节拍归平台**：`eui_init()` 只存 `fps_target`，从不睡眠。固件主循环
+  用 `eui_port_esp_idf_delay_frame()`（按 fps 与上帧实际耗时补偿）或自己
+  `vTaskDelay`；`fps_target = 0` 表示不节拍。
+- **池放置与容量下限**：池必须 DMA 可达的内部 RAM（SPI DMA 读不了 PSRAM）；
+  16bpp 画布占 w*h*2 字节。bringup 失败时会打印需要的字节数。
+- **配置走 Kconfig**：`CONFIG_EUI_*`（Component config → EUI settings）经
+  `port/esp-idf/include/eui/eui_config.h` 映射成 `EUI_*`；默认值与
+  standalone 的 CMake 变量逐项一致。
+- **`display->init()` 归属**：core 不会调用它。走 `board_init` 时已代劳；
+  手搓装配必须自己调。
+- **多输入用 mux**：`eui_init()` 只收一个 input driver；编码器 + 按键用
+  `eui_input_mux` 合成。
+- **编码器优先用绝对计数 HAL**：`eui_hal_encoder_t`（PCNT）不怕快速旋转
+  丢步；GPIO 状态表驱动只适合低速场合。

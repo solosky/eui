@@ -4,6 +4,13 @@
 **日期**: 2026-05-22  
 **状态**: 设计中
 
+> **状态（2026-09-24 更新）**：本文档已被取代。实际实现与本设计有多处偏差
+> （I2C 暂用 legacy 驱动——IDF 5.1.5 无 i2c_master API、示例路径不同、
+> `port/esp-idf/eui_port_bootstrap.c` 已删除改为库侧
+> `eui_port_esp_idf_board_init()` bringup、配置改由 Kconfig 驱动、显示路径
+> 明确不依赖 esp_lcd）。当前权威设计见 VAMeter 仓库
+> `docs/superpowers/specs/2026-09-24-eui-esp-idf-port-rework-design.md`。
+
 ## 1. 概述
 
 为 EUI 框架移植第一个嵌入式平台——ESP-IDF（Espressif IoT Development Framework）。通过封装 ESP-IDF 的 I2C、SPI、GPIO 驱动 API，补齐 `eui_hal_i2c_t`、`eui_hal_spi_t`、`eui_hal_gpio_t` 三个传输层回调，使得内置的 SSD1306、ST7735 等芯片驱动可直接在 ESP32 系列芯片上运行。
