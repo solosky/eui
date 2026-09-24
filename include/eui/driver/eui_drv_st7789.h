@@ -14,7 +14,7 @@ extern "C" {
  *
  * 初始化序列对齐 LovyanGFX Panel_ST7789 的默认行为（参考 VAMeter
  * 240x240 真机配置：4-wire SPI、invert=true）：SWRESET → SLPOUT →
- * COLMOD 16bit → MADCTL → INVON/INVOFF → NORON → DISPON。
+ * COLMOD 16bit → MADCTL → RAMCTL → INVON/INVOFF → NORON → DISPON。
  */
 typedef struct {
     eui_hal_spi_t spi;
@@ -24,6 +24,10 @@ typedef struct {
     uint8_t       row_offset; /**< GRAM 行偏移（240x240 为 0；135x240 类为 53） */
     uint8_t       madctl;     /**< MADCTL 值（方向/RGB 顺序），0x00 = 竖屏 RGB */
     bool          invert;     /**< 多数 ST7789 面板需要 INVON（ips 屏） */
+    bool          little_endian; /**< RGB565 字节序落在面板 RAMCTL 的 bit3：
+                                  *   false = MSB 先（面板复位默认）；
+                                  *   true  = LSB 先（小端 MCU 直发原生
+                                  *   uint16 布局，如 ESP32，无需软件交换） */
 } eui_drv_st7789_config_t;
 
 eui_display_drv_t* eui_drv_st7789_create(const eui_drv_st7789_config_t *cfg);

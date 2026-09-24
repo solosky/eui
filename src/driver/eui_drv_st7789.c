@@ -11,6 +11,7 @@ typedef struct {
     uint8_t           row_offset;
     uint8_t           madctl;
     bool              invert;
+    bool              little_endian;
 } st7789_t;
 
 #define ST7789_NOP     0x00
@@ -24,6 +25,7 @@ typedef struct {
 #define ST7789_RASET   0x2B
 #define ST7789_RAMWR   0x2C
 #define ST7789_MADCTL  0x36
+#define ST7789_RAMCTL  0xB0
 #define ST7789_COLMOD  0x3A
 
 static void st7789_write_cmd(st7789_t *d, uint8_t cmd) {
@@ -69,6 +71,13 @@ static int st7789_init(void *ud) {
 
     st7789_write_cmd(d, ST7789_MADCTL);
     { uint8_t v = d->madctl; st7789_write_data(d, &v, 1); }
+
+    /* RAMCTL(0xB0)：RGB565 字节序交给面板，CPU 侧零成本（不需要软件交换
+     * 或 bounce buffer）。bit3 = 1 为 LSB 先。取值参考 IDF esp_lcd 的
+     * ST7789 面板驱动（LCD_RGB_DATA_ENDIAN_BIG/LITTLE 语义）。 */
+    st7789_write_cmd(d, ST7789_RAMCTL);
+    { uint8_t v[2] = { 0x00, (uint8_t)(0xF0 | (d->little_endian ? (1u << 3) : 0u)) };
+      st7789_write_data(d, v, 2); }
 
     { uint8_t v = d->invert ? ST7789_INVON : ST7789_INVOFF;
       st7789_write_cmd(d, v); }
@@ -122,6 +131,7 @@ eui_display_drv_t* eui_drv_st7789_create(const eui_drv_st7789_config_t *cfg) {
     d->row_offset = cfg->row_offset;
     d->madctl = cfg->madctl;
     d->invert = cfg->invert;
+    d->little_endian = cfg->little_endian;
     d->base.caps.width = cfg->width;
     d->base.caps.height = cfg->height;
     d->base.caps.color_depth = 16;

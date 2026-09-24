@@ -123,22 +123,37 @@ static void test_st7735_create_and_caps(void) {
 /* ST7789：捕获命令字节，验证初始化序列与 invert 语义 */
 static uint8_t test_st7789_cmds[32];
 static int test_st7789_cmd_count;
+static uint8_t test_st7789_cur_cmd;   /* mock_write_data 按它归档载荷 */
 static void mock_st7789_write_cmd(uint8_t cmd, void *ud) {
     (void)ud;
+    test_st7789_cur_cmd = cmd;
     if (test_st7789_cmd_count < (int)sizeof(test_st7789_cmds))
         test_st7789_cmds[test_st7789_cmd_count++] = cmd;
 }
 
+/* RAMCTL 需要看数据字节：init 末尾的 CASET/RASET 各发 4 字节会覆盖
+ * "最后一次 write_data"，所以按当前命令归档（只留 RAMCTL 的载荷） */
+static uint8_t test_st7789_ramctl_data[2];
+static int test_st7789_ramctl_len;
+static void mock_st7789_write_data(const uint8_t *buf, uint32_t len, void *ud) {
+    (void)ud;
+    if (test_st7789_cur_cmd == 0xB0) {
+        test_st7789_ramctl_len =
+            (int)(len < sizeof(test_st7789_ramctl_data) ? len : sizeof(test_st7789_ramctl_data));
+        memcpy(test_st7789_ramctl_data, buf, (size_t)test_st7789_ramctl_len);
+    }
+}
+
 static void test_st7789_create_and_init_sequence(void) {
-    TEST("ST7789 create + init sequence (invert=true) and set_invert toggle");
+    TEST("ST7789 create + init sequence (invert=true, RAMCTL) and set_invert toggle");
     test_st7789_cmd_count = 0;
     eui_drv_st7789_config_t cfg = {
-        .spi = { .write_cmd = mock_st7789_write_cmd, .write_data = mock_spi_write_data,
+        .spi = { .write_cmd = mock_st7789_write_cmd, .write_data = mock_st7789_write_data,
                  .read_data = mock_spi_read_data, .set_dc = mock_spi_set_dc,
                  .set_cs = mock_spi_set_cs, .set_rst = mock_spi_set_rst,
                  .delay_ms = mock_spi_delay_ms, .user_data = NULL },
         .width = 240, .height = 240, .col_offset = 0, .row_offset = 0,
-        .madctl = 0x00, .invert = true,
+        .madctl = 0x00, .invert = true, .little_endian = false,
     };
     eui_display_drv_t *hal = eui_drv_st7789_create(&cfg);
     if (!hal) FAIL("create returned NULL");
@@ -148,12 +163,18 @@ static void test_st7789_create_and_init_sequence(void) {
     if (hal->caps.buffer_mode != EUI_BUFFER_FULL) FAIL("buffer mode mismatch");
 
     if (hal->init(hal->user_data) != 0) FAIL("init returned error");
-    /* SWRESET SLPOUT COLMOD MADCTL INVON NORON DISPON CASET RASET */
-    static const uint8_t want[] = { 0x01, 0x11, 0x3A, 0x36, 0x21, 0x13, 0x29, 0x2A, 0x2B };
+    /* SWRESET SLPOUT COLMOD MADCTL RAMCTL INVON NORON DISPON CASET RASET */
+    static const uint8_t want[] = { 0x01, 0x11, 0x3A, 0x36, 0xB0, 0x21, 0x13, 0x29, 0x2A, 0x2B };
     if (test_st7789_cmd_count != (int)(sizeof(want))) FAIL("init command count mismatch");
     for (unsigned i = 0; i < sizeof(want); i++) {
         if (test_st7789_cmds[i] != want[i]) FAIL("init command sequence mismatch");
     }
+    /* RAMCTL 载荷：{0x00, 0xF0 | (little_endian << 3)}；init 的最后一次
+     * write_data 就是它（RASET 在其后但走 set_addr_window 之外不会触发
+     * write_data——init 末尾只有地址窗口设置，为稳妥在 set_invert 前断言） */
+    if (test_st7789_ramctl_len != 2) FAIL("RAMCTL payload length != 2");
+    if (test_st7789_ramctl_data[0] != 0x00) FAIL("RAMCTL val1 != 0x00");
+    if (test_st7789_ramctl_data[1] != 0xF0) FAIL("RAMCTL big-endian val2 != 0xF0");
 
     hal->set_invert(false, hal->user_data);
     if (test_st7789_cmds[test_st7789_cmd_count - 1] != 0x20) FAIL("set_invert(false) != INVOFF");
@@ -162,6 +183,25 @@ static void test_st7789_create_and_init_sequence(void) {
 
     eui_drv_st7789_destroy(hal);
     eui_drv_st7789_destroy(NULL);   /* NULL 安全 */
+    PASS();
+}
+
+static void test_st7789_little_endian(void) {
+    TEST("ST7789 little_endian=true 写 RAMCTL 0xF8");
+    test_st7789_cmd_count = 0;
+    eui_drv_st7789_config_t cfg = {
+        .spi = { .write_cmd = mock_st7789_write_cmd, .write_data = mock_st7789_write_data,
+                 .read_data = mock_spi_read_data, .set_dc = mock_spi_set_dc,
+                 .set_cs = mock_spi_set_cs, .set_rst = mock_spi_set_rst,
+                 .delay_ms = mock_spi_delay_ms, .user_data = NULL },
+        .width = 240, .height = 240, .col_offset = 0, .row_offset = 0,
+        .madctl = 0x00, .invert = true, .little_endian = true,
+    };
+    eui_display_drv_t *hal = eui_drv_st7789_create(&cfg);
+    if (!hal) FAIL("create returned NULL");
+    if (hal->init(hal->user_data) != 0) FAIL("init returned error");
+    if (test_st7789_ramctl_data[1] != 0xF8) FAIL("RAMCTL little-endian val2 != 0xF8 (0xF0|1<<3)");
+    eui_drv_st7789_destroy(hal);
     PASS();
 }
 
@@ -376,6 +416,7 @@ int main(void) {
 
     printf("--- ST7789 ---\n");
     test_st7789_create_and_init_sequence();
+    test_st7789_little_endian();
 
     printf("--- ILI9341 ---\n");
     test_ili9341_create_and_caps();
