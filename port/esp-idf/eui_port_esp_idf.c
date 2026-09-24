@@ -299,13 +299,24 @@ void eui_port_esp_idf_spi_destroy(eui_hal_spi_t *hal)
 
 typedef struct {
     uint32_t pin_mask;
+    bool     active_low;   /* 低电平视为按下（上拉接地按键） */
 } gpio_priv_t;
 
 static bool esp_gpio_read_pin(uint8_t pin_id, void *user_data)
 {
     gpio_priv_t *priv = (gpio_priv_t *)user_data;
-    if (!((((uint32_t)1) << pin_id) & priv->pin_mask)) return false;
-    return gpio_get_level((gpio_num_t)pin_id) != 0;
+    if (!((((uint32_t)1) << pin_id) & priv->pin_mask)) {
+        /* 曾经静默返回 false——配错掩码时整条输入链路失效却毫无提示 */
+        static bool warned;
+        if (!warned) {
+            warned = true;
+            ESP_LOGW("eui_port", "read_pin(%u) not in pin_mask 0x%08x; input silently dead",
+                     (unsigned)pin_id, (unsigned)priv->pin_mask);
+        }
+        return false;
+    }
+    bool level = gpio_get_level((gpio_num_t)pin_id) != 0;
+    return priv->active_low ? !level : level;
 }
 
 static void esp_gpio_delay_us(uint32_t us, void *user_data)
@@ -320,13 +331,9 @@ eui_hal_gpio_t* eui_port_esp_idf_gpio_create(const esp_idf_gpio_config_t *cfg)
         .pin_bit_mask = cfg->pin_mask,
         .mode = GPIO_MODE_INPUT,
     };
-    if (cfg->pull_up) {
-        io_cfg.pull_up_en = GPIO_PULLUP_ENABLE;
-        io_cfg.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    } else {
-        io_cfg.pull_up_en = GPIO_PULLUP_DISABLE;
-        io_cfg.pull_down_en = GPIO_PULLDOWN_DISABLE;
-    }
+    io_cfg.pull_up_en = (cfg->pull_up && !cfg->pull_down) ? GPIO_PULLUP_ENABLE
+                                                          : GPIO_PULLUP_DISABLE;
+    io_cfg.pull_down_en = cfg->pull_down ? GPIO_PULLDOWN_ENABLE : GPIO_PULLDOWN_DISABLE;
     io_cfg.intr_type = GPIO_INTR_DISABLE;
 
     if (gpio_config(&io_cfg) != ESP_OK) return NULL;
@@ -335,6 +342,7 @@ eui_hal_gpio_t* eui_port_esp_idf_gpio_create(const esp_idf_gpio_config_t *cfg)
     if (!priv) return NULL;
     memset(priv, 0, sizeof(*priv));
     priv->pin_mask = cfg->pin_mask;
+    priv->active_low = cfg->active_low;
 
     eui_hal_gpio_t *hal = eui_malloc(sizeof(eui_hal_gpio_t));
     if (!hal) {

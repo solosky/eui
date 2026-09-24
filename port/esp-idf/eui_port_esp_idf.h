@@ -42,6 +42,8 @@ typedef struct {
 typedef struct {
     uint32_t pin_mask;
     bool     pull_up;
+    bool     pull_down;    /**< 与 pull_up 同时为 true 时下拉优先（掩码内全部生效） */
+    bool     active_low;   /**< true = 低电平视为按下（上拉接地按键，如 VAMeter） */
 } esp_idf_gpio_config_t;
 
 eui_hal_i2c_t* eui_port_esp_idf_i2c_create(const esp_idf_i2c_config_t *cfg);
