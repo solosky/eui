@@ -2,4 +2,5 @@ build/
 build_default/
 build_st7306/
 build_output/
-sdkconfig*
+sdkconfig
+sdkconfig.old

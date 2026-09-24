@@ -1,0 +1,3 @@
+# VAMeter 侧要求 1000Hz tick（arduino-esp32 硬性要求，见 platforms/vameter/sdkconfig）。
+# 同时它是任务 3 静态断言的判别依据：假配置头写死 100，真配置才是 1000。
+CONFIG_FREERTOS_HZ=1000
