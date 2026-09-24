@@ -67,8 +67,8 @@ const eui_selector_option_t *eui_selector_get(const eui_selector_t *s, int idx);
 const eui_selector_option_t *eui_selector_get_selected(const eui_selector_t *s);
 void eui_selector_go_next(eui_selector_t *s);
 void eui_selector_go_last(eui_selector_t *s);
-void eui_selector_move_to(eui_selector_t *s, int idx);
-void eui_selector_jump_to(eui_selector_t *s, int idx);
+void eui_selector_glide_to(eui_selector_t *s, int idx);
+void eui_selector_snap_to(eui_selector_t *s, int idx);
 /** @brief 挤压到关键帧 @p kf（按下态）；release 后回弹选中项，落位触发 on_click。 */
 void eui_selector_press(eui_selector_t *s, const eui_selector_option_t *kf);
 void eui_selector_release(eui_selector_t *s);

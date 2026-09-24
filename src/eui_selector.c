@@ -57,29 +57,29 @@ void eui_selector_go_last(eui_selector_t *s)
     if (s->on_go_last) s->on_go_last(s);
 }
 
-void eui_selector_move_to(eui_selector_t *s, int idx)
+void eui_selector_glide_to(eui_selector_t *s, int idx)
 {
     if (idx < 0 || idx >= s->option_count) return;
     s->selected_index = idx;
     const eui_selector_option_t *o = s->options[idx];
-    mc_transition2d_move_to(&s->selector_position, o->x, o->y);
-    mc_transition2d_move_to(&s->selector_shape, o->w, o->h);
+    mc_transition2d_glide_to(&s->selector_position, o->x, o->y);
+    mc_transition2d_glide_to(&s->selector_shape, o->w, o->h);
 }
 
-void eui_selector_jump_to(eui_selector_t *s, int idx)
+void eui_selector_snap_to(eui_selector_t *s, int idx)
 {
     if (idx < 0 || idx >= s->option_count) return;
     s->selected_index = idx;
     const eui_selector_option_t *o = s->options[idx];
-    mc_transition2d_jump_to(&s->selector_position, o->x, o->y);
-    mc_transition2d_jump_to(&s->selector_shape, o->w, o->h);
+    mc_transition2d_snap_to(&s->selector_position, o->x, o->y);
+    mc_transition2d_snap_to(&s->selector_shape, o->w, o->h);
 }
 
 void eui_selector_press(eui_selector_t *s, const eui_selector_option_t *kf)
 {
     s->is_pressing = true;
-    mc_transition2d_move_to(&s->selector_position, kf->x, kf->y);
-    mc_transition2d_move_to(&s->selector_shape, kf->w, kf->h);
+    mc_transition2d_glide_to(&s->selector_position, kf->x, kf->y);
+    mc_transition2d_glide_to(&s->selector_shape, kf->w, kf->h);
 }
 
 void eui_selector_release(eui_selector_t *s)
@@ -94,8 +94,8 @@ void eui_selector_open(eui_selector_t *s, const eui_selector_option_t *kf)
 {
     s->is_opening = true;
     s->was_opened = true;
-    mc_transition2d_move_to(&s->selector_position, kf->x, kf->y);
-    mc_transition2d_move_to(&s->selector_shape, kf->w, kf->h);
+    mc_transition2d_glide_to(&s->selector_position, kf->x, kf->y);
+    mc_transition2d_glide_to(&s->selector_shape, kf->w, kf->h);
 }
 
 void eui_selector_close(eui_selector_t *s)
@@ -117,8 +117,8 @@ void eui_selector_update(eui_selector_t *s, uint32_t now_ms)
         s->is_changed = false;
         const eui_selector_option_t *o = eui_selector_get_selected(s);
         if (o) {
-            mc_transition2d_move_to(&s->selector_position, o->x, o->y);
-            mc_transition2d_move_to(&s->selector_shape, o->w, o->h);
+            mc_transition2d_glide_to(&s->selector_position, o->x, o->y);
+            mc_transition2d_glide_to(&s->selector_shape, o->w, o->h);
         }
         if (s->on_update_camera_keyframe) s->on_update_camera_keyframe(s);
     }

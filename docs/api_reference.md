@@ -615,7 +615,7 @@ eui_selector_add_option(&sel, &opts[1]);
 sel.on_read_input = my_read_input;              /* 20ms 节流：在此喂输入、go_next/go_last */
 sel.on_click = my_click;                        /* release 回弹落位后触发一次 */
 sel.on_open_end = my_open_end;                  /* open 全屏动画落位后触发一次 */
-sel.on_update_camera_keyframe = my_camera_kf;   /* 选中项变化时：在此 move_to 相机目标 */
+sel.on_update_camera_keyframe = my_camera_kf;   /* 选中项变化时：在此 glide_to 相机目标 */
 
 /* 帧驱动（View 绘制回调内） */
 eui_selector_update(&sel, now_ms);
