@@ -73,6 +73,7 @@ eui_add_test(test_config_mapping config/test_config_mapping.c)
 
 # ---- 输入多路合成 ----
 eui_add_test(test_input_mux      input/test_input_mux.c)
+eui_add_test(test_encoder_hw     drivers/test_encoder_hw.c)
 
 # ---- u8g2 reference comparison tests ----
 set(U8G2_DIR "${CMAKE_SOURCE_DIR}/../u8g2" CACHE PATH "u8g2 source directory")

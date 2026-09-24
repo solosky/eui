@@ -59,6 +59,12 @@ void eui_port_esp_idf_gpio_destroy(eui_hal_gpio_t *hal);
  *  brick 可在关键路径（如首帧提交）后查询本值做自诊断。 */
 int eui_port_esp_idf_last_error(void);
 
+/** PCNT 正交计数编码器：half-quad 模式（A 相双沿计数，2 计数/格），
+ *  与老固件 ESP32Encoder::attachHalfQuad 的计数倍率一致。
+ *  pull_up 通常为 true（多数编码器模块开漏输出）。 */
+eui_hal_encoder_t *eui_port_esp_idf_encoder_create(int pin_a, int pin_b, bool pull_up);
+void eui_port_esp_idf_encoder_destroy(eui_hal_encoder_t *hal);
+
 #ifdef __cplusplus
 }
 #endif

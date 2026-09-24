@@ -5,6 +5,7 @@
 #include "driver/gpio.h"
 #include "esp_rom_gpio.h"
 #include "esp_log.h"
+#include "driver/pulse_cnt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
@@ -367,5 +368,102 @@ void eui_port_esp_idf_gpio_destroy(eui_hal_gpio_t *hal)
 
     gpio_priv_t *priv = (gpio_priv_t *)hal->user_data;
     if (priv) eui_free(priv);
+    eui_free(hal);
+}
+
+/* === PCNT Encoder Implementation === */
+
+typedef struct {
+    pcnt_unit_handle_t unit;
+} enc_priv_t;
+
+static int32_t esp_enc_read_count(void *user_data) {
+    enc_priv_t *priv = (enc_priv_t *)user_data;
+    int count = 0;
+    pcnt_unit_get_count(priv->unit, &count);
+    return (int32_t)count;
+}
+
+eui_hal_encoder_t *eui_port_esp_idf_encoder_create(int pin_a, int pin_b, bool pull_up)
+{
+    if (pin_a < 0 || pin_b < 0) return NULL;
+
+    pcnt_unit_config_t unit_cfg = {
+        .high_limit = 30000,
+        .low_limit = -30000,
+    };
+    pcnt_unit_handle_t unit = NULL;
+    if (pcnt_new_unit(&unit_cfg, &unit) != ESP_OK) return NULL;
+
+    pcnt_glitch_filter_config_t filter = { .max_glitch_ns = 1000 };
+    pcnt_unit_set_glitch_filter(unit, &filter);
+
+    /* half-quad：A 相做边沿计数、B 相做电平定向（2 计数/格），与老固件
+     * ESP32Encoder::attachHalfQuad 的倍率一致 */
+    pcnt_chan_config_t cha = { .edge_gpio_num = (gpio_num_t)pin_a, .level_gpio_num = (gpio_num_t)pin_b };
+    pcnt_chan_config_t chb = { .edge_gpio_num = (gpio_num_t)pin_b, .level_gpio_num = (gpio_num_t)pin_a };
+    pcnt_channel_handle_t chan_a = NULL, chan_b = NULL;
+    if (pcnt_new_channel(unit, &cha, &chan_a) != ESP_OK) { pcnt_del_unit(unit); return NULL; }
+    if (pcnt_new_channel(unit, &chb, &chan_b) != ESP_OK) {
+        pcnt_del_channel(chan_a);
+        pcnt_del_unit(unit);
+        return NULL;
+    }
+
+    pcnt_channel_set_edge_action(chan_a, PCNT_CHANNEL_EDGE_ACTION_INCREASE,
+                                         PCNT_CHANNEL_EDGE_ACTION_DECREASE);
+    pcnt_channel_set_level_action(chan_a, PCNT_CHANNEL_LEVEL_ACTION_KEEP,
+                                          PCNT_CHANNEL_LEVEL_ACTION_INVERSE);
+    pcnt_channel_set_edge_action(chan_b, PCNT_CHANNEL_EDGE_ACTION_DECREASE,
+                                         PCNT_CHANNEL_EDGE_ACTION_INCREASE);
+    pcnt_channel_set_level_action(chan_b, PCNT_CHANNEL_LEVEL_ACTION_INVERSE,
+                                          PCNT_CHANNEL_LEVEL_ACTION_KEEP);
+
+    if (pull_up) {
+        gpio_pullup_en((gpio_num_t)pin_a);
+        gpio_pullup_en((gpio_num_t)pin_b);
+    } else {
+        gpio_pullup_dis((gpio_num_t)pin_a);
+        gpio_pullup_dis((gpio_num_t)pin_b);
+    }
+
+    if (pcnt_unit_enable(unit) != ESP_OK || pcnt_unit_clear_count(unit) != ESP_OK ||
+        pcnt_unit_start(unit) != ESP_OK) {
+        pcnt_del_channel(chan_a);
+        pcnt_del_channel(chan_b);
+        pcnt_del_unit(unit);
+        return NULL;
+    }
+
+    enc_priv_t *priv = eui_malloc(sizeof(enc_priv_t));
+    eui_hal_encoder_t *hal = eui_malloc(sizeof(eui_hal_encoder_t));
+    if (!priv || !hal) {
+        eui_free(priv);
+        eui_free(hal);
+        pcnt_unit_stop(unit);
+        pcnt_unit_disable(unit);
+        pcnt_del_channel(chan_a);
+        pcnt_del_channel(chan_b);
+        pcnt_del_unit(unit);
+        return NULL;
+    }
+    priv->unit = unit;
+    hal->read_count = esp_enc_read_count;
+    hal->user_data = priv;
+    return hal;
+}
+
+void eui_port_esp_idf_encoder_destroy(eui_hal_encoder_t *hal)
+{
+    if (!hal) return;
+    enc_priv_t *priv = (enc_priv_t *)hal->user_data;
+    if (priv) {
+        if (priv->unit) {
+            pcnt_unit_stop(priv->unit);
+            pcnt_unit_disable(priv->unit);
+            pcnt_del_unit(priv->unit);
+        }
+        eui_free(priv);
+    }
     eui_free(hal);
 }

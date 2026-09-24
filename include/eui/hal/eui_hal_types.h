@@ -33,6 +33,14 @@ typedef struct {
     void *user_data;
 } eui_hal_gpio_t;
 
+/** 绝对计数编码器 HAL：硬件计数器（PCNT/正交解码器）提供绝对计数，
+ *  驱动负责求增量。相比 eui_hal_gpio_t 的轮询状态表，它不会因为采样
+ *  周期长而丢掉快速旋转的刻度。 */
+typedef struct {
+    int32_t (*read_count)(void *user_data);
+    void *user_data;
+} eui_hal_encoder_t;
+
 #ifdef __cplusplus
 }
 #endif
