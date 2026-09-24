@@ -45,7 +45,7 @@ typedef struct {
     uint8_t  *mem_pool_buffer;   /**< Pointer to the memory pool for internal allocations. */
     size_t    mem_pool_size;      /**< Size in bytes of the memory pool buffer. */
     struct eui_display_drv_t *display;  /**< Display HAL implementation (cannot be NULL). */
-    struct eui_input_drv_t   *input;    /**< Input HAL implementation (may be NULL). */
+    struct eui_input_drv_t   *input;    /**< Input HAL implementation (cannot be NULL; a board with several input devices must combine them with eui_input_mux). */
     uint16_t  fps_target;        /**< Desired frame rate in frames-per-second. */
     uint8_t   max_views;         /**< Maximum number of concurrent views. */
     uint8_t   max_animations;    /**< Maximum number of simultaneous animations. */

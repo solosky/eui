@@ -1,0 +1,77 @@
+# eui 的 IDF 侧配置入口。
+#
+# 这两条路径必须逐项一致（改一处要改两处）：
+#   IDF:        Kconfig → CONFIG_EUI_* → port/esp-idf/include/eui/eui_config.h
+#   standalone: CMakeLists.txt 的 EUI_* cache 变量 → configure_file → eui_config.h
+#
+# 不套 menu/endmenu：IDF 会把组件 Kconfig 归到 "Component config" 之下，
+# 自己再包一层只会多一层嵌套。
+
+config EUI_COLOR_DEPTH
+    int "Color depth (1, 2, 4, 8, 16)"
+    range 1 16
+    default 1
+    help
+        Bits per pixel of the canvas.  A 16bpp canvas costs
+        width*height*2 bytes out of the TLSF pool (240x240 -> 115200),
+        so raise EUI_MEM_POOL_SIZE accordingly.  Values other than
+        1/2/4/8/16 are rejected at compile time.
+
+config EUI_MEM_POOL_SIZE
+    int "TLSF pool size in bytes"
+    default 8192
+    help
+        Size of the memory pool handed to eui_init().  Must cover the
+        canvas plus every view, scene, overlay, animation and font
+        descriptor.
+
+config EUI_MAX_VIEWS
+    int "Maximum concurrent views"
+    default 8
+
+config EUI_MAX_ANIMATIONS
+    int "Maximum concurrent animations"
+    default 8
+
+config EUI_MAX_WIDGETS
+    int "Maximum widget instances"
+    default 32
+
+config EUI_EVENT_QUEUE_SIZE
+    int "Event queue capacity"
+    default 8
+
+config EUI_MAX_OVERLAYS
+    int "Overlay stack depth"
+    default 4
+
+config EUI_SCENE_MAX
+    int "Maximum registered scenes"
+    default 16
+
+config EUI_KEY_ID_MAX
+    int "Key id state slots (capacity, no semantics)"
+    range 1 8
+    default 8
+
+config EUI_POST_QUEUE_SIZE
+    int "Frame-tail post queue capacity"
+    range 1 255
+    default 16
+
+config EUI_POST_DRAIN_MAX
+    int "Max post callbacks executed per tick"
+    range 1 64
+    default 64
+
+config EUI_FONT_ENABLE_U8G2
+    bool "Enable u8g2 font format support"
+    default y
+
+config EUI_FONT_ENABLE_KERNING
+    bool "Enable font kerning support"
+    default y
+
+config EUI_FONT_ENABLE_MULTILINE
+    bool "Enable multiline text support"
+    default y
