@@ -196,12 +196,15 @@ static void esp_spi_set_dc(bool data_mode, void *user_data)
 
 static void esp_spi_set_cs(bool active, void *user_data)
 {
+    /* 驱动侧既定契约：false = 拉低选中，true = 拉高释放，**每事务括起**。
+     * 此前实现成 active=true 拉低，极性反了；修好极性后仍全黑，真机 A/B 定位到
+     * 另一个前提也错了：显示驱动曾长期持有 CS(常低)，而本面板要求事务之间释放
+     * CS（见 eui_hal_types.h 的 set_cs 契约与 eui_drv_st7789.c 的 st7789_cmd）。 */
     spi_priv_t *priv = (spi_priv_t *)user_data;
-    /* 硬件 CS 模式下该引脚由 SPI 外设按事务拉低/释放，HAL 层不再插手
-     * （ST7789 驱动只在 init 里调一次 set_cs(false)）。 */
+    /* 硬件 CS 模式下该引脚由 SPI 外设按事务拉低/释放，HAL 层不再插手 */
     if (priv->cs_owned_by_hw) return;
     if (priv->cs_pin != GPIO_NUM_NC) {
-        gpio_set_level(priv->cs_pin, active ? 0 : 1);
+        gpio_set_level(priv->cs_pin, active ? 1 : 0);
     }
 }
 
@@ -251,15 +254,23 @@ eui_hal_spi_t* eui_port_esp_idf_spi_create(const esp_idf_spi_config_t *cfg)
         return NULL;
     }
 
+    /* DC/CS/RST 必须先把 IOMUX 切到 GPIO 功能再设方向/电平：
+     * gpio_set_direction 只动 GPIO 矩阵和输出使能、不做 func_sel——S3
+     * 复位后 GPIO2/3/6 停在默认功能 0，pad 不接 GPIO 矩阵，电平永远
+     * 写不到引脚上（症状：SPI 传输全部成功返回，面板黑屏）。
+     * gpio_reset_pin 负责 func_sel。 */
     if (cfg->dc != GPIO_NUM_NC) {
+        gpio_reset_pin(cfg->dc);
         gpio_set_direction(cfg->dc, GPIO_MODE_OUTPUT);
     }
     if (!cfg->hw_cs && cfg->cs != GPIO_NUM_NC) {
         /* 软件 CS 才由这里配置成输出；硬件 CS 的引脚归 SPI 外设 */
+        gpio_reset_pin(cfg->cs);
         gpio_set_direction(cfg->cs, GPIO_MODE_OUTPUT);
         gpio_set_level(cfg->cs, 1);
     }
     if (cfg->rst != GPIO_NUM_NC) {
+        gpio_reset_pin(cfg->rst);
         gpio_set_direction(cfg->rst, GPIO_MODE_OUTPUT);
         gpio_set_level(cfg->rst, 0);
     }
@@ -411,8 +422,11 @@ eui_hal_encoder_t *eui_port_esp_idf_encoder_create(int pin_a, int pin_b, bool pu
     pcnt_glitch_filter_config_t filter = { .max_glitch_ns = 1000 };
     pcnt_unit_set_glitch_filter(unit, &filter);
 
-    /* half-quad：A 相做边沿计数、B 相做电平定向（2 计数/格），与老固件
-     * ESP32Encoder::attachHalfQuad 的倍率一致 */
+    /* 全正交（4 计数/格），动作表 = IDF 官方 rotary_encoder 示例逐字。
+     * 此前 chan_b 的电平动作写成 INVERSE/KEEP（示例是 KEEP/INVERSE），
+     * 两个通道的贡献逐边沿相消——任何方向净计数恒 0，编码器全死
+     * （真机 PCNT 原始计数 0 实测定位）。缩放层相应 /4（见调用方
+     * vameter_ui.c enc_read_scale），保持每格 1 个事件单位。 */
     pcnt_chan_config_t cha = { .edge_gpio_num = (gpio_num_t)pin_a, .level_gpio_num = (gpio_num_t)pin_b };
     pcnt_chan_config_t chb = { .edge_gpio_num = (gpio_num_t)pin_b, .level_gpio_num = (gpio_num_t)pin_a };
     pcnt_channel_handle_t chan_a = NULL, chan_b = NULL;
@@ -423,14 +437,14 @@ eui_hal_encoder_t *eui_port_esp_idf_encoder_create(int pin_a, int pin_b, bool pu
         return NULL;
     }
 
-    pcnt_channel_set_edge_action(chan_a, PCNT_CHANNEL_EDGE_ACTION_INCREASE,
-                                         PCNT_CHANNEL_EDGE_ACTION_DECREASE);
+    pcnt_channel_set_edge_action(chan_a, PCNT_CHANNEL_EDGE_ACTION_DECREASE,
+                                         PCNT_CHANNEL_EDGE_ACTION_INCREASE);
     pcnt_channel_set_level_action(chan_a, PCNT_CHANNEL_LEVEL_ACTION_KEEP,
                                           PCNT_CHANNEL_LEVEL_ACTION_INVERSE);
-    pcnt_channel_set_edge_action(chan_b, PCNT_CHANNEL_EDGE_ACTION_DECREASE,
-                                         PCNT_CHANNEL_EDGE_ACTION_INCREASE);
-    pcnt_channel_set_level_action(chan_b, PCNT_CHANNEL_LEVEL_ACTION_INVERSE,
-                                          PCNT_CHANNEL_LEVEL_ACTION_KEEP);
+    pcnt_channel_set_edge_action(chan_b, PCNT_CHANNEL_EDGE_ACTION_INCREASE,
+                                         PCNT_CHANNEL_EDGE_ACTION_DECREASE);
+    pcnt_channel_set_level_action(chan_b, PCNT_CHANNEL_LEVEL_ACTION_KEEP,
+                                          PCNT_CHANNEL_LEVEL_ACTION_INVERSE);
 
     if (pull_up) {
         gpio_pullup_en((gpio_num_t)pin_a);
