@@ -24,6 +24,7 @@ option(EUI_BUILD_CROSS_EXAMPLES "Build cross-platform examples" OFF)
 
 # Compile-time config
 set(EUI_COLOR_DEPTH 1 CACHE STRING "Color depth: 1, 2, 4, 8, 16")
+set(EUI_16BPP_SWAP565 OFF CACHE BOOL "16bpp canvas stores byte-swapped RGB565 (swap565)")
 set(EUI_MEM_POOL_SIZE 8192 CACHE STRING "TLSF memory pool size in bytes")
 set(EUI_MAX_VIEWS 8 CACHE STRING "Maximum concurrent views")
 set(EUI_MAX_ANIMATIONS 8 CACHE STRING "Maximum concurrent animations")

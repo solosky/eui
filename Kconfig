@@ -64,6 +64,17 @@ config EUI_POST_DRAIN_MAX
     range 1 64
     default 64
 
+config EUI_16BPP_SWAP565
+    bool "16bpp canvas stores byte-swapped RGB565 (swap565 line order)"
+    default n
+    help
+        VAMeter panels are fed with LovyanGFX swap565 line order and the
+        app writes colors already swapped, so the canvas convention is
+        swap565 end-to-end.  Any per-channel math inside eui (alpha
+        blending for AA text / arcs / translucent fills) must convert
+        back to standard RGB565 before extracting bit fields, then swap
+        the result back.  Leave off for standard little-endian RGB565.
+
 config EUI_FONT_ENABLE_U8G2
     bool "Enable u8g2 font format support"
     default y

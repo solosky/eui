@@ -78,18 +78,22 @@ void eui_tick(void) {
     while (eui_input_edge_pop_event(&vd->edge, &gesture))
         eui_view_dispatcher_send_input(vd, &gesture);
 
-    /* Step 4: Render */
-    eui_view_dispatcher_tick(vd);
+    /* Step 4: Render —— 主视图画入画布（不提交）。
+     * Step 5: chrome 层（系统 status bar）在同一画布上叠画（不清屏、
+     *         最后画、浮于主视图与过渡动画之上；chrome 的 input edge
+     *         永不泵（不可点））。
+     * Step 5.5: 整帧一次提交。此前主视图与 chrome 各自 commit（各推一次
+     *         整帧），面板 GRAM 一半时间没有状态条 → 状态条以帧率一半
+     *         的频率闪烁（真机实测）。 */
+    eui_view_dispatcher_render(vd);
 
-    /* Step 5: chrome 层（系统 status bar）——不清屏、最后画、浮于主视图与
-     * 过渡动画之上；chrome 的 input edge 永不泵（不可点）。 */
     if (g_eui.chrome_vd) {
         eui_view_t *cv = eui_view_dispatcher_get_active(g_eui.chrome_vd);
-        if (cv) {
+        if (cv)
             eui_view_send_draw(cv, g_eui.chrome_vd->canvas);
-            eui_canvas_commit(g_eui.chrome_vd->canvas);
-        }
     }
+
+    eui_canvas_commit(g_eui.canvas);
 
     /* Step 6: post 队列排空（帧尾延迟执行）——渲染与 chrome 均已 commit，
      * 本步回调若绘制则只写 canvas、不 commit（下一帧 Step 4 提交），与
@@ -137,4 +141,9 @@ void eui_set_tick_callback(uint32_t (*tick_fn)(void)) {
 
 uint32_t eui_get_tick_ms(void) {
     return g_eui.tick_fn ? g_eui.tick_fn() : 0;
+}
+
+uint8_t eui_input_pending(void) {
+    if (!g_eui.initialized) return 0;
+    return eui_event_queue_count(&g_eui.input_mgr.queue);
 }

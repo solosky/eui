@@ -106,6 +106,19 @@ eui_view_t* eui_view_dispatcher_get_active(eui_view_dispatcher_t *vd);
 void eui_view_dispatcher_tick(eui_view_dispatcher_t *vd);
 
 /**
+ * @brief Redraw the active view (or transition) into the canvas WITHOUT
+ *        committing to the display.
+ *
+ * clear + draw only.  Hosts that overlay extra layers (system chrome)
+ * on the same canvas call this, draw their layers, then commit once —
+ * committing per layer pushes intermediate frames to the panel and the
+ * topmost layer visibly flickers at half the frame rate.
+ *
+ * @param vd Pointer to the dispatcher.
+ */
+void eui_view_dispatcher_render(eui_view_dispatcher_t *vd);
+
+/**
  * @brief Send an input event to the active view (or its overlays).
  *
  * The event is first offered to the topmost overlay; if unhandled,

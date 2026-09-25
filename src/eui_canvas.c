@@ -117,13 +117,28 @@ eui_color_t eui_canvas_px_get(eui_canvas_t *c, int16_t x, int16_t y)
 #if EUI_COLOR_DEPTH == 16
 /* Alpha-blend fg over dst in native RGB565 space (a: 0..255 ink coverage).
  * static：只被同 TU 的 eui_canvas_px_blend 使用（Task 2 曾临时去掉 static，
- * Task 4 收回，以免未加 eui_ 前缀的符号进入库全局命名空间）。 */
+ * Task 4 收回，以免未加 eui_ 前缀的符号进入库全局命名空间）。
+ *
+ * EUI_16BPP_SWAP565（VAMeter 项目约定，EUI_MIGRATION §6.2）：画布线序是
+ * 字节交换的 swap565，位域提取前必须先换回标准序、混完再换回去——否则
+ * R/G/B 位域错位，症状为状态条 alpha 底色发黄、AA 文字/圆弧边缘出彩色
+ * 硬边（真机实测）。 */
+static uint16_t blend_swap16(uint16_t v) { return (uint16_t)((uint16_t)(v << 8) | (uint16_t)(v >> 8)); }
+
 static eui_color_t blend_565(eui_color_t dst, eui_color_t fg, uint8_t a)
 {
+#if EUI_16BPP_SWAP565
+    dst = (eui_color_t)blend_swap16((uint16_t)dst);
+    fg  = (eui_color_t)blend_swap16((uint16_t)fg);
+#endif
     uint16_t r = (uint16_t)((((fg >> 11) & 0x1Fu) * a + ((dst >> 11) & 0x1Fu) * (255u - a) + 127u) / 255u);
     uint16_t g = (uint16_t)((((fg >> 5) & 0x3Fu) * a + ((dst >> 5) & 0x3Fu) * (255u - a) + 127u) / 255u);
     uint16_t b = (uint16_t)((((fg) & 0x1Fu) * a + ((dst) & 0x1Fu) * (255u - a) + 127u) / 255u);
-    return (eui_color_t)((r << 11) | (g << 5) | b);
+    uint16_t out = (uint16_t)((r << 11) | (g << 5) | b);
+#if EUI_16BPP_SWAP565
+    out = blend_swap16(out);
+#endif
+    return (eui_color_t)out;
 }
 #endif
 

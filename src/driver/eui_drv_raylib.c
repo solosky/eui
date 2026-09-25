@@ -115,7 +115,9 @@ static void disp_write_buffer(const uint8_t *buffer, const eui_rect_t *rect, voi
         for (int y = 0; y < (int)d->height; y++) {
             int flipped_y = (int)d->height - 1 - y;
             for (int x = 0; x < (int)d->width; x++) {
+                /* 本项目画布是 swap565（字节交换）线序，先换回标准 RGB565 再解字段 */
                 uint16_t c = src16[y * d->width + x];
+                c = (uint16_t)((c << 8) | (c >> 8));
                 uint8_t r = (uint8_t)(((c >> 11) & 0x1F) << 3);
                 uint8_t g = (uint8_t)(((c >> 5)  & 0x3F) << 2);
                 uint8_t b = (uint8_t)((c & 0x1F) << 3);

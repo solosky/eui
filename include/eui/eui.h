@@ -130,6 +130,17 @@ void eui_set_tick_callback(uint32_t (*tick_fn)(void));
 uint32_t eui_get_tick_ms(void);
 
 /**
+ * @brief Number of raw driver events waiting in the input manager queue.
+ *
+ * Diagnostic accessor: hosts can tell whether input drivers are producing
+ * events (count > 0 right after a poll) versus events being lost further
+ * down the pipeline (gesture edge / dispatcher).
+ *
+ * @return Pending raw event count (0..EUI_EVENT_QUEUE_SIZE).
+ */
+uint8_t eui_input_pending(void);
+
+/**
  * @brief Get the global view dispatcher instance.
  *
  * @return Pointer to the library's internal eui_view_dispatcher_t.

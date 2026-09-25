@@ -206,7 +206,7 @@ static void render_transition(eui_view_dispatcher_t *vd) {
     }
 }
 
-void eui_view_dispatcher_tick(eui_view_dispatcher_t *vd) {
+void eui_view_dispatcher_render(eui_view_dispatcher_t *vd) {
     eui_canvas_clear(vd->canvas);
 
     if (vd->transitioning) {
@@ -217,7 +217,10 @@ void eui_view_dispatcher_tick(eui_view_dispatcher_t *vd) {
             eui_view_send_draw(active, vd->canvas);
         }
     }
+}
 
+void eui_view_dispatcher_tick(eui_view_dispatcher_t *vd) {
+    eui_view_dispatcher_render(vd);
     eui_canvas_commit(vd->canvas);
 }
 
