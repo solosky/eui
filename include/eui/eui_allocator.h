@@ -1,6 +1,7 @@
 #ifndef EUI_ALLOCATOR_H
 #define EUI_ALLOCATOR_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -62,6 +63,9 @@ void  eui_free(void *ptr);
  * @param size    Size of the pool in bytes.
  */
 void eui_allocator_init_tlsf(uint8_t *buffer, size_t size);
+/* TLSF 池是否已初始化（eui_init 用它避免对先行分配的 transport/driver
+ * 私有结构做二次池初始化——池重建会把已分配块的元数据清掉）。 */
+bool eui_allocator_is_initialized(void);
 
 /**
  * @brief Allocation statistics snapshot.

@@ -21,7 +21,10 @@ static struct {
 int eui_init(const eui_config_t *config) {
     if (!config || !config->display || !config->input) return -1;
 
-    if (config->mem_pool_buffer) {
+    /* 池只建一次：transport/driver 先于 eui_init 装配的 brick（池初始化在
+     * 更早处完成）已分配过块，此处重建会把它们的元数据清掉——真机上表现
+     * 为 HAL 函数指针被覆写成野值（InstrFetchProhibited）。 */
+    if (config->mem_pool_buffer && !eui_allocator_is_initialized()) {
         eui_allocator_init_tlsf(config->mem_pool_buffer, config->mem_pool_size);
     }
 

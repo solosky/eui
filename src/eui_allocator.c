@@ -25,9 +25,14 @@ static void stats_walker(void *ptr, size_t size, int used, void *user)
     }
 }
 
+static bool s_tlsf_ready;
+
+bool eui_allocator_is_initialized(void) { return s_tlsf_ready; }
+
 void eui_allocator_init_tlsf(uint8_t *buffer, size_t size)
 {
     g_tlsf = tlsf_create_with_pool(buffer, size);
+    s_tlsf_ready = true;
     memset(&g_alloc, 0, sizeof(g_alloc));
     g_alloc_count = 0;
     g_free_count = 0;
