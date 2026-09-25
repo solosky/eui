@@ -165,12 +165,13 @@ static void nrf5_spi_set_dc(bool data_mode, void *user_data)
 
 static void nrf5_spi_set_cs(bool active, void *user_data)
 {
+    /* 驱动侧契约与 esp-idf port 一致：false = 拉低选中，true = 拉高释放 */
     spi_priv_t *p = (spi_priv_t *)user_data;
     if (p->cs_pin == NRF5_PIN_NOT_USED) return;
     if (active) {
-        nrf_gpio_pin_clear(p->cs_pin);
-    } else {
         nrf_gpio_pin_set(p->cs_pin);
+    } else {
+        nrf_gpio_pin_clear(p->cs_pin);
     }
 }
 
