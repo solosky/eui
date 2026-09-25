@@ -55,6 +55,23 @@ void eui_port_esp_idf_spi_destroy(eui_hal_spi_t *hal);
 eui_hal_gpio_t* eui_port_esp_idf_gpio_create(const esp_idf_gpio_config_t *cfg);
 void eui_port_esp_idf_gpio_destroy(eui_hal_gpio_t *hal);
 
+/* ---- 背光（LEDC PWM）----
+ * level 域 0..255，与老固件 setBrightness 同域（8bit duty 直通）。
+ * 低速模式 8bit 分辨率；timer/channel 默认 TIMER_1/CHANNEL_1，给常用
+ * TIMER_0/CH0（如蜂鸣 tone）让位，可经 config 覆盖。 */
+typedef struct {
+    int      pin;         /* < 0 = 不启用 */
+    uint32_t freq_hz;     /* 0 = 默认 500Hz（老固件背光同款） */
+    uint8_t  init_level;  /* init 时的亮度 0..255 */
+    int      timer;       /* ledc_timer_t；< 0 = LEDC_TIMER_1 */
+    int      channel;     /* ledc_channel_t；< 0 = LEDC_CHANNEL_1 */
+} esp_idf_backlight_config_t;
+
+int     eui_port_esp_idf_backlight_init(const esp_idf_backlight_config_t *cfg);
+void    eui_port_esp_idf_backlight_set(uint8_t level);  /* 未 init 时静默忽略 */
+uint8_t eui_port_esp_idf_backlight_get(void);
+void    eui_port_esp_idf_backlight_deinit(void);
+
 /** 最近一次 SPI/I2C 传输的错误码（0 = 无错）。传输接口是 void 返回，
  *  brick 可在关键路径（如首帧提交）后查询本值做自诊断。 */
 int eui_port_esp_idf_last_error(void);
@@ -71,12 +88,16 @@ void eui_port_esp_idf_encoder_destroy(eui_hal_encoder_t *hal);
 
 typedef struct {
     int      spi_host;      /* SPI2_HOST / SPI3_HOST */
-    int      pin_mosi, pin_sclk, pin_cs, pin_dc, pin_rst, pin_bl; /* bl 仅记录，由 brick 自配 PWM */
+    int      pin_mosi, pin_sclk, pin_cs, pin_dc, pin_rst, pin_bl;
+                             /* pin_bl >= 0 = board_init 自动起背光 PWM
+                                （bl_freq_hz / bl_init_level，见背光段） */
     uint16_t width, height;
     uint8_t  col_offset, row_offset, madctl;
     bool     invert;
     bool     little_endian; /* ESP32 原生 uint16 布局用 true（RAMCTL bit3） */
     int      freq_hz;       /* 80MHz 高刷 / 40MHz 常规 */
+    int      bl_freq_hz;    /* 背光 PWM 频率；0 = 默认 500Hz */
+    uint8_t  bl_init_level; /* board_init 时的初始亮度 0..255 */
     bool     hw_cs;         /* true = CS 交给 SPI 外设按事务拉低 */
 } eui_port_esp_idf_display_t;
 

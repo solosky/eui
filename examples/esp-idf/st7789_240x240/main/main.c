@@ -14,7 +14,7 @@
 #define PIN_CS   3
 #define PIN_DC   2
 #define PIN_RST  6
-#define PIN_BL   13      /* 背光由 brick 自配 LEDC；eui 不管 PWM */
+#define PIN_BL   13      /* 背光由 board_init 起 LEDC PWM（pin_bl/bl_init_level） */
 #define ENC_A    18
 #define ENC_B    17
 #define BTN_ENC  21      /* 编码器按键 */
@@ -60,6 +60,9 @@ void app_main(void)
     board.panel.st7789.pin_dc   = PIN_DC;
     board.panel.st7789.pin_rst  = PIN_RST;
     board.panel.st7789.pin_bl   = PIN_BL;
+    board.panel.st7789.bl_freq_hz    = 500;   /* 0 = 默认 500Hz（老固件背光同款） */
+    board.panel.st7789.bl_init_level = 255;   /* 演示全程全亮；运行时可改
+                                                 eui_port_esp_idf_backlight_set() */
     board.panel.st7789.width    = 240;
     board.panel.st7789.height   = 240;
     board.panel.st7789.madctl   = 0x00;

@@ -6,6 +6,7 @@
 #include "esp_rom_gpio.h"
 #include "esp_log.h"
 #include "driver/pulse_cnt.h"
+#include "driver/ledc.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
@@ -477,6 +478,62 @@ void eui_port_esp_idf_encoder_destroy(eui_hal_encoder_t *hal)
     eui_free(hal);
 }
 
+/* === 背光（LEDC PWM） === */
+
+static bool s_bl_ready;
+static uint8_t s_bl_level;
+static ledc_timer_t s_bl_timer = LEDC_TIMER_1;
+static ledc_channel_t s_bl_channel = LEDC_CHANNEL_1;
+
+int eui_port_esp_idf_backlight_init(const esp_idf_backlight_config_t *cfg)
+{
+    if (!cfg || cfg->pin < 0) return -1;
+    s_bl_timer = cfg->timer >= 0 ? (ledc_timer_t)cfg->timer : LEDC_TIMER_1;
+    s_bl_channel = cfg->channel >= 0 ? (ledc_channel_t)cfg->channel : LEDC_CHANNEL_1;
+
+    ledc_timer_config_t tcfg = {
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .duty_resolution = LEDC_TIMER_8_BIT,
+        .timer_num = s_bl_timer,
+        .freq_hz = cfg->freq_hz ? (int)cfg->freq_hz : 500,   /* 老固件背光 500Hz */
+        .clk_cfg = LEDC_AUTO_CLK,
+    };
+    if (ledc_timer_config(&tcfg) != ESP_OK) return -1;
+    ledc_channel_config_t ccfg = {
+        .gpio_num = (gpio_num_t)cfg->pin,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .channel = s_bl_channel,
+        .timer_sel = s_bl_timer,
+        .duty = cfg->init_level,
+        .hpoint = 0,
+    };
+    if (ledc_channel_config(&ccfg) != ESP_OK) return -1;
+    s_bl_level = cfg->init_level;
+    s_bl_ready = true;
+    return 0;
+}
+
+void eui_port_esp_idf_backlight_set(uint8_t level)
+{
+    if (!s_bl_ready) return;
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, s_bl_channel, level);
+    ledc_update_duty(LEDC_LOW_SPEED_MODE, s_bl_channel);
+    s_bl_level = level;
+}
+
+uint8_t eui_port_esp_idf_backlight_get(void)
+{
+    return s_bl_ready ? s_bl_level : 0;
+}
+
+void eui_port_esp_idf_backlight_deinit(void)
+{
+    if (!s_bl_ready) return;
+    ledc_stop(LEDC_LOW_SPEED_MODE, s_bl_channel, 0);
+    s_bl_ready = false;
+    s_bl_level = 0;
+}
+
 /* === Board bring-up（brick 契约） === */
 
 #include "esp_timer.h"
@@ -640,6 +697,19 @@ int eui_port_esp_idf_board_init(const eui_port_esp_idf_board_t *board)
         return -1;
     }
 
+    /* 背光：面板配了 pin_bl 才起（失败只告警，不阻断 bring-up——屏幕已可用，
+     * 只是暗着）。放在 display->init 之后：点亮时首帧内容已就绪，不闪白。 */
+    if (board->panel.kind == EUI_PORT_DISP_ST7789 && board->panel.st7789.pin_bl >= 0) {
+        esp_idf_backlight_config_t blcfg = {
+            .pin = board->panel.st7789.pin_bl,
+            .freq_hz = (uint32_t)board->panel.st7789.bl_freq_hz,
+            .init_level = board->panel.st7789.bl_init_level,
+            .timer = -1, .channel = -1,
+        };
+        if (eui_port_esp_idf_backlight_init(&blcfg) != 0)
+            ESP_LOGW(EUI_PORT_TAG, "backlight init failed (pin %d)", board->panel.st7789.pin_bl);
+    }
+
     eui_allocator_stats_t st = { 0 };
     eui_allocator_get_stats(&st);
     ESP_LOGI(EUI_PORT_TAG, "bringup ok: pool %u used %u peak %u; canvas needs %u",
@@ -664,6 +734,7 @@ void eui_port_esp_idf_delay_frame(void)
 
 void eui_port_esp_idf_board_deinit(void)
 {
+    eui_port_esp_idf_backlight_deinit();
     eui_deinit();
     if (g_board.mux_owned && g_board.mux) eui_input_mux_destroy(g_board.mux);
     if (g_board.buttons) eui_drv_buttons_destroy(g_board.buttons);
