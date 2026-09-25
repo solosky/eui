@@ -153,14 +153,23 @@ static void esp_spi_write_data(const uint8_t *buf, uint32_t len, void *user_data
     spi_priv_t *priv = (spi_priv_t *)user_data;
     gpio_set_level(priv->dc_pin, 1);
 
-    spi_transaction_t trans = {
-        .length = len * 8,
-        .tx_buffer = buf,
-    };
-    /* 整帧 115200 字节也走这里：DMA 开启且 max_transfer_sz 覆盖整帧时
-     * IDF 内部按 DMA 缓冲分片，整条事务期间 CS 保持拉低（一次 RAMWR
-     * 连续写的要求），返回即发送完成。 */
-    port_note_result(spi_device_polling_transmit(priv->handle, &trans), "spi write_data");
+    /* 整帧 115200 字节也走这里。S3 的单条 DMA 事务上限是
+     * SPI_LL_DMA_MAX_BIT_LEN = 2^18 bit = 32KB（spi_master 的
+     * check_trans_valid 直接拒绝更长的 length，与 max_transfer_sz 无关
+     * ——计划期"IDF 自动分片"的结论在 S3 上不成立）。按 32KB 分块轮询
+     * 发送：软件 CS 由驱动持有、跨块保持拉低（一次 RAMWR 连续写的
+     * 要求），返回即发送完成。 */
+    enum { SPI_CHUNK_MAX = 32768 };
+    while (len > 0) {
+        uint32_t chunk = len > SPI_CHUNK_MAX ? SPI_CHUNK_MAX : len;
+        spi_transaction_t trans = {
+            .length = chunk * 8,
+            .tx_buffer = buf,
+        };
+        port_note_result(spi_device_polling_transmit(priv->handle, &trans), "spi write_data");
+        buf += chunk;
+        len -= chunk;
+    }
 }
 
 static void esp_spi_read_data(uint8_t *buf, uint32_t len, void *user_data)
