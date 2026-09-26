@@ -374,10 +374,17 @@ void eui_canvas_clear(eui_canvas_t *canvas)
         memset(canvas->buffer, 0, size);
 #if EUI_COLOR_DEPTH == 16
     } else {
+        /* memcpy 倍增填充：先写 8 像素种子，再逐次倍增拷贝。标量循环
+         * ~5.7 万次写 ≈ 0.7ms，倍增后整屏 < 0.2ms（memcpy 4B/拍）。 */
         uint16_t *buf16 = (uint16_t *)canvas->buffer;
         size_t pixels = (size_t)canvas->buf_width * canvas->buf_height;
-        for (size_t i = 0; i < pixels; i++) {
-            buf16[i] = canvas->bg_color;
+        size_t seed = pixels < 8 ? pixels : 8;
+        for (size_t i = 0; i < seed; i++) buf16[i] = canvas->bg_color;
+        size_t filled = seed;
+        while (filled < pixels) {
+            size_t n = (pixels - filled < filled) ? (pixels - filled) : filled;
+            memcpy(buf16 + filled, buf16, n * sizeof(uint16_t));
+            filled += n;
         }
 #else
     } else {
@@ -430,6 +437,32 @@ void eui_canvas_draw_line(eui_canvas_t *canvas, int16_t x1, int16_t y1, int16_t 
 void eui_canvas_fill_rect(eui_canvas_t *canvas, int16_t x, int16_t y, uint16_t w, uint16_t h)
 {
     if (!canvas || w == 0 || h == 0) return;
+#if EUI_COLOR_DEPTH == 16
+    /* FULL 模式 16bpp：先矩形求交（clip ∩ 屏幕），再逐行连续填——px_set 的
+     * 逐像素 clip 判断是圆角矩形/面板填充的主要开销（launcher 每帧 ~10 万
+     * 像素），行内连续写省掉全部判断。求交语义与 px_set 逐位一致。 */
+    if (!(canvas->display->caps.buffer_mode & EUI_BUFFER_PAGE)) {
+        int16_t ex = x + (int16_t)w, ey = y + (int16_t)h;
+        int32_t x0 = x, x1 = ex, y0 = y, y1 = ey;
+        if (x0 < (int32_t)canvas->clip.x) x0 = canvas->clip.x;
+        if (y0 < (int32_t)canvas->clip.y) y0 = canvas->clip.y;
+        if (x1 > (int32_t)(canvas->clip.x + canvas->clip.w)) x1 = canvas->clip.x + canvas->clip.w;
+        if (y1 > (int32_t)(canvas->clip.y + canvas->clip.h)) y1 = canvas->clip.y + canvas->clip.h;
+        if (x0 < 0) x0 = 0;
+        if (y0 < 0) y0 = 0;
+        if (x1 > canvas->buf_width) x1 = canvas->buf_width;
+        if (y1 > canvas->buf_height) y1 = canvas->buf_height;
+        if (x0 >= x1 || y0 >= y1) return;
+        uint16_t *buf16 = (uint16_t *)canvas->buffer;
+        eui_color_t col = canvas->fg_color;
+        for (int32_t yi = y0; yi < y1; yi++) {
+            uint16_t *row = buf16 + (uint32_t)yi * canvas->buf_width;
+            for (int32_t xi = x0; xi < x1; xi++)
+                row[xi] = col;
+        }
+        return;
+    }
+#endif
     int16_t ex = x + (int16_t)w;
     int16_t ey = y + (int16_t)h;
     for (int16_t yi = y; yi < ey; yi++) {
@@ -446,6 +479,41 @@ void eui_canvas_fill_rect_alpha(eui_canvas_t *canvas, int16_t x, int16_t y,
     /* 逐像素走 px_blend：cov==0 不写、cov==255 快路 px_set、clip 与越界
      * 语义全部由 px_set/px_get 继承；低色深退化为灰度混合 + 抖动量化。 */
     if (!canvas || w == 0 || h == 0 || alpha == 0) return;
+#if EUI_COLOR_DEPTH == 16
+    /* FULL 模式 16bpp：矩形求交一次，随后行内直接读 dst → blend_565 → 写回，
+     * 与 px_blend 逐位一致（同一混合核），仅省掉每像素函数调用 + clip 判断。
+     * 状态条半透明整条填充（240x20 = 4800 px/帧）走这里。 */
+    if (canvas->buffer != NULL &&
+        !(canvas->display->caps.buffer_mode & EUI_BUFFER_PAGE)) {
+        uint16_t *buf16 = (uint16_t *)canvas->buffer;
+        int32_t x0 = x, y0 = y, x1 = x + (int16_t)w, y1 = y + (int16_t)h;
+        if (x0 < (int32_t)canvas->clip.x) x0 = canvas->clip.x;
+        if (y0 < (int32_t)canvas->clip.y) y0 = canvas->clip.y;
+        if (x1 > (int32_t)(canvas->clip.x + canvas->clip.w)) x1 = canvas->clip.x + canvas->clip.w;
+        if (y1 > (int32_t)(canvas->clip.y + canvas->clip.h)) y1 = canvas->clip.y + canvas->clip.h;
+        if (x0 < 0) x0 = 0;
+        if (y0 < 0) y0 = 0;
+        if (x1 > canvas->buf_width) x1 = canvas->buf_width;
+        if (y1 > canvas->buf_height) y1 = canvas->buf_height;
+        if (x0 < x1 && y0 < y1) {
+            if (alpha >= 255) {
+                for (int32_t yi = y0; yi < y1; yi++) {
+                    uint16_t *row = buf16 + (uint32_t)yi * canvas->buf_width;
+                    for (int32_t xi = x0; xi < x1; xi++)
+                        row[xi] = (uint16_t)color;
+                }
+            } else {
+                for (int32_t yi = y0; yi < y1; yi++) {
+                    uint16_t *row = buf16 + (uint32_t)yi * canvas->buf_width;
+                    for (int32_t xi = x0; xi < x1; xi++)
+                        row[xi] = (uint16_t)blend_565((eui_color_t)row[xi], color, alpha);
+                }
+            }
+            return;
+        }
+        return;
+    }
+#endif
     int16_t ex = x + (int16_t)w;
     int16_t ey = y + (int16_t)h;
     for (int16_t yi = y; yi < ey; yi++) {
@@ -767,6 +835,34 @@ static eui_color_t bitmap_pixel_color(const eui_bitmap_t *bmp, uint16_t col, uin
 void eui_canvas_draw_bitmap(eui_canvas_t *canvas, int16_t x, int16_t y, const eui_bitmap_t *bmp)
 {
     if (!canvas || !bmp || !bmp->data) return;
+#if EUI_COLOR_DEPTH == 16
+    /* 16bpp 位图 → 16bpp FULL 画布：bitmap_pixel_color 对 16bpp 就是原样
+     * uint16 拷贝，逐行 memcpy 语义逐位一致，但省掉每像素的解码 + clip
+     * 判断（launcher 每帧 5 张 100x100 图标 = 5 万像素）。行外/列外的
+     * 裁剪在求交时一并完成；完全在外的行/列零开销跳过。 */
+    if (!(canvas->display->caps.buffer_mode & EUI_BUFFER_PAGE) &&
+        bmp->color_depth == 16) {
+        uint16_t screen_w = canvas->buf_width, screen_h = canvas->buf_height;
+        int32_t x0 = x, y0 = y, x1 = x + (int16_t)bmp->width, y1 = y + (int16_t)bmp->height;
+        if (x0 < (int32_t)canvas->clip.x) x0 = canvas->clip.x;
+        if (y0 < (int32_t)canvas->clip.y) y0 = canvas->clip.y;
+        if (x1 > (int32_t)(canvas->clip.x + canvas->clip.w)) x1 = canvas->clip.x + canvas->clip.w;
+        if (y1 > (int32_t)(canvas->clip.y + canvas->clip.h)) y1 = canvas->clip.y + canvas->clip.h;
+        if (x0 < 0) x0 = 0;
+        if (y0 < 0) y0 = 0;
+        if (x1 > screen_w) x1 = screen_w;
+        if (y1 > screen_h) y1 = screen_h;
+        if (x0 >= x1 || y0 >= y1) return;
+        uint16_t *buf16 = (uint16_t *)canvas->buffer;
+        const uint16_t *src16 = (const uint16_t *)bmp->data;
+        size_t copy_bytes = (size_t)(x1 - x0) * sizeof(uint16_t);
+        for (int32_t yi = y0; yi < y1; yi++) {
+            const uint16_t *src = src16 + (uint32_t)(yi - y) * bmp->width + (x0 - x);
+            memcpy(buf16 + (uint32_t)yi * screen_w + x0, src, copy_bytes);
+        }
+        return;
+    }
+#endif
     for (uint16_t row = 0; row < bmp->height; row++) {
         for (uint16_t col = 0; col < bmp->width; col++) {
             eui_canvas_px_set(canvas, x + (int16_t)col, y + (int16_t)row,

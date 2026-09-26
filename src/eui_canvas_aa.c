@@ -70,6 +70,63 @@ static int s_cap_side(int64_t cross, int64_t thr, int inside_is_positive)
     return (cross <= 0) ? 1 : -1;
 }
 
+/* floor / ceil 整除（b != 0；C 的 / 向零截断，这里要数学上的向下/向上取整） */
+static int64_t s_fdiv_floor(int64_t a, int64_t b)
+{
+    int64_t q = a / b;
+    if ((a % b != 0) && ((a < 0) != (b < 0))) q--;
+    return q;
+}
+static int64_t s_fdiv_ceil(int64_t a, int64_t b) { return -s_fdiv_floor(-a, b); }
+
+/* 32 位逐位开方：与 eui_canvas_isqrt(x, 0) 同算法同结果，但全程 32 位运算。
+ * 64 位版本在 Xtensa 上每次开方要数百拍（64 位移位无桶形移位器），是圆角
+ * 矩形角落扫描的主要开销；n < 2^32（r_out <= 255 时所有径向被开方数都在
+ * 此范围内）时用它。 */
+static uint32_t s_isqrt32(uint32_t n)
+{
+    uint32_t rem = n, root = 0, bit = 1u << 30;
+    while (bit > rem) bit >>= 2;
+    while (bit != 0) {
+        if (rem >= root + bit) {
+            rem -= root + bit;
+            root = (root >> 1) + bit;
+        } else {
+            root >>= 1;
+        }
+        bit >>= 2;
+    }
+    return root;
+}
+
+/* 被开方数落在 32 位域时走 32 位版本（结果逐位一致），否则回 64 位版本 */
+static inline uint32_t s_isqrt_fit(int64_t x)
+{
+    return (x >= 0 && x <= 0xFFFFFFFFll) ? s_isqrt32((uint32_t)x)
+                                         : (uint32_t)eui_canvas_isqrt((uint64_t)x, 0);
+}
+
+/* 轴对齐端帽（ux == 0 的水平端帽线）的"深内侧" x 区间：
+ * cross(x) = ux*dy256 - uy*vx 在 ux==0 时 = uy*(cx256-128) - uy*256*x，与行 y 无关
+ * （水平端帽线）、随 x 线性变化。sign：cap_a 内侧为 +1、cap_b 内侧为 -1，即
+ * sign*cross >= 0 为内侧；深内侧 ⇔ sign*cross >= thr。
+ * 返回深内侧区间 [*xlo, *xhi]（半无界用 INT32_MIN/MAX）；中心恰在端帽线上的
+ * 跨缝像素不在区间内，仍由逐像素路径按锥面积精确算覆盖度（语义与慢路径一致）。 */
+static void s_cap_deep_span_x(int32_t uy, int64_t thr, int sign,
+                              int32_t cx256, int32_t *xlo, int32_t *xhi)
+{
+    int64_t a = (int64_t)uy * ((int64_t)cx256 - 128);  /* cross(x) = a - uy*256*x */
+    int64_t t = (int64_t)sign * uy * 256;              /* sign*cross(x) = sign*a - t*x */
+    int64_t rhs = (int64_t)sign * a - thr;             /* t*x <= rhs */
+    if (t > 0) {
+        *xlo = INT32_MIN;
+        *xhi = (int32_t)s_fdiv_floor(rhs, t);
+    } else {
+        *xhi = INT32_MAX;
+        *xlo = (int32_t)s_fdiv_ceil(rhs, t);
+    }
+}
+
 /* 用半平面 value(P) >= 0（sign = 1）或 <= 0（sign = -1）裁剪凸多边形（原位）。
  * value(P) = base + ux*Ly - uy*Lx，base 已含 4 倍标度，与局部坐标同量纲。
  * 交点按 1/1024 px 取整，面积误差 < 1/1024 px^2（覆盖度 0.25/256，可忽略）。 */
@@ -189,7 +246,34 @@ void eui_canvas_aa_arc(eui_canvas_t *c, int16_t cx, int16_t cy,
     int32_t cy_lo = (int32_t)cy - (int32_t)r_out - 1;
     int32_t cy_hi = (int32_t)cy + (int32_t)r_out + 1;
     int32_t clip_x0 = c->clip.x, clip_x1 = (int32_t)c->clip.x + c->clip.w;
-    int32_t clip_y0 = c->clip.y, clip_y1 = (int32_t)c->clip.y + c->clip.h;
+    int32_t clip_y0 = c->clip.y, clip_y1 = c->clip.y + c->clip.h;
+
+    /* 快路径（launcher 圆角矩形/图标底板热点）：实心盘 + 端帽轴对齐（90° 整数倍，
+     * 圆角矩形四角；sweep==360 即 fill_circle 无端帽）时：
+     *   1) 行常量端帽（uy==0）整行深度判定 → 深外侧整行跳过（90° 扇形因此只扫
+     *      四分之一 bbox，扫描量 4r² → ~r²）；
+     *   2) 水平端帽线（ux==0）解出"深内侧" x 区间钳制直填段；
+     *   3) 每行用一次 isqrt 求出径向全满半宽（d <= r-0.5px），与端帽区间求交后
+     *      连续写 fg，只有边界环像素走逐像素覆盖度。
+     * 直填段像素在慢路径下必满足 rad==256 → px_set(fg)，逐位等价；不满足前提
+     * （一般角度端帽、圆环 r_in>0、补扇形）→ 完全走原逐像素路径。 */
+    bool fast = (ri256 == 0 && r_out <= 255);   /* r<=255：径向被开方数均在 32 位域 */
+    if (fast && sweep < 360) {
+        fast = !complement &&
+               (ux_a == 0 || uy_a == 0) && (ux_b == 0 || uy_b == 0);
+    }
+
+    /* 轴对齐端帽的"深内侧"x 区间与行 y 无关（cross 对 x 线性、系数全是常量），
+     * 行循环外一次解出。s_cap_deep_span_x 里的 64 位除法在 Xtensa 上是软除法
+     * 库调用（数百拍），绝不能落进行循环。 */
+    int32_t xlo_a = INT32_MIN, xhi_a = INT32_MAX;
+    int32_t xlo_b = INT32_MIN, xhi_b = INT32_MAX;
+    if (fast && sweep < 360) {
+        if (uy_a != 0)
+            s_cap_deep_span_x(uy_a, thr_a, 1, cx256, &xlo_a, &xhi_a);
+        if (uy_b != 0)
+            s_cap_deep_span_x(uy_b, thr_b, -1, cx256, &xlo_b, &xhi_b);
+    }
 
     for (int32_t y = cy_lo; y <= cy_hi; y++) {
         if (y < clip_y0 || y >= clip_y1) continue;
@@ -198,13 +282,79 @@ void eui_canvas_aa_arc(eui_canvas_t *c, int16_t cx, int16_t cy,
         int64_t b     = ex_out - dy2;                  /* 有覆盖半宽的平方 */
         if (b <= 0) continue;
         /* xout 以 1/256 px 为单位，折成像素半宽；+1 覆盖像素中心半格偏移 */
-        int32_t xout = (int32_t)(eui_canvas_isqrt((uint64_t)b, 0) >> 8) + 1;
+        int32_t xout = (int32_t)(s_isqrt_fit(b) >> 8) + 1;
 
         int32_t xs = (int32_t)cx - xout, xe = (int32_t)cx + xout;
         if (xs < clip_x0) xs = clip_x0;
         if (xe >= clip_x1) xe = clip_x1 - 1;
 
+        /* 行级端帽处理（仅快路径）：uy==0 的端帽 cross 是行常量，整行同侧。
+         * ux==0 的端帽把"深内侧"区间解析解出后**直接钳制扫描范围**——轴对齐
+         * 端帽（Q14 单位向量）没有跨缝像素：|cross| < thr ⇔ |vx| < 128，而
+         * vx = 256(x-cx)+128 对整数 x 恒有 |vx| >= 128，故 s_cap_side 只会
+         * 返回 ±1、锥面积路径永不触发，区间外像素与慢路径的 continue 等价。 */
+        bool skip_row = false, row_all_pixel = false;
+        if (fast && sweep < 360) {
+            if (uy_a == 0) {
+                int sd = s_cap_side((int64_t)ux_a * dy256, thr_a, 1);
+                if (sd < 0) skip_row = true;
+                else if (sd == 0) row_all_pixel = true;
+            } else {
+                if (xlo_a > xs) xs = xlo_a;
+                if (xhi_a < xe) xe = xhi_a;
+            }
+            if (uy_b == 0) {
+                int sd = s_cap_side((int64_t)ux_b * dy256, thr_b, 0);
+                if (sd < 0) skip_row = true;
+                else if (sd == 0) row_all_pixel = true;
+            } else {
+                if (xlo_b > xs) xs = xlo_b;
+                if (xhi_b < xe) xe = xhi_b;
+            }
+        }
+        if (skip_row || xs > xe) continue;
+
+        /* 径向全满段：xin = isqrt(in_out - dy2) 向下取整到像素。区间
+         * [cx-xin, cx+xin-1] 内 |vx| <= 256*xin - 128 → d2 <= in_out 恒成立
+         * （像素中心 +0.5 偏移使左右不对称），慢路径对这些像素给出 rad==256
+         * → px_set(fg)，直填逐位等价。 */
+        int32_t span_lo = INT32_MAX, span_hi = INT32_MIN;
+        if (fast && !row_all_pixel) {
+            int64_t b_full = in_out - dy2;
+            if (b_full > 0) {
+                int32_t xin = (int32_t)(s_isqrt_fit(b_full) >> 8);
+                span_lo = (int32_t)cx - xin;
+                span_hi = (int32_t)cx + xin - 1;
+                if (sweep < 360) {
+                    if (span_lo < xlo_a) span_lo = xlo_a;
+                    if (span_lo < xlo_b) span_lo = xlo_b;
+                    if (span_hi > xhi_a) span_hi = xhi_a;
+                    if (span_hi > xhi_b) span_hi = xhi_b;
+                }
+                if (span_lo < xs) span_lo = xs;
+                if (span_hi > xe) span_hi = xe;
+                if (span_lo > span_hi) {
+                    span_lo = INT32_MAX;
+                    span_hi = INT32_MIN;
+                }
+            }
+        }
+
         for (int32_t x = xs; x <= xe; x++) {
+            if (x == span_lo && span_hi >= span_lo) {
+                /* 跨度段连续直填（仅 FULL 模式画布；PAGE 条带布局不同，退回
+                 * px_set）。直填语义 = 对每个像素 px_set(fg)，与慢路径的
+                 * rad==256 分支逐位一致，但免去逐像素函数调用 + clip 判断。 */
+                if (!(c->display->caps.buffer_mode & EUI_BUFFER_PAGE)) {
+                    uint16_t *row = (uint16_t *)c->buffer + (uint32_t)y * c->buf_width;
+                    for (int32_t xi = span_lo; xi <= span_hi; xi++)
+                        row[xi] = (uint16_t)c->fg_color;
+                    x = span_hi;
+                    continue;
+                }
+                eui_canvas_px_set(c, (int16_t)x, (int16_t)y, c->fg_color);
+                continue;
+            }
             int32_t vx = ((x * 256) + 128) - cx256;      /* p - c 的 x 分量（有符号） */
             int64_t d2 = (int64_t)vx * vx + dy2;
 
@@ -215,7 +365,7 @@ void eui_canvas_aa_arc(eui_canvas_t *c, int16_t cx, int16_t cy,
             } else if (d2 >= ex_out || d2 <= ex_in) {
                 continue;                               /* 完全在外或完全在孔内 */
             } else {
-                int32_t d256 = (int32_t)eui_canvas_isqrt((uint64_t)d2, 0);
+                int32_t d256 = (int32_t)s_isqrt_fit(d2);
                 rad = 128 + ro256 - d256;
                 if (rad <= 0) continue;
                 if (rad > 256) rad = 256;
