@@ -5,10 +5,13 @@
 #include "driver/gpio.h"
 #include "esp_rom_gpio.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
+#include "esp_memory_utils.h"   /* esp_ptr_dma_capable（write_data 零拷贝分道） */
 #include "driver/pulse_cnt.h"
 #include "driver/ledc.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include <stdlib.h>
 #include <string.h>
 
 /* 传输接口是 void 返回，错误只能记在侧通道：brick 可在关键路径后查询 */
@@ -23,6 +26,75 @@ static void port_note_result(esp_err_t err, const char *what)
 }
 
 int eui_port_esp_idf_last_error(void) { return g_last_error; }
+
+/* === Allocator（esp-idf 自带堆）===
+ * UI 显存/结构对 CPU 访存极敏感：canvas 在 PSRAM 时逐像素/逐行写全走
+ * 32B 缓存行 write-allocate，真机渲染 9ms → ~40ms（48fps → 17fps，实测
+ * 2026-09-26）。故 eui 分配一律**内部 RAM 优先**（S3 全部内部 DRAM 均为
+ * GDMA 可达，SPI 还能零拷贝直发），装不下（内部连续块不足）再回退默认堆
+ * （大块由此落 PSRAM，功能不断只变慢）。PSRAM 留给 app 层自带的大缓冲
+ * （HTTP/web 等，走系统 malloc 的 SPIRAM 路由）与 WiFi（TRY_ALLOCATE_-
+ * WIFI_LWIP）。统计取 MALLOC_CAP_DEFAULT 堆（内部 8bit 区 + PSRAM 区）
+ * 的 free/total，chrome 性能浮层直接显示。
+ *
+ * 大块预留：canvas 115.2KB 是全系统最大的单块请求，但 eui_init 时内部堆
+ * 已被 backend/FS/transport 等先行初始化啃碎（真机 free 165KB 而最大块仅
+ * 72KB），直接申请必败回退 PSRAM。brick 可在 app_main 最开头（一切子系统
+ * 之前）heap_caps_malloc 预留好这块内存，经 eui_port_esp_idf_heap_preset
+ * 交给本分配器；首个 ≥64KB 请求（即 canvas）优先接管之。 */
+static void *s_preset_block;
+static size_t s_preset_size;
+
+void eui_port_esp_idf_heap_preset(void *block, size_t size)
+{
+    s_preset_block = block;
+    s_preset_size = size;
+    ESP_LOGI("eui_port", "heap preset %u B @ %p", (unsigned)size, block);
+}
+
+static void *esp_heap_alloc(size_t size, void *ctx)
+{
+    (void)ctx;
+    if (s_preset_block && size >= 65536 && size <= s_preset_size) {
+        void *p = s_preset_block;          /* canvas 接管预留块 */
+        s_preset_block = NULL;
+        s_preset_size = 0;
+        return p;
+    }
+    void *p = heap_caps_malloc(size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (p == NULL) {
+        p = malloc(size);
+        if (p != NULL && size >= 65536) {
+            ESP_LOGW("eui_port", "%u B alloc fell back to PSRAM "
+                     "(internal largest too small; render will be slow)",
+                     (unsigned)size);
+        }
+    }
+    return p;
+}
+
+static void esp_heap_free(void *ptr, void *ctx)
+{
+    (void)ctx;
+    free(ptr);
+}
+
+static void esp_heap_stats(eui_allocator_stats_t *out, void *ctx)
+{
+    (void)ctx;
+    size_t total = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
+    out->total = total;
+    out->used = total - heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+}
+
+void eui_port_esp_idf_allocator_use(void)
+{
+    static const eui_allocator_t s_heap_alloc = {
+        esp_heap_alloc, esp_heap_free, esp_heap_stats, NULL,
+    };
+    eui_set_allocator(&s_heap_alloc);
+}
+
 
 /* === I2C Implementation ===
  * 仍用 legacy 驱动（i2c_param_config + i2c_cmd_link）：IDF 5.1.5 还没有
@@ -127,6 +199,13 @@ void eui_port_esp_idf_i2c_destroy(eui_hal_i2c_t *hal)
 
 /* === SPI Implementation === */
 
+/* S3 的单条 DMA 事务上限是 SPI_LL_DMA_MAX_BIT_LEN = 2^18 bit = 32KB
+ * （spi_master 的 check_trans_valid 直接拒绝更长的 length）。分块取 16KB
+ * 而非打满 32KB：bounce 暂存与内部堆里其他大块的共存性好得多——canvas
+ * 预留（115.2KB）之后内部 RAM 只剩 ~54KB，32KB 暂存会申请失败导致整机
+ * 起不来（真机实录 2026-09-26）；16KB 每帧 8 个事务，ISR 开销可忽略。 */
+#define SPI_CHUNK_MAX 16384
+
 typedef struct {
     spi_device_handle_t handle;
     gpio_num_t          dc_pin;
@@ -135,6 +214,7 @@ typedef struct {
     bool                cs_owned_by_hw;  /* CS 由 SPI 外设按事务控制时，HAL 不再插手 */
     spi_host_device_t   host;
     bool                bus_initialized; /* 总线所有权在 transport，destroy 时归还 */
+    uint8_t            *bounce;          /* 内部 DMA 暂存（transport 期一次性持有） */
 } spi_priv_t;
 
 static void esp_spi_write_cmd(uint8_t cmd, void *user_data)
@@ -154,21 +234,34 @@ static void esp_spi_write_data(const uint8_t *buf, uint32_t len, void *user_data
     spi_priv_t *priv = (spi_priv_t *)user_data;
     gpio_set_level(priv->dc_pin, 1);
 
-    /* 整帧 115200 字节也走这里。S3 的单条 DMA 事务上限是
-     * SPI_LL_DMA_MAX_BIT_LEN = 2^18 bit = 32KB（spi_master 的
-     * check_trans_valid 直接拒绝更长的 length，与 max_transfer_sz 无关
-     * ——计划期"IDF 自动分片"的结论在 S3 上不成立）。按 32KB 分块发送：
-     * 软件 CS 由驱动持有、跨块保持拉低（一次 RAMWR 连续写的要求）。
-     * 用中断驱动的 spi_device_transmit（DMA 完成信号量挂起任务）而非
-     * polling_transmit（CPU 原地忙等）：整帧约 11.5ms 的传输期 CPU 可
-     * 让出，满载刷屏场景省约 1/4 的 CPU。write_cmd/read_data 仍走
-     * polling（字节级小事务，不值得付 ISR 开销）。 */
-    enum { SPI_CHUNK_MAX = 32768 };
+    /* 整帧 115200 字节也走这里，按 32KB 分块发送：软件 CS 由驱动持有、
+     * 跨块保持拉低（一次 RAMWR 连续写的要求）。用中断驱动的
+     * spi_device_transmit（DMA 完成信号量挂起任务）而非 polling_transmit
+     * （CPU 原地忙等）：整帧约 11.5ms 的传输期 CPU 可让出，满载刷屏场景
+     * 省约 1/4 的 CPU。write_cmd/read_data 仍走 polling（字节级小事务，
+     * 不值得付 ISR 开销）。
+     *
+     * 发送前按 DMA 可达性分道：内部 RAM 源（常态 = canvas：S3 内部 DRAM
+     * 不经缓存、DMA 天然一致，esp_ptr_dma_capable 为 true）直接零拷贝
+     * 提交；其余（PSRAM 源、栈/rodata 小写入）拷进 transport 自有的内部
+     * DMA 暂存。第二道必须存在：PSRAM 缓冲 esp_ptr_dma_capable 为 false，
+     * 驱动会自行 bounce——但那是**每事务**
+     * heap_caps_malloc(32KB, MALLOC_CAP_DMA)+memcpy+free，每帧 3~4 次
+     * 的往复跟其他任务的分配交错，内部堆几十秒内就被蹭碎，从此拿不到
+     * 连续 32KB，整帧刷屏 ESP_ERR_NO_MEM（真机实录：约 29s 起全线失败）。
+     * 一次性持有同尺寸暂存把这笔分配变成零常态开销。 */
     while (len > 0) {
         uint32_t chunk = len > SPI_CHUNK_MAX ? SPI_CHUNK_MAX : len;
+        const void *tx;
+        if (esp_ptr_dma_capable(buf) && ((uintptr_t)buf & 3u) == 0) {
+            tx = buf;                       /* 零拷贝：canvas 常驻内部 RAM */
+        } else {
+            memcpy(priv->bounce, buf, chunk);
+            tx = priv->bounce;
+        }
         spi_transaction_t trans = {
             .length = chunk * 8,
-            .tx_buffer = buf,
+            .tx_buffer = tx,
         };
         port_note_result(spi_device_transmit(priv->handle, &trans), "spi write_data");
         buf += chunk;
@@ -289,6 +382,15 @@ eui_hal_spi_t* eui_port_esp_idf_spi_create(const esp_idf_spi_config_t *cfg)
     priv->cs_owned_by_hw = cfg->hw_cs;
     priv->host = cfg->host;
     priv->bus_initialized = true;
+    /* DMA 暂存一次性持有（write_data 用；PSRAM 画布的非 DMA 缓冲经它过桥） */
+    priv->bounce = heap_caps_malloc(SPI_CHUNK_MAX, MALLOC_CAP_DMA);
+    if (!priv->bounce) {
+        ESP_LOGE("eui_port", "spi bounce buffer (%d B, MALLOC_CAP_DMA) alloc failed", (int)SPI_CHUNK_MAX);
+        spi_bus_remove_device(handle);
+        spi_bus_free(cfg->host);
+        eui_free(priv);
+        return NULL;
+    }
 
     eui_hal_spi_t *hal = eui_malloc(sizeof(eui_hal_spi_t));
     if (!hal) {
@@ -319,6 +421,7 @@ void eui_port_esp_idf_spi_destroy(eui_hal_spi_t *hal)
         if (priv->handle) spi_bus_remove_device(priv->handle);
         /* 不归还总线会让同一 host 再次 create 失败 */
         if (priv->bus_initialized) spi_bus_free(priv->host);
+        free(priv->bounce);
         eui_free(priv);
     }
     eui_free(hal);

@@ -6,6 +6,17 @@
 #include <stdint.h>
 
 /**
+ * @brief Allocation statistics snapshot.
+ */
+typedef struct {
+    size_t total;        /**< Total pool/heap size in bytes. */
+    size_t used;         /**< Currently allocated bytes. */
+    size_t peak;         /**< Peak allocated bytes since init. */
+    size_t alloc_count;  /**< Total number of successful allocations. */
+    size_t free_count;   /**< Total number of frees. */
+} eui_allocator_stats_t;
+
+/**
  * @brief Allocator interface (strategy pattern).
  *
  * Allows the application to substitute the memory allocator used
@@ -25,6 +36,14 @@ typedef struct {
      * @param ctx  User context from eui_allocator_t::ctx.
      */
     void  (*free)(void *ptr, void *ctx);
+    /**
+     * @brief Optional statistics callback (may be NULL).
+     *
+     * When set, eui_allocator_get_stats() routes through it so a
+     * host-system allocator (e.g. esp-idf heap_caps) can report real
+     * free/total instead of the built-in TLSF pool accounting.
+     */
+    void  (*stats)(eui_allocator_stats_t *out, void *ctx);
     void* ctx; /**< Opaque user context passed to alloc/free. */
 } eui_allocator_t;
 
@@ -68,18 +87,10 @@ void eui_allocator_init_tlsf(uint8_t *buffer, size_t size);
 bool eui_allocator_is_initialized(void);
 
 /**
- * @brief Allocation statistics snapshot.
- */
-typedef struct {
-    size_t total;        /**< Total pool size in bytes. */
-    size_t used;         /**< Currently allocated bytes. */
-    size_t peak;         /**< Peak allocated bytes since init. */
-    size_t alloc_count;  /**< Total number of successful allocations. */
-    size_t free_count;   /**< Total number of frees. */
-} eui_allocator_stats_t;
-
-/**
  * @brief Retrieve allocator statistics.
+ *
+ * Custom allocator with a stats callback reports through it（如 esp-idf
+ * 堆的 free/total）；否则报告内置 TLSF 池的用量。
  *
  * @param stats  [out] Pointer to receive the statistics snapshot.
  */

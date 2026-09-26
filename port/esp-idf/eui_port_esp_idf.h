@@ -76,6 +76,21 @@ void    eui_port_esp_idf_backlight_deinit(void);
  *  brick 可在关键路径（如首帧提交）后查询本值做自诊断。 */
 int eui_port_esp_idf_last_error(void);
 
+/** 把 eui 全局分配器切到 esp-idf 自带堆（malloc/free）：≤16KB 落内部
+ *  RAM，>16KB（画布/QR 位图等大块）优先落 PSRAM（需 sdkconfig 开
+ *  CONFIG_SPIRAM，未开时大块仍从内部堆分配，等于放弃隔离池）。
+ *  stats 经 eui_allocator_get_stats 上报 MALLOC_CAP_DEFAULT 堆的
+ *  free/total。必须在首个 eui_malloc 之前调用（取代静态 TLSF 池的
+ *  brick 契约第 0 步）。 */
+void eui_port_esp_idf_allocator_use(void);
+
+/** 大块预留（canvas 专用通道）：app_main 最开头（一切子系统 init 之前）
+ *  heap_caps_malloc(240*240*2, MALLOC_CAP_INTERNAL|8BIT) 申请画布内存并经
+ *  本函数交给 eui 分配器——彼时内部堆最完整，否则到 eui_init 时最大连续
+ *  块已 < canvas 尺寸，画布会静默落 PSRAM（渲染慢 3~4 倍）。分配器把首个
+ *  ≥64KB 的 eui_malloc 请求接管为该块。block 为 NULL = 清除预留。 */
+void eui_port_esp_idf_heap_preset(void *block, size_t size);
+
 /** PCNT 正交计数编码器：half-quad 模式（A 相双沿计数，2 计数/格），
  *  与老固件 ESP32Encoder::attachHalfQuad 的计数倍率一致。
  *  pull_up 通常为 true（多数编码器模块开漏输出）。 */
@@ -138,7 +153,9 @@ typedef struct {
     eui_port_esp_idf_panel_t   panel;    /* 面板类型 + 引脚/时序 */
     eui_port_esp_idf_input_t   input;
     uint16_t fps;                    /* 0 = delay_frame 不做节拍 */
-    uint8_t *mem_pool;               /* 必须 DMA 可达的内部 RAM（SPI DMA 读不了 PSRAM） */
+    uint8_t *mem_pool;               /* 建议 DMA 可达的内部 RAM：PSRAM 池也能跑
+                                        （spi_master 对非 DMA 缓冲自动走内部
+                                        bounce），但整帧传输多一次拷贝 */
     size_t   mem_pool_size;
 } eui_port_esp_idf_board_t;
 

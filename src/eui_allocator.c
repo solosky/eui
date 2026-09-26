@@ -4,7 +4,7 @@
 #include <string.h>
 
 static tlsf_t g_tlsf = NULL;
-static eui_allocator_t g_alloc = { NULL, NULL, NULL };
+static eui_allocator_t g_alloc = { NULL, NULL, NULL, NULL };
 static size_t g_alloc_count = 0;
 static size_t g_free_count = 0;
 static size_t g_peak_used = 0;
@@ -94,6 +94,16 @@ void eui_allocator_get_stats(eui_allocator_stats_t *stats)
 {
     stats->alloc_count = g_alloc_count;
     stats->free_count = g_free_count;
+
+    /* 宿主分配器（如 esp-idf heap_caps）自带统计回调时走它：total/used
+     * 反映宿主堆而非 TLSF 池。alloc/free 计数与 peak 仍归本模块。 */
+    if (g_alloc.stats) {
+        g_alloc.stats(stats, g_alloc.ctx);
+        stats->alloc_count = g_alloc_count;
+        stats->free_count = g_free_count;
+        stats->peak = g_peak_used;
+        return;
+    }
 
     if (g_tlsf) {
         pool_t pool = tlsf_get_pool(g_tlsf);
