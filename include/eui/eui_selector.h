@@ -18,7 +18,10 @@
  * motionc 的 mc_transition（eui 静态库已导出其头文件与链接）。
  */
 
-#define EUI_SELECTOR_MAX_OPTIONS 128
+/* 上限按真实最深的菜单（settings root 15 项）取 16：曾是 128，把
+ * menu_view_t（内嵌 3 组 [MAX_OPTIONS] 数组）撑到 13.9KB——真机 libc 堆
+ * 最大连续块只有 ~7.7KB，calloc 必败（表现为 settings 进不去）。 */
+#define EUI_SELECTOR_MAX_OPTIONS 16
 
 typedef struct {
     int x, y, w, h;               /**< 选项内容矩形与目标选中框 */
