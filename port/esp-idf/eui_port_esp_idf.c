@@ -430,20 +430,20 @@ void eui_port_esp_idf_spi_destroy(eui_hal_spi_t *hal)
 /* === GPIO Implementation === */
 
 typedef struct {
-    uint32_t pin_mask;
+    uint64_t pin_mask;
     bool     active_low;   /* 低电平视为按下（上拉接地按键） */
 } gpio_priv_t;
 
 static bool esp_gpio_read_pin(uint8_t pin_id, void *user_data)
 {
     gpio_priv_t *priv = (gpio_priv_t *)user_data;
-    if (!((((uint32_t)1) << pin_id) & priv->pin_mask)) {
+    if (!(((uint64_t)1 << pin_id) & priv->pin_mask)) {
         /* 曾经静默返回 false——配错掩码时整条输入链路失效却毫无提示 */
         static bool warned;
         if (!warned) {
             warned = true;
-            ESP_LOGW("eui_port", "read_pin(%u) not in pin_mask 0x%08x; input silently dead",
-                     (unsigned)pin_id, (unsigned)priv->pin_mask);
+            ESP_LOGW("eui_port", "read_pin(%u) not in pin_mask 0x%08llx; input silently dead",
+                     (unsigned)pin_id, (unsigned long long)priv->pin_mask);
         }
         return false;
     }
@@ -769,11 +769,11 @@ int eui_port_esp_idf_board_init(const eui_port_esp_idf_board_t *board)
         subs[sub_count++] = g_board.encoder;
     }
     if (board->input.btn_count > 0) {
-        uint32_t mask = 0;
+        uint64_t mask = 0;
         for (uint8_t i = 0; i < board->input.btn_count && i < 4; i++) {
             s_btn_map[i].pin_id = (uint8_t)board->input.btn_pin[i];
             s_btn_map[i].key    = board->input.btn_key[i];
-            mask |= 1u << board->input.btn_pin[i];
+            mask |= (uint64_t)1 << board->input.btn_pin[i];
         }
         esp_idf_gpio_config_t gcfg = {
             .pin_mask = mask,

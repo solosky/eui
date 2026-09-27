@@ -40,7 +40,9 @@ typedef struct {
 } esp_idf_spi_config_t;
 
 typedef struct {
-    uint32_t pin_mask;
+    uint64_t pin_mask;     /* GPIO42 等 >31 的脚必须放进 64 位掩码（IDF gpio_config_t
+                            * 的 pin_bit_mask 同为 64 位）；曾用 32 位导致 (1<<42) 截断、
+                            * 侧键脚未被配置且被读成错误引脚 */
     bool     pull_up;
     bool     pull_down;    /**< 与 pull_up 同时为 true 时下拉优先（掩码内全部生效） */
     bool     active_low;   /**< true = 低电平视为按下（上拉接地按键，如 VAMeter） */
